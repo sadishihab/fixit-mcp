@@ -43,7 +43,13 @@ from pathlib import Path
 import pymupdf
 from pydantic import BaseModel, Field
 
-from fixit_mcp.ingestion.text_repair import repair_run
+from fixit_mcp.ingestion.text_repair import (
+    DominantOffset,
+    TokenRepair,
+    infer_dominant_offset,
+    repair_line_tokens,
+    repair_run,
+)
 
 # PyMuPDF span flag bit for bold text (see pymupdf docs: TextPage.extractDICT).
 _BOLD_FLAG = 1 << 4
@@ -109,9 +115,17 @@ class Line:
     text: str
     font_size: float
     is_bold: bool
-    # Set only when text_repair.repair_run() repaired this line's text (see
-    # _extract_lines_by_page). None means either untouched or not attempted.
+    # Set only when text_repair.repair_run() whole-line-repaired this line's
+    # text (see _extract_lines_by_page). None means either untouched or the
+    # line was never a repair candidate.
     repair_confidence: float | None = None
+    # The offset repair_run() used, when repair_confidence is set. Kept
+    # separately from confidence so a document's dominant offset can be
+    # inferred from many lines' offsets (see text_repair.infer_dominant_offset).
+    repair_offset: int | None = None
+    # Populated only by the token-level repair pass (extract_lines), for
+    # lines whole-run repair left untouched. Empty otherwise.
+    token_repairs: list[TokenRepair] = field(default_factory=list)
 
 
 @dataclass
@@ -333,10 +347,12 @@ def _extract_lines_by_page(doc: pymupdf.Document) -> list[list[Line]]:
                 is_bold = any(s["flags"] & _BOLD_FLAG for s in spans)
 
                 repair_confidence = None
+                repair_offset = None
                 repair = repair_run(text)
                 if repair.was_repaired:
                     text = repair.text
                     repair_confidence = repair.confidence
+                    repair_offset = repair.offset
 
                 lines.append(
                     Line(
@@ -345,23 +361,65 @@ def _extract_lines_by_page(doc: pymupdf.Document) -> list[list[Line]]:
                         font_size=font_size,
                         is_bold=is_bold,
                         repair_confidence=repair_confidence,
+                        repair_offset=repair_offset,
                     )
                 )
         pages.append(lines)
     return pages
 
 
+def dominant_offset_for_pages(pages: list[list[Line]]) -> DominantOffset | None:
+    """The document-wide offset established by run-level repair, if one
+    clearly dominates -- see text_repair.infer_dominant_offset."""
+    offsets = [
+        line.repair_offset for page_lines in pages for line in page_lines if line.repair_offset is not None
+    ]
+    return infer_dominant_offset(offsets)
+
+
+def apply_token_level_repair(pages: list[list[Line]]) -> list[TokenRepair]:
+    """Second repair pass, run after whole-line repair: once a document's
+    dominant offset is established, re-scan lines whole-line repair left
+    untouched for individual corrupted tokens worth fixing (see
+    text_repair.repair_line_tokens). A no-op if no offset dominates -- this
+    never guesses an offset itself, only reuses an already-confirmed one.
+
+    Mutates the given pages' Line objects in place (text and token_repairs)
+    and returns every repair applied, across the whole document.
+    """
+    dominant = dominant_offset_for_pages(pages)
+    if dominant is None:
+        return []
+
+    all_repairs: list[TokenRepair] = []
+    for page_lines in pages:
+        for line in page_lines:
+            if line.repair_confidence is not None:
+                continue  # already whole-line repaired; nothing left to fix
+            new_text, repairs = repair_line_tokens(line.text, dominant.offset)
+            if repairs:
+                line.text = new_text
+                line.token_repairs = repairs
+                all_repairs.extend(repairs)
+    return all_repairs
+
+
 def extract_lines(pdf_path: str | Path) -> list[list[Line]]:
-    """Open a manual PDF and extract its lines (with text-repair already
-    applied). Exposed separately from parse_manual so callers can inspect
-    per-line repair_confidence -- e.g. to report how many lines were
-    repaired, and at what confidence -- without duplicating the extraction
-    logic."""
+    """Open a manual PDF and extract its lines, with both repair passes
+    already applied: whole-line repair during extraction, then token-level
+    repair once the document's dominant offset (if any) is known. Exposed
+    separately from parse_manual so callers can inspect per-line
+    repair_confidence/token_repairs -- e.g. to report how many lines/tokens
+    were repaired, and at what confidence -- without duplicating the
+    extraction logic."""
     doc = pymupdf.open(pdf_path)
     try:
-        return _extract_lines_by_page(doc)
+        pages = _extract_lines_by_page(doc)
     finally:
         doc.close()
+
+    apply_token_level_repair(pages)
+    return pages
 
 
 def parse_manual(pdf_path: str | Path, manual_meta: ManualMeta) -> list[ManualChunk]:

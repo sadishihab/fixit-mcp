@@ -90,6 +90,19 @@ Alexa+ MCP Toolkit and helps customers with home appliances:
   (case-swap offsets, substring-match coincidences) and the known remaining
   limitation (a clean-prefix + corrupted-suffix run with no separating space
   is correctly left untouched rather than partially repaired).
+  `infer_dominant_offset()`/`repair_line_tokens()` add a second, token-level
+  pass for exactly that remaining case at the *sub-line* granularity: once a
+  document's one true offset is established from many whole-line repairs
+  (never guessed from a single short token), a short token with a strong
+  corruption signal (a stray control character, or `&`/`'` next to a
+  letter/digit — **not** `(`/`)`, which are too common next to ordinary
+  numbers and caused real false positives, see `FRICTION_LOG.md`) is
+  repaired on its own; a weaker one (a bare short number) is only repaired
+  when it shares a line with a strong-signal sibling, so an ordinary
+  quantity like "wait 5 minutes" is never touched. Still can't fix a
+  corruption boundary that falls *inside* a single whitespace-delimited
+  token (no space to split on) — the GE fridge's `AUTO FILL<corrupted
+  tail>` case remains a known limitation for that reason.
 
 ## Testing
 

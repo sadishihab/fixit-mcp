@@ -390,3 +390,90 @@ Template for each entry:
   tail) rather than an all-or-nothing whole-line decision -- worth doing if
   this pattern turns out to be common across a larger manual corpus, not
   worth the added complexity for the two manuals seen so far.
+
+### 2026-09-23 — the "leftover" garbled short tokens were the same +31 cipher, not a separate quirk (confirmed before building)
+
+- **Tool/SDK**: N/A (arithmetic verification), `fixit_mcp.ingestion.text_repair`.
+- **Task attempted**: Before writing any token-level repair code, verify
+  whether the remaining garbled short tokens on LG's Error Code table
+  (`U&`, `14`, `1'`, `O1`) were the same already-confirmed +31 corruption, or
+  a distinct font/glyph issue as speculated in the prior step's friction log.
+- **Steps taken**: Shifted each token by +31 by hand and independently in
+  Python, then checked the results against context and LG's own published
+  dryer error-code terminology.
+- **Expected**: Uncertain -- the prior step's friction log had flagged these
+  as "a separate, still-unexplained third font quirk."
+- **Actual**: Same cipher. `U&`+31 = `tE` (matches its row's cause,
+  "Temperature sensor failure" -- LG's real code is `tE1`/`tE2`); `14`+31 =
+  `PS`, `1'`+31 = `PF`, `O1`+31 = `nP` -- all three are genuine LG
+  power-supply-fault codes, matching that row's causes exactly. They were
+  never touched by whole-line repair because each sits on a line with
+  already-clean English (`"or"`), so shifting the *whole* line by any offset
+  would corrupt that clean word -- the noise gate correctly vetoes it, same
+  root cause as the GE "AUTO FILL&lt;corrupted tail&gt;" case already logged.
+- **Severity**: N/A (confirmation, not friction) -- logged because it
+  directly justified building token-level repair as a real fix for a
+  correctly-identified problem, rather than chasing a hypothetical unrelated
+  font bug.
+- **Actionable suggestion**: N/A.
+
+### 2026-09-23 — parentheses are far too common next to real numbers to trust as a corruption signal
+
+- **Tool/SDK**: `fixit_mcp.ingestion.text_repair.repair_line_tokens` (this
+  project's own code).
+- **Task attempted**: Detect a short corrupted token via "mixes letters with
+  symbols like `&` `'` `(` `)` in a word position," per the task's own
+  suggested signal list.
+- **Steps taken**: Implemented the signal literally (all four symbols),
+  then ran it against the real GE refrigerator and LG dryer manuals (not
+  just the four target tokens) before trusting it.
+- **Expected**: A modest number of additional genuine repairs.
+- **Actual**: Dozens of false positives, all on completely ordinary text:
+  unit conversions (`(35.6` next to `cm)`, from "14 in. (35.6 cm)"),
+  numbered list markers (`(1)`, `(2)`), and catalog abbreviations (`(SD)`
+  for "Standard Depth"). Parentheses sit directly next to digits and letters
+  constantly in normal English; `&` and `'` next to a letter/digit do not
+  (outside real contractions, which are excluded separately).
+- **Severity**: High if shipped -- would have silently corrupted ordinary
+  measurements and list markers throughout both manuals.
+- **Workaround**: Dropped `(` and `)` from the strong-signal symbol set,
+  keeping only `&` and `'`. Re-verified against the full corpus afterward:
+  zero token repairs on the three manuals with no known corruption, and the
+  false positives on the two affected manuals disappeared.
+- **Actionable suggestion**: When a task specification lists example
+  detection signals, test each one individually against real data before
+  combining them -- "the task suggested it" isn't the same as "it's safe on
+  this corpus." Symbols that are rare-next-to-alphanumerics in the *target*
+  language's corruption pattern can still be common-next-to-alphanumerics in
+  ordinary prose.
+
+### 2026-09-23 — the real target tokens have a control character glued on, so "becomes pure alphabetic" was the wrong acceptance test
+
+- **Tool/SDK**: `fixit_mcp.ingestion.text_repair._repair_token`.
+- **Task attempted**: Verify token-level repair against the *actual* PDF
+  content, not just the four token strings quoted in the task, before
+  declaring it done.
+- **Steps taken**: Ran the finished repair pass on the real LG dryer PDF and
+  checked whether the "U& or U&" line in the output chunk was actually fixed.
+- **Expected**: `U&` -> `tE` on both occurrences, per the already-verified
+  arithmetic.
+- **Actual**: Still broken. The real extracted line is
+  `"U&\x12 or U&\x13"` -- LG's superscript code markers (`tE1`, `tE2`) are
+  attached directly to `U&` with no space, so `\x12`/`\x13` are part of the
+  *same token*. `\x12`+31 = `"1"` and `\x13`+31 = `"2"`, so the correct
+  decode is `tE1`/`tE2` -- which **ends in a digit**. The acceptance rule at
+  the time only accepted a shift that produced a purely alphabetic result
+  (`str.isalpha()`), so it rejected the correct decode outright.
+- **Severity**: Medium -- would have silently left the exact codes this step
+  was built to fix still broken, while apparently "working" on every other
+  test case.
+- **Workaround**: Changed the acceptance test from "becomes purely
+  alphabetic" to "becomes a clean alphanumeric token with no leftover
+  control characters" (`str.isalnum()`), since several of this cipher's real
+  targets are a short abbreviation plus a trailing digit, not pure letters.
+  Added the exact `"U&\x12 or U&\x13"` line as a regression test.
+- **Actionable suggestion**: Always test a fix against the literal bytes
+  extracted from the source document, not a cleaned-up version of the
+  example quoted in a task description -- real PDF text carries adjacent
+  artifacts (here, an attached control-character digit with no separating
+  space) that a hand-typed test string won't reproduce.

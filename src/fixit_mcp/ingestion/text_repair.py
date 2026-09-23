@@ -48,6 +48,30 @@ FILL<corrupted tail>") -- shifting the whole run by any single offset
 corrupts the clean part, which reliably fails the noise gate for every
 candidate, so the run is correctly left untouched rather than "fixed" into
 something worse.
+
+Step 2d: token-level repair for the same mixed-run case. A line like
+"14 or 1' or O1" (LG dryer, page 31) never gets whole-run repaired, because
+"or" is already clean English and shifting the whole line by any offset
+would corrupt it -- exactly the mixed-run case above. But "1'" and "O1" are
+themselves corrupted (same +31 cipher: "1'" -> "PF", "O1" -> "nP", real LG
+power-supply codes; "U&" -> "tE" in a sibling line, matching its row's
+"Temperature sensor failure" cause), just too short for word-matching or
+letter-frequency scoring to judge on their own. `infer_dominant_offset` first
+confirms, from the many already-repaired lines in this document, which single
+offset this whole document actually uses (only proceeding if one offset
+clearly dominates -- token-level repair never runs on an offset guessed from
+a single short token). `repair_line_tokens` then re-scans lines that whole-run
+repair skipped, token by token, against that one already-trusted document
+offset: a token with a strong corruption signal (a stray control character,
+or a letter/digit sitting next to `&'()`, e.g. "U&", "1'") is always a
+candidate; a weaker one (e.g. a bare short digit token like "14") is only a
+candidate when it shares a line with a strong-signal sibling -- otherwise an
+ordinary number like the "5" in "wait 5 minutes" would also qualify, since
+almost any short digit token becomes alphabetic under a large-enough offset.
+A candidate is only repaired if shifting it by the document's dominant offset
+turns it from not-purely-alphabetic into purely alphabetic (the token-level
+signature of this cipher) or, for a control-char-bearing token, into an exact
+common word -- never merely because it "looks different."
 """
 
 from __future__ import annotations
@@ -300,3 +324,164 @@ def repair_run(text: str) -> RepairResult:
         offset=best_offset,
         confidence=_confidence(best_shifted),
     )
+
+
+# --- Step 2d: document-level dominant offset + token-level repair ----------
+
+# A document's offset only "clearly dominates" if at least this many lines
+# were confidently repaired at it, and it accounts for at least this share of
+# every repair in the document -- both required so a handful of repairs (or a
+# near-even split across two offsets) never triggers token-level repair on a
+# guess.
+_MIN_REPAIRS_FOR_DOMINANT_OFFSET = 5
+_MIN_DOMINANT_SHARE = 0.8
+
+_TRAILING_PUNCT = ".,;:!?"
+_CONTRACTION_SUFFIXES = ("'t", "'s", "'re", "'ll", "'ve", "'d", "'m")
+# NOTE: '(' and ')' were tried here too (per the task's own examples) and
+# dropped after testing against the real corpus: parentheses sit directly
+# next to digits/letters constantly in totally normal text -- unit
+# conversions ("14 in. (35.6 cm)"), list markers ("(1)"), catalog
+# abbreviations ("(SD)") -- and treating that adjacency as strong evidence
+# produced dozens of false positives on ordinary numbers. '&' and \"'\" next
+# to a letter/digit are far rarer outside this exact corruption. See
+# FRICTION_LOG.md.
+_STRONG_SYMBOL_ADJACENCY_RE = re.compile(r"[A-Za-z0-9][&']|[&'][A-Za-z0-9]")
+_WEAK_TOKEN_MAX_LEN = 4
+
+
+@dataclass
+class DominantOffset:
+    """The single offset that clearly dominates a document's run-level
+    repairs, with the evidence behind that call."""
+
+    offset: int
+    count: int
+    total_repaired: int
+    share: float
+
+
+@dataclass
+class TokenRepair:
+    """One token-level repair applied by repair_line_tokens."""
+
+    original: str
+    repaired: str
+    confidence: float
+
+
+def infer_dominant_offset(offsets: list[int]) -> DominantOffset | None:
+    """Given the offsets of every confidently run-level-repaired line in a
+    document, return the one offset that clearly dominates -- or None if
+    there isn't enough evidence, or no single offset clearly wins."""
+    if len(offsets) < _MIN_REPAIRS_FOR_DOMINANT_OFFSET:
+        return None
+
+    counts: dict[int, int] = {}
+    for offset in offsets:
+        counts[offset] = counts.get(offset, 0) + 1
+    best_offset, best_count = max(counts.items(), key=lambda item: item[1])
+    share = best_count / len(offsets)
+    if share < _MIN_DOMINANT_SHARE:
+        return None
+
+    return DominantOffset(offset=best_offset, count=best_count, total_repaired=len(offsets), share=share)
+
+
+def _strip_trailing_punct(token: str) -> tuple[str, str]:
+    core = token.rstrip(_TRAILING_PUNCT)
+    return core, token[len(core) :]
+
+
+def _looks_like_contraction(core: str) -> bool:
+    lowered = core.lower()
+    return "'" in core and any(lowered.endswith(suffix) for suffix in _CONTRACTION_SUFFIXES)
+
+
+def _token_has_strong_signal(token: str) -> bool:
+    """Strong evidence a token is corrupted, valid on its own without needing
+    a corrupted sibling in the same line: a stray control character, or a
+    letter/digit sitting directly next to &'() -- normal English essentially
+    never does this outside a contraction like "don't"."""
+    if not token:
+        return False
+    if _has_stray_control_char(token):
+        return True
+    core, _ = _strip_trailing_punct(token)
+    if not core or _looks_like_contraction(core):
+        return False
+    return bool(_STRONG_SYMBOL_ADJACENCY_RE.search(core))
+
+
+def _token_has_weak_signal(token: str) -> bool:
+    """Weaker evidence, only trusted when a strong-signal sibling is present
+    on the same line (see repair_line_tokens): a short token that mixes
+    letters and digits, or is a bare short number -- either digits landing on
+    letters under a shift, which is this cipher's signature, but also
+    exactly what an ordinary short quantity ("5", "24") looks like, hence the
+    sibling requirement."""
+    core, _ = _strip_trailing_punct(token)
+    if not core or core.isalpha() or not core.isalnum():
+        return False
+    return len(core) <= _WEAK_TOKEN_MAX_LEN and any(c.isdigit() for c in core)
+
+
+def _repair_token(token: str, dominant_offset: int) -> tuple[str, float] | None:
+    core, suffix = _strip_trailing_punct(token)
+    if not core:
+        return None
+    shifted_core = _shift(core, dominant_offset)
+    if not shifted_core or shifted_core == core or _has_stray_control_char(shifted_core):
+        return None
+
+    if shifted_core.isalnum():
+        # The signature effect of this cipher: digits/symbols/control chars
+        # land on ordinary letters-and-digits under the document's one
+        # known-real offset -- e.g. "14" -> "PS", or "U&\x12" (a control
+        # character directly follows, no space) -> "tE1", a real LG error
+        # code. Deliberately isalnum(), not isalpha(): several of this
+        # cipher's real targets are a short abbreviation plus a trailing
+        # digit (tE1, tE2), not pure letters. Short tokens (<=2 chars) get a
+        # lower confidence -- there's less evidence per token to be sure of.
+        confidence = 0.5 if len(core) <= 2 else 0.65
+        return shifted_core + suffix, confidence
+
+    if _has_stray_control_char(core) and shifted_core.lower() in _COMMON_WORDS:
+        return shifted_core + suffix, 0.8
+
+    return None
+
+
+def repair_line_tokens(text: str, dominant_offset: int) -> tuple[str, list[TokenRepair]]:
+    """Second-pass, token-level repair for a line that whole-run repair left
+    untouched (typically because it mixes already-clean words with a
+    corrupted token, which fails repair_run's noise gate for every offset).
+
+    Only ever applied against the document's already-established dominant
+    offset (see infer_dominant_offset) -- this function never searches for an
+    offset itself.
+    """
+    parts = re.split(r"(\s+)", text)
+    token_positions = range(0, len(parts), 2)
+
+    any_strong_signal = any(_token_has_strong_signal(parts[i]) for i in token_positions)
+
+    repairs: list[TokenRepair] = []
+    for i in token_positions:
+        token = parts[i]
+        if not token:
+            continue
+        is_candidate = _token_has_strong_signal(token) or (
+            any_strong_signal and _token_has_weak_signal(token)
+        )
+        if not is_candidate:
+            continue
+
+        result = _repair_token(token, dominant_offset)
+        if result is None:
+            continue
+        repaired_token, confidence = result
+        repairs.append(TokenRepair(original=token, repaired=repaired_token, confidence=confidence))
+        parts[i] = repaired_token
+
+    return "".join(parts), repairs

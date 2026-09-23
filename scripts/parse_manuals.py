@@ -17,9 +17,16 @@ from pathlib import Path
 
 import yaml
 
-from fixit_mcp.ingestion.parser import ManualChunk, ManualMeta, extract_lines, parse_manual
+from fixit_mcp.ingestion.parser import (
+    ManualChunk,
+    ManualMeta,
+    dominant_offset_for_pages,
+    extract_lines,
+    parse_manual,
+)
 
 LOW_CONFIDENCE_REPAIR_THRESHOLD = 0.6
+LOW_CONFIDENCE_TOKEN_THRESHOLD = 0.6
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 MANIFEST_PATH = REPO_ROOT / "data" / "manuals" / "manifest.yaml"
@@ -53,8 +60,28 @@ def summarize(manual_id: str, chunks: list[ManualChunk], pdf_path: Path) -> str:
     if repaired:
         repair_summary += f" ({len(low_confidence)} below {LOW_CONFIDENCE_REPAIR_THRESHOLD} confidence)"
 
+    dominant = dominant_offset_for_pages(lines_by_page)
+    token_repairs = [tr for line in all_lines for tr in line.token_repairs]
+    low_confidence_tokens = [tr for tr in token_repairs if tr.confidence < LOW_CONFIDENCE_TOKEN_THRESHOLD]
+
+    token_summary_lines = []
+    if dominant is not None:
+        token_summary_lines.append(
+            f"  dominant document offset: {dominant.offset:+d} "
+            f"({dominant.count}/{dominant.total_repaired} repaired lines, {dominant.share:.0%})"
+        )
+    token_summary_lines.append(
+        f"  token-level repairs applied: {len(token_repairs)} "
+        f"({len(low_confidence_tokens)} below {LOW_CONFIDENCE_TOKEN_THRESHOLD} confidence)"
+    )
+    if low_confidence_tokens:
+        token_summary_lines.append("  low-confidence token repairs (eyeball these):")
+        for tr in low_confidence_tokens:
+            token_summary_lines.append(f"    {tr.original!r} -> {tr.repaired!r} (confidence {tr.confidence})")
+    token_summary = "\n".join(token_summary_lines)
+
     if not chunks:
-        return f"{manual_id}: 0 chunks (nothing extracted)\n{repair_summary}"
+        return f"{manual_id}: 0 chunks (nothing extracted)\n{repair_summary}\n{token_summary}"
 
     pages_covered = {p for c in chunks for p in range(c.page_start, c.page_end + 1)}
     table_like = [c for c in chunks if c.is_table]
@@ -73,6 +100,7 @@ def summarize(manual_id: str, chunks: list[ManualChunk], pdf_path: Path) -> str:
         f"({longest.chunk_id}, pages {longest.page_start}-{longest.page_end})",
         f"  avg chunk length: {sum(lengths) / len(lengths):.0f} chars",
         repair_summary,
+        token_summary,
     ]
     return "\n".join(lines)
 

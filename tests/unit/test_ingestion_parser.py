@@ -1,7 +1,9 @@
 from fixit_mcp.ingestion.parser import (
     Line,
     Section,
+    apply_token_level_repair,
     build_sections,
+    dominant_offset_for_pages,
     find_boilerplate,
     heading_info,
     is_allcaps_heading,
@@ -15,6 +17,17 @@ BODY_SIZE = 10.0
 
 def make_line(text: str, font_size: float = BODY_SIZE, is_bold: bool = False, page_no: int = 1) -> Line:
     return Line(page_no=page_no, text=text, font_size=font_size, is_bold=is_bold)
+
+
+def make_repaired_line(text: str, offset: int, page_no: int = 1) -> Line:
+    return Line(
+        page_no=page_no,
+        text=text,
+        font_size=BODY_SIZE,
+        is_bold=False,
+        repair_confidence=0.8,
+        repair_offset=offset,
+    )
 
 
 # --- heading detection ---------------------------------------------------
@@ -238,3 +251,38 @@ def test_looks_like_table_rejects_ordinary_prose() -> None:
     text = "This appliance must be grounded for safe operation in all households."
 
     assert looks_like_table(text) is False
+
+
+# --- document-level dominant offset + token-level repair wiring (step 2d) ---
+
+
+def test_dominant_offset_for_pages_none_without_enough_repaired_lines() -> None:
+    pages = [[make_line("Some ordinary line."), make_line("Another ordinary line.")]]
+
+    assert dominant_offset_for_pages(pages) is None
+
+
+def test_apply_token_level_repair_is_a_noop_without_a_dominant_offset() -> None:
+    """No lines in these pages were ever whole-run repaired (repair_offset is
+    None everywhere), so there's no document-wide offset to trust -- the
+    token pass must not guess one from a single suspicious-looking line."""
+    target = make_line("14 or 1' or O1")
+    pages = [[target]]
+
+    repairs = apply_token_level_repair(pages)
+
+    assert repairs == []
+    assert target.text == "14 or 1' or O1"
+    assert target.token_repairs == []
+
+
+def test_apply_token_level_repair_fixes_tokens_once_offset_is_established() -> None:
+    established = [make_repaired_line(f"Genuinely repaired line number {i}.", offset=31) for i in range(6)]
+    target = make_line("14 or 1' or O1")
+    pages = [[*established, target]]
+
+    repairs = apply_token_level_repair(pages)
+
+    assert target.text == "PS or PF or nP"
+    assert len(repairs) == 3
+    assert target.token_repairs == repairs
