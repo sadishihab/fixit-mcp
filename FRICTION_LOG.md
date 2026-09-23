@@ -524,3 +524,52 @@ Template for each entry:
   to "sections that look like the kind of content we're actually trying to
   fix" (not just "this line, or a strong-enough neighbor") is the more
   robust rule, and reused an existing heuristic rather than adding a new one.
+
+### 2026-09-23 — two layered blockers kept the Bedrock verification step from running live
+
+- **Tool/SDK**: `boto3`, Amazon Bedrock (`bedrock`, `bedrock-runtime`), AWS STS.
+- **Task attempted**: Run `BedrockExtractor` for real against the LG dryer
+  manual's chunks and show the raw extracted records, per the step's own
+  instructions, before running it against all five manuals.
+- **Steps taken**, in order, verifying each layer before moving to the next
+  rather than guessing past it:
+  1. Checked for AWS credentials before attempting a live call: no
+     `~/.aws` directory, no `AWS_*` env vars, `boto3.Session().get_credentials()`
+     returned `None`. Stopped and asked the user rather than fabricate a
+     result -- this sandbox has no way to authenticate to AWS on its own.
+  2. User supplied IAM access keys. Verified them with `sts.get_caller_identity()`
+     (confirmed account + IAM user, without ever printing the secret key back)
+     before doing anything else with them.
+  3. Listed available Bedrock models (`bedrock.list_foundation_models`) to
+     confirm the configured default (`anthropic.claude-sonnet-5`) actually
+     exists and is `ACTIVE` in this account/region -- it does.
+  4. Attempted one minimal real `converse()` call before running the full
+     extraction, specifically to catch a permissions/access problem cheaply
+     rather than discover it mid-batch.
+- **Actual**: Step 4 failed: `AccessDeniedException` -- "Your account is
+  currently being verified. Verification normally takes less than 2 hours."
+  This is a brand-new AWS account still in Amazon's own fraud/abuse
+  verification pipeline, unrelated to IAM permissions or model access
+  entitlement (both of which checked out fine in steps 2-3).
+- **Severity**: N/A -- an external account-state constraint neither side of
+  this conversation can resolve directly, correctly surfaced rather than
+  worked around by substituting stub output and presenting it as if it came
+  from Bedrock.
+- **Workaround**: None available immediately. `BedrockExtractor` itself was
+  already fully built and verified end-to-end against a mocked
+  `bedrock-runtime` client before any of this (parsing, schema validation,
+  and the bounded retry path all covered by `tests/unit/test_extraction.py`,
+  19 tests, zero AWS credentials required), so the code is ready the moment
+  the account clears verification -- `make extract-codes MANUAL=lg-dlex8000w-dryer`
+  with `FIXIT_EXTRACTOR=bedrock` is the command to run then. Proceeding with
+  everything else finished and committed now, per the user's choice, rather
+  than blocking further work on an AWS-side clock neither of us controls.
+- **Actionable suggestion**: For a project meant to run in varied
+  environments (a contributor's laptop, CI, a hackathon judge's sandbox), a
+  README note on which commands need real AWS credentials+access (`make
+  extract-codes` with `FIXIT_EXTRACTOR=bedrock`) versus which don't (every
+  other Makefile target, including `FIXIT_EXTRACTOR=stub`) saves this exact
+  back-and-forth. Separately: a cheap one-call permission/access smoke test
+  (like step 4 above) before a real batch job is worth doing by default, not
+  just when troubleshooting -- it turned a potentially confusing failure
+  partway through a 5-manual run into a single, clear, upfront answer.

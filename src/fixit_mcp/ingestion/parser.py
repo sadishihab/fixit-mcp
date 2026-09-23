@@ -113,6 +113,9 @@ class ManualChunk(BaseModel):
     """One section-bounded, size-limited slice of a parsed manual."""
 
     manual_id: str
+    brand: str
+    model: str
+    appliance_type: str
     chunk_id: str
     text: str
     page_start: int = Field(description="1-indexed page the chunk starts on.")
@@ -290,7 +293,7 @@ def build_sections(pages: list[list[Line]]) -> list[Section]:
 
 
 def split_section_into_chunks(
-    section: Section, manual_id: str, next_chunk_index: list[int]
+    section: Section, manual_meta: ManualMeta, next_chunk_index: list[int]
 ) -> list[ManualChunk]:
     """Split one section's lines into <=MAX_CHUNK_CHARS chunks with overlap.
     Never crosses a section boundary -- this is only ever called with the
@@ -299,6 +302,7 @@ def split_section_into_chunks(
     if not lines:
         return []
 
+    manual_id = manual_meta.id
     is_table = looks_like_table("\n".join(line.text for line in lines))
     chunks: list[ManualChunk] = []
     n = len(lines)
@@ -322,6 +326,9 @@ def split_section_into_chunks(
         chunks.append(
             ManualChunk(
                 manual_id=manual_id,
+                brand=manual_meta.brand,
+                model=manual_meta.model,
+                appliance_type=manual_meta.appliance_type,
                 chunk_id=f"{manual_id}::chunk-{next_chunk_index[0]:04d}",
                 text="\n".join(line.text for line in chunk_lines),
                 page_start=chunk_lines[0].page_no,
@@ -479,5 +486,5 @@ def parse_manual(pdf_path: str | Path, manual_meta: ManualMeta) -> list[ManualCh
     chunks: list[ManualChunk] = []
     next_chunk_index = [0]
     for section in sections:
-        chunks.extend(split_section_into_chunks(section, manual_meta.id, next_chunk_index))
+        chunks.extend(split_section_into_chunks(section, manual_meta, next_chunk_index))
     return chunks

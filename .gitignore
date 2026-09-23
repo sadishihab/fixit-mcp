@@ -16,3 +16,7 @@ data/manuals/pdf/
 
 # Parsed manual chunks (derived from the PDFs above by scripts/parse_manuals.py).
 data/manuals/parsed/
+
+# Per-chunk extraction cache (scripts/extract_codes.py) -- derived, not the
+# artifact. data/index/error_codes.json itself IS committed.
+data/index/.extract_cache/

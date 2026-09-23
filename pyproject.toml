@@ -19,6 +19,7 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
+    "boto3>=1.43.100",
     "httpx>=0.28.1",
     "pymupdf>=1.28.2",
     "pypdf>=6.19.0",

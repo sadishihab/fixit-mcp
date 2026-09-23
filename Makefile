@@ -1,4 +1,4 @@
-.PHONY: run test lint format inspector tunnel fetch-manuals parse-manuals
+.PHONY: run test lint format inspector tunnel fetch-manuals parse-manuals extract-codes
 
 run:
 	uv run python -m fixit_mcp
@@ -32,3 +32,11 @@ fetch-manuals:
 # data/manuals/parsed/<manual_id>.json. Run `make fetch-manuals` first.
 parse-manuals:
 	uv run python scripts/parse_manuals.py
+
+# Extracts structured error-code records from data/manuals/parsed/*.json into
+# data/index/error_codes.json (committed). Defaults to FIXIT_EXTRACTOR=stub
+# (no AWS needed); set FIXIT_EXTRACTOR=bedrock to use Amazon Bedrock instead.
+# Pass MANUAL=<manual_id> to process just one manual, FORCE=1 to bypass the
+# per-chunk cache.
+extract-codes:
+	uv run python scripts/extract_codes.py $(if $(MANUAL),--manual $(MANUAL),) $(if $(FORCE),--force,)

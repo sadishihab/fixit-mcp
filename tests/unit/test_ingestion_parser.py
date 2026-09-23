@@ -1,5 +1,6 @@
 from fixit_mcp.ingestion.parser import (
     Line,
+    ManualMeta,
     Section,
     apply_token_level_repair,
     build_sections,
@@ -13,6 +14,7 @@ from fixit_mcp.ingestion.parser import (
 )
 
 BODY_SIZE = 10.0
+MANUAL_META = ManualMeta(id="manual-x", brand="Acme", model="X100", appliance_type="oven")
 
 
 def make_line(text: str, font_size: float = BODY_SIZE, is_bold: bool = False, page_no: int = 1) -> Line:
@@ -181,7 +183,7 @@ def test_split_section_into_chunks_respects_max_size() -> None:
     long_lines = [make_line(f"line number {i} with some filler text to add length") for i in range(200)]
     section = Section(heading="Big Section", section_path=["Big Section"], lines=long_lines)
 
-    chunks = split_section_into_chunks(section, "manual-x", [0])
+    chunks = split_section_into_chunks(section, MANUAL_META, [0])
 
     assert len(chunks) > 1
     for chunk in chunks:
@@ -192,7 +194,7 @@ def test_split_section_into_chunks_overlaps_consecutive_chunks() -> None:
     long_lines = [make_line(f"unique line {i:04d} padding padding padding") for i in range(150)]
     section = Section(heading="Big Section", section_path=["Big Section"], lines=long_lines)
 
-    chunks = split_section_into_chunks(section, "manual-x", [0])
+    chunks = split_section_into_chunks(section, MANUAL_META, [0])
 
     assert len(chunks) >= 2
     first_lines = set(chunks[0].text.splitlines())
@@ -205,8 +207,8 @@ def test_split_section_into_chunks_never_merges_two_sections() -> None:
     section_b = Section(heading="B", section_path=["B"], lines=[make_line("short b")])
 
     counter = [0]
-    chunks_a = split_section_into_chunks(section_a, "manual-x", counter)
-    chunks_b = split_section_into_chunks(section_b, "manual-x", counter)
+    chunks_a = split_section_into_chunks(section_a, MANUAL_META, counter)
+    chunks_b = split_section_into_chunks(section_b, MANUAL_META, counter)
 
     assert len(chunks_a) == 1
     assert len(chunks_b) == 1
@@ -220,7 +222,7 @@ def test_split_section_assigns_page_start_and_end_from_its_lines() -> None:
     lines = [make_line("first", page_no=5), make_line("second", page_no=6), make_line("third", page_no=7)]
     section = Section(heading="S", section_path=["S"], lines=lines)
 
-    chunks = split_section_into_chunks(section, "manual-x", [0])
+    chunks = split_section_into_chunks(section, MANUAL_META, [0])
 
     assert chunks[0].page_start == 5
     assert chunks[0].page_end == 7
@@ -229,7 +231,7 @@ def test_split_section_assigns_page_start_and_end_from_its_lines() -> None:
 def test_split_section_on_empty_lines_returns_no_chunks() -> None:
     section = Section(heading="Empty", section_path=["Empty"], lines=[])
 
-    assert split_section_into_chunks(section, "manual-x", [0]) == []
+    assert split_section_into_chunks(section, MANUAL_META, [0]) == []
 
 
 # --- table detection -------------------------------------------------

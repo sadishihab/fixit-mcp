@@ -112,6 +112,25 @@ Alexa+ MCP Toolkit and helps customers with home appliances:
   token-level repair under 0.6 confidence is also recorded on its
   `ManualChunk.uncertain_repairs` (original + repaired + confidence) so a
   downstream consumer isn't forced to trust a low-confidence repair blindly.
+- `fixit_mcp.ingestion.extraction` (`scripts/extract_codes.py`, `make
+  extract-codes`) turns `data/manuals/parsed/*.json` chunks into structured
+  `ErrorCodeRecord`s, written to `data/index/error_codes.json` (**committed**
+  -- this is the artifact a future MCP tool will load, unlike everything
+  else under `data/`). Two extractors share one interface, selected via
+  `FIXIT_EXTRACTOR=stub|bedrock`: `StubExtractor` is a deterministic,
+  no-network regex matcher (used by tests and by anyone without AWS) that
+  only ever fills in `error_code`/`code_normalized` -- it never guesses at
+  meaning/causes/steps/parts/warnings, since a fixed regex has no honest
+  basis to; `BedrockExtractor` calls Amazon Bedrock (Claude) via boto3 with a
+  strict JSON schema, validates with pydantic, retries a bounded number of
+  times on malformed output, and returns `[]` rather than ever guessing when
+  a chunk has no real codes or every retry still fails. Both are still
+  offline ingestion tooling only -- extraction never runs inside a tool
+  handler (rule 3 above). The extraction prompt is told about a chunk's
+  `uncertain_repairs` explicitly and instructed to distrust a repaired token
+  that doesn't make sense as part of a code. Per-chunk extraction is cached
+  by content hash (`data/index/.extract_cache/`, gitignored) so re-runs cost
+  nothing once a chunk hasn't changed.
 
 ## Testing
 
@@ -129,9 +148,11 @@ Alexa+ MCP Toolkit and helps customers with home appliances:
 
 ## What's explicitly out of scope for the current milestone
 
-Manual PDFs are now fetched (`fixit_mcp.repository`, step 2a) and parsed into
-chunks (`fixit_mcp.ingestion.parser`, step 2b), but nothing downstream of
-that yet: no embeddings, no retrieval/RAG, no error-code extraction tool, no
-Bedrock/Strands, no AWS deployment, no auth/account linking, no MCP Apps UI,
-no web client. See `docs/alexa-plus-requirements.md` for the full
+Manual PDFs are fetched (`fixit_mcp.repository`, step 2a), parsed into chunks
+(`fixit_mcp.ingestion.parser`, step 2b-2e), and structured error codes are
+extracted into a committed index (`fixit_mcp.ingestion.extraction`, step
+3a) -- but nothing downstream of that yet: no MCP tool reads
+`data/index/error_codes.json`, no embeddings, no retrieval/RAG beyond exact
+code lookup, no Strands, no AWS deployment, no auth/account linking, no MCP
+Apps UI, no web client. See `docs/alexa-plus-requirements.md` for the full
 done/todo/not-needed checklist against the Alexa+ MCP Toolkit requirements.
