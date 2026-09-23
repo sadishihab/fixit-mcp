@@ -43,6 +43,32 @@ Template for each entry:
   sample code for `mcp` 2.x's `MCPServer` API, or explicitly pin `mcp<2` in
   their own `pip install` instructions.
 
+### 2026-09-23 — 404 fetching the python-sdk `CHANGELOG.md` from GitHub
+
+- **Tool/SDK**: `modelcontextprotocol/python-sdk` GitHub repo.
+- **Task attempted**: Before pinning a version, wanted to read the SDK's
+  changelog to confirm protocol-version support and negotiation behavior
+  across releases without spelunking through source.
+- **Steps taken**: Fetched
+  `https://raw.githubusercontent.com/modelcontextprotocol/python-sdk/main/CHANGELOG.md`.
+- **Expected**: A changelog listing releases and notable changes, including
+  protocol-version support (this pattern works for most GitHub Python
+  projects).
+- **Actual**: HTTP 404 — the file doesn't exist at that path on `main` (the
+  project apparently doesn't maintain a root `CHANGELOG.md`, or release notes
+  live elsewhere, e.g. GitHub Releases).
+- **Severity**: Low — didn't block anything, just meant switching approach.
+- **Workaround**: Verified protocol-version support directly against the
+  installed package instead of a changelog: installed both `mcp` 1.30.0 and
+  2.2.0 in scratch venvs and inspected `mcp.types.LATEST_PROTOCOL_VERSION` /
+  `mcp.shared.version.SUPPORTED_PROTOCOL_VERSIONS` (1.x) and
+  `mcp_types.version.HANDSHAKE_PROTOCOL_VERSIONS` (2.x) directly, plus a
+  `WebSearch` that surfaced the GitHub Releases page instead.
+- **Actionable suggestion**: Either add a root `CHANGELOG.md` to the repo (the
+  convention most tooling and humans expect), or make the README point
+  explicitly to GitHub Releases as the source of truth for what changed
+  between versions.
+
 ### 2026-09-23 — No way to make the official MCP client send an older `protocolVersion`
 
 - **Tool/SDK**: `mcp` 1.30.0, `mcp.client.session.ClientSession`.
