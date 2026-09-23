@@ -103,6 +103,15 @@ Alexa+ MCP Toolkit and helps customers with home appliances:
   corruption boundary that falls *inside* a single whitespace-delimited
   token (no space to split on) — the GE fridge's `AUTO FILL<corrupted
   tail>` case remains a known limitation for that reason.
+  `apply_token_level_repair()` (parser.py) further restricts the weak-signal
+  path to sections that `looks_like_table` — same-line company from a
+  strong-signal sibling turned out too wide a scope once a real document
+  mixed genuinely-corrupted narrative text with uncorrupted data-table
+  numbers (GE's EPA water-quality table: a corrupted chemical name next to a
+  real, uncorrupted concentration value), see `FRICTION_LOG.md`. Every
+  token-level repair under 0.6 confidence is also recorded on its
+  `ManualChunk.uncertain_repairs` (original + repaired + confidence) so a
+  downstream consumer isn't forced to trust a low-confidence repair blindly.
 
 ## Testing
 

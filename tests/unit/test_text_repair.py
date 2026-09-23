@@ -173,6 +173,36 @@ def test_repair_line_tokens_leaves_clean_line_with_numbers_untouched() -> None:
     assert repairs == []
 
 
+# --- step 2e: restricting weak-signal repair to table-like sections --------
+#
+# Regression tests for real false positives found in GE's EPA water-quality
+# table: a genuinely corrupted chemical name shares a line with ordinary,
+# uncorrupted concentration numbers ("86", "24", "3.", "80", "5"). With
+# weak-signal repair disabled -- which the parser does for any section that
+# doesn't look like error-code/troubleshooting content, see
+# parser.apply_token_level_repair -- the strong-signal token (the chemical
+# name) is still fixed, but the bare numbers must be left alone rather than
+# "repaired" into different, equally plausible-looking wrong numbers.
+
+
+def test_weak_signal_disabled_leaves_real_false_positive_numbers_untouched() -> None:
+    line = "&DUEDPD]HSLQH 86 24 3. 80 5"
+
+    new_text, repairs = repair_line_tokens(line, dominant_offset=29, allow_weak_signal=False)
+
+    assert new_text == "Carbamazepine 86 24 3. 80 5"
+    assert {r.original for r in repairs} == {"&DUEDPD]HSLQH"}
+
+
+def test_weak_signal_enabled_still_repairs_bare_numbers_with_a_sibling() -> None:
+    """Sanity check that allow_weak_signal=True (the default, used only
+    inside table-like sections) is unaffected by the step 2e change."""
+    new_text, repairs = repair_line_tokens("14 or 1' or O1", dominant_offset=31, allow_weak_signal=True)
+
+    assert new_text == "PS or PF or nP"
+    assert len(repairs) == 3
+
+
 def test_repair_line_tokens_does_nothing_without_dominant_offset_context() -> None:
     """repair_line_tokens itself always takes an offset -- this test
     documents the actual no-op boundary: infer_dominant_offset must return

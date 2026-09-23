@@ -452,7 +452,9 @@ def _repair_token(token: str, dominant_offset: int) -> tuple[str, float] | None:
     return None
 
 
-def repair_line_tokens(text: str, dominant_offset: int) -> tuple[str, list[TokenRepair]]:
+def repair_line_tokens(
+    text: str, dominant_offset: int, *, allow_weak_signal: bool = True
+) -> tuple[str, list[TokenRepair]]:
     """Second-pass, token-level repair for a line that whole-run repair left
     untouched (typically because it mixes already-clean words with a
     corrupted token, which fails repair_run's noise gate for every offset).
@@ -460,6 +462,18 @@ def repair_line_tokens(text: str, dominant_offset: int) -> tuple[str, list[Token
     Only ever applied against the document's already-established dominant
     offset (see infer_dominant_offset) -- this function never searches for an
     offset itself.
+
+    allow_weak_signal=False disables the weak-signal path entirely (a bare
+    short number, or short mixed alnum, repaired only because it shares a
+    line with a strong-signal sibling). The caller should pass this when the
+    surrounding section doesn't look like error-code/troubleshooting content
+    (see parser.apply_token_level_repair) -- weak-signal repair is what
+    turned real data-table values (e.g. concentration numbers in an EPA
+    water-quality table) into plausible-looking wrong numbers, since a
+    genuinely corrupted word can sit on the very same row as an uncorrupted
+    measurement. Strong-signal tokens (a stray control character, or '&'/"'"
+    next to a letter/digit) are independent evidence on their own and are
+    still repaired regardless of section.
     """
     parts = re.split(r"(\s+)", text)
     token_positions = range(0, len(parts), 2)
@@ -472,7 +486,7 @@ def repair_line_tokens(text: str, dominant_offset: int) -> tuple[str, list[Token
         if not token:
             continue
         is_candidate = _token_has_strong_signal(token) or (
-            any_strong_signal and _token_has_weak_signal(token)
+            allow_weak_signal and any_strong_signal and _token_has_weak_signal(token)
         )
         if not is_candidate:
             continue

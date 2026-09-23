@@ -267,22 +267,57 @@ def test_apply_token_level_repair_is_a_noop_without_a_dominant_offset() -> None:
     None everywhere), so there's no document-wide offset to trust -- the
     token pass must not guess one from a single suspicious-looking line."""
     target = make_line("14 or 1' or O1")
+    section = Section(heading="Error codes", section_path=["Error codes"], lines=[target])
     pages = [[target]]
 
-    repairs = apply_token_level_repair(pages)
+    repairs = apply_token_level_repair(pages, [section])
 
     assert repairs == []
     assert target.text == "14 or 1' or O1"
     assert target.token_repairs == []
 
 
-def test_apply_token_level_repair_fixes_tokens_once_offset_is_established() -> None:
-    established = [make_repaired_line(f"Genuinely repaired line number {i}.", offset=31) for i in range(6)]
+def test_apply_token_level_repair_fixes_tokens_in_a_table_like_section() -> None:
+    """Step 2e: weak-signal repair (a bare number, trusted only via a
+    strong-signal sibling) is restricted to sections that look like
+    error-code/troubleshooting content -- this section's own text includes
+    "Possible Causes"/"Solutions", satisfying looks_like_table."""
+    established = [make_repaired_line(f"Genuinely repaired line number {i}.", offset=31) for i in range(5)]
+    header = make_repaired_line("Error Code Possible Causes Solutions", offset=31)
     target = make_line("14 or 1' or O1")
-    pages = [[*established, target]]
+    section = Section(
+        heading="Error codes",
+        section_path=["Error codes"],
+        lines=[*established, header, target],
+    )
+    pages = [[*established, header, target]]
 
-    repairs = apply_token_level_repair(pages)
+    repairs = apply_token_level_repair(pages, [section])
 
     assert target.text == "PS or PF or nP"
     assert len(repairs) == 3
     assert target.token_repairs == repairs
+
+
+def test_apply_token_level_repair_skips_weak_signal_outside_table_like_sections() -> None:
+    """Regression test for a real false-positive class: GE's EPA
+    water-quality table has a genuinely corrupted chemical name
+    ("&DUEDPD]HSLQH" -> "Carbamazepine") sitting on the same line as an
+    ordinary, uncorrupted concentration value ("86"). Outside a section that
+    looks like error-code/troubleshooting content, only the strong-signal
+    token (the chemical name) should be repaired -- the bare number must be
+    left alone rather than "repaired" into a different, equally
+    plausible-looking wrong number."""
+    established = [make_repaired_line(f"Genuinely repaired line number {i}.", offset=29) for i in range(6)]
+    target = make_line("&DUEDPD]HSLQH 86")
+    section = Section(
+        heading="Water Quality Data",
+        section_path=["Water Quality Data"],
+        lines=[*established, target],
+    )
+    pages = [[*established, target]]
+
+    repairs = apply_token_level_repair(pages, [section])
+
+    assert target.text == "Carbamazepine 86"
+    assert {r.original for r in repairs} == {"&DUEDPD]HSLQH"}

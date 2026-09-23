@@ -80,6 +80,10 @@ OVERLAP_CHARS = 200
 # A normalized line repeated across at least this fraction of a manual's pages
 # is treated as running header/footer boilerplate rather than real content.
 BOILERPLATE_PAGE_FRACTION = 0.25
+# A token-level repair below this confidence is recorded on its chunk as an
+# UncertainRepair, alongside the (already-applied) repaired text, so the
+# original can be recovered if the repair looks wrong.
+LOW_CONFIDENCE_TOKEN_REPAIR = 0.6
 
 
 class ManualMeta(BaseModel):
@@ -90,6 +94,19 @@ class ManualMeta(BaseModel):
     brand: str
     model: str
     appliance_type: str
+
+
+class UncertainRepair(BaseModel):
+    """A token-level repair applied at confidence < 0.6, kept alongside the
+    chunk so the original can be recovered if the repair looks wrong.
+    A plausible-looking wrong value (e.g. a corrupted concentration number
+    "repaired" into a different, equally plausible number) is worse than a
+    visibly-garbled one, since it fails silently downstream -- keeping both
+    forms means a repair doesn't have to be trusted blindly."""
+
+    original: str
+    repaired: str
+    confidence: float
 
 
 class ManualChunk(BaseModel):
@@ -104,6 +121,10 @@ class ManualChunk(BaseModel):
     section_path: list[str] = Field(description="Breadcrumb of nested headings, root first.")
     is_table: bool = Field(
         description="Best-effort flag: does this section read like a code/troubleshooting table?"
+    )
+    uncertain_repairs: list[UncertainRepair] = Field(
+        default_factory=list,
+        description="Token-level repairs in this chunk applied at confidence < 0.6 -- see UncertainRepair.",
     )
 
 
@@ -291,6 +312,12 @@ def split_section_into_chunks(
             j += 1
 
         chunk_lines = lines[i:j]
+        uncertain_repairs = [
+            UncertainRepair(original=tr.original, repaired=tr.repaired, confidence=tr.confidence)
+            for line in chunk_lines
+            for tr in line.token_repairs
+            if tr.confidence < LOW_CONFIDENCE_TOKEN_REPAIR
+        ]
         next_chunk_index[0] += 1
         chunks.append(
             ManualChunk(
@@ -302,6 +329,7 @@ def split_section_into_chunks(
                 section_heading=section.heading,
                 section_path=section.section_path,
                 is_table=is_table,
+                uncertain_repairs=uncertain_repairs,
             )
         )
 
@@ -377,26 +405,42 @@ def dominant_offset_for_pages(pages: list[list[Line]]) -> DominantOffset | None:
     return infer_dominant_offset(offsets)
 
 
-def apply_token_level_repair(pages: list[list[Line]]) -> list[TokenRepair]:
+def apply_token_level_repair(pages: list[list[Line]], sections: list[Section]) -> list[TokenRepair]:
     """Second repair pass, run after whole-line repair: once a document's
     dominant offset is established, re-scan lines whole-line repair left
     untouched for individual corrupted tokens worth fixing (see
     text_repair.repair_line_tokens). A no-op if no offset dominates -- this
     never guesses an offset itself, only reuses an already-confirmed one.
 
-    Mutates the given pages' Line objects in place (text and token_repairs)
-    and returns every repair applied, across the whole document.
+    Section-aware on purpose: weak-signal token repair (a bare short number,
+    trusted only because it shares a line with a strong-signal sibling) is
+    restricted to sections that look like error-code/troubleshooting content
+    (looks_like_table on the section's text). Without this, a genuinely
+    corrupted word sitting on the same table row as an ordinary data value
+    (e.g. a concentration number in an EPA water-quality table, next to a
+    corrupted chemical name) gets that value "repaired" into a different,
+    equally plausible-looking wrong number -- silently wrong is worse than
+    visibly garbled. Strong-signal tokens are repaired regardless of section,
+    since they're independent evidence on their own.
+
+    Mutates the given sections' (and therefore pages') Line objects in place
+    (text and token_repairs) and returns every repair applied, across the
+    whole document.
     """
     dominant = dominant_offset_for_pages(pages)
     if dominant is None:
         return []
 
     all_repairs: list[TokenRepair] = []
-    for page_lines in pages:
-        for line in page_lines:
+    for section in sections:
+        section_text = "\n".join(line.text for line in section.lines)
+        allow_weak_signal = looks_like_table(section_text)
+        for line in section.lines:
             if line.repair_confidence is not None:
                 continue  # already whole-line repaired; nothing left to fix
-            new_text, repairs = repair_line_tokens(line.text, dominant.offset)
+            new_text, repairs = repair_line_tokens(
+                line.text, dominant.offset, allow_weak_signal=allow_weak_signal
+            )
             if repairs:
                 line.text = new_text
                 line.token_repairs = repairs
@@ -406,19 +450,21 @@ def apply_token_level_repair(pages: list[list[Line]]) -> list[TokenRepair]:
 
 def extract_lines(pdf_path: str | Path) -> list[list[Line]]:
     """Open a manual PDF and extract its lines, with both repair passes
-    already applied: whole-line repair during extraction, then token-level
-    repair once the document's dominant offset (if any) is known. Exposed
-    separately from parse_manual so callers can inspect per-line
-    repair_confidence/token_repairs -- e.g. to report how many lines/tokens
-    were repaired, and at what confidence -- without duplicating the
-    extraction logic."""
+    already applied: whole-line repair during extraction, then section-aware
+    token-level repair once the document's dominant offset (if any) is
+    known. Exposed separately from parse_manual so callers can inspect
+    per-line repair_confidence/token_repairs -- e.g. to report how many
+    lines/tokens were repaired, and at what confidence -- without
+    duplicating the extraction logic."""
     doc = pymupdf.open(pdf_path)
     try:
         pages = _extract_lines_by_page(doc)
     finally:
         doc.close()
 
-    apply_token_level_repair(pages)
+    boilerplate = find_boilerplate(pages)
+    sections = build_sections(strip_boilerplate(pages, boilerplate))
+    apply_token_level_repair(pages, sections)
     return pages
 
 

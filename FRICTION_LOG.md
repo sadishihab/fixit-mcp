@@ -477,3 +477,50 @@ Template for each entry:
   example quoted in a task description -- real PDF text carries adjacent
   artifacts (here, an attached control-character digit with no separating
   space) that a hand-typed test string won't reproduce.
+
+### 2026-09-23 — weak-signal token repair silently mangled real data-table numbers
+
+- **Tool/SDK**: `fixit_mcp.ingestion.text_repair.repair_line_tokens` (this
+  project's own code).
+- **Task attempted**: The weak-signal rule added in step 2d (repair a bare
+  short number when it shares a line with a strong-signal sibling) was meant
+  for cases like LG's `14 or 1' or O1`. Checking it against the rest of the
+  corpus surfaced a second real false-positive class beyond the parentheses
+  issue already logged: GE's EPA water-quality/contaminant table has
+  genuinely corrupted chemical names (`&DUEDPD]HSLQH` -> `Carbamazepine`)
+  sitting on the same table row as ordinary, uncorrupted concentration
+  values. The chemical name's strong signal was making its numeric row-mate
+  look like a candidate too, and the shift produced another plausible-looking
+  number: `86`->`US`, `5`->`R`, `24`->`OQ`, `3.`->`P.`, `80`->`UM`.
+- **Severity**: High -- worse than the earlier false positives, because a
+  wrong *number* that still looks like plausible data fails silently
+  downstream (a wrong word is usually obviously wrong; a wrong concentration
+  value is not), and this is real regulatory/certification data.
+- **Fix chosen (of the three offered, in order)**: **Option 1** --
+  restrict weak-signal repair to sections that look like error-code/
+  troubleshooting content, reusing `looks_like_table` on the section's own
+  text. This was picked over option 2 (a negative unit/measurement signal)
+  because the data supported it being sufficient on its own: the EPA table's
+  section is headed by a misdetected corrupted unit label (`"PJ\x12/"`,
+  itself `"mg/L"` shifted) and never contains `"possible causes"`/
+  `"solutions"`/`"error code"`-style wording, so `looks_like_table` already
+  and correctly returns False for it -- no separate unit-detection heuristic
+  needed. Verified empirically before and after: all five reported false
+  positives disappear, while LG's `14`/`1'`/`O1` -- inside the section headed
+  `"Installation test (Exhaust check) (cont.)"`, whose own text contains
+  `"Possible Causes"`/`"Solutions"` -- still repair correctly. Strong-signal
+  tokens (control characters, `&`/`'` adjacency) are still repaired
+  regardless of section, since they're independent evidence on their own and
+  weren't implicated in this false-positive class.
+- **Also implemented (option 3), unconditionally**: `ManualChunk` now carries
+  `uncertain_repairs` (original, repaired, confidence) for every token-level
+  repair under 0.6 confidence in that chunk, so a downstream consumer can see
+  the original text and decide for itself rather than trusting a low-
+  confidence repair blindly.
+- **Actionable suggestion**: A weak/ambiguous signal that only fires "in the
+  company of" a strong one needs a scope for that company -- same line
+  turned out to be too wide once real documents mix corrupted narrative text
+  with uncorrupted tabular data on adjacent lines within one section. Scoping
+  to "sections that look like the kind of content we're actually trying to
+  fix" (not just "this line, or a strong-enough neighbor") is the more
+  robust rule, and reused an existing heuristic rather than adding a new one.
