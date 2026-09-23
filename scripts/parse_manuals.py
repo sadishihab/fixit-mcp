@@ -17,7 +17,9 @@ from pathlib import Path
 
 import yaml
 
-from fixit_mcp.ingestion.parser import ManualChunk, ManualMeta, parse_manual
+from fixit_mcp.ingestion.parser import ManualChunk, ManualMeta, extract_lines, parse_manual
+
+LOW_CONFIDENCE_REPAIR_THRESHOLD = 0.6
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 MANIFEST_PATH = REPO_ROOT / "data" / "manuals" / "manifest.yaml"
@@ -41,9 +43,18 @@ def load_manifest_metas() -> dict[str, ManualMeta]:
     }
 
 
-def summarize(manual_id: str, chunks: list[ManualChunk]) -> str:
+def summarize(manual_id: str, chunks: list[ManualChunk], pdf_path: Path) -> str:
+    lines_by_page = extract_lines(pdf_path)
+    all_lines = [line for page_lines in lines_by_page for line in page_lines]
+    repaired = [line for line in all_lines if line.repair_confidence is not None]
+    low_confidence = [line for line in repaired if line.repair_confidence < LOW_CONFIDENCE_REPAIR_THRESHOLD]
+
+    repair_summary = f"  text repairs applied: {len(repaired)} lines"
+    if repaired:
+        repair_summary += f" ({len(low_confidence)} below {LOW_CONFIDENCE_REPAIR_THRESHOLD} confidence)"
+
     if not chunks:
-        return f"{manual_id}: 0 chunks (nothing extracted)"
+        return f"{manual_id}: 0 chunks (nothing extracted)\n{repair_summary}"
 
     pages_covered = {p for c in chunks for p in range(c.page_start, c.page_end + 1)}
     table_like = [c for c in chunks if c.is_table]
@@ -61,6 +72,7 @@ def summarize(manual_id: str, chunks: list[ManualChunk]) -> str:
         f"  longest chunk: {len(longest.text)} chars "
         f"({longest.chunk_id}, pages {longest.page_start}-{longest.page_end})",
         f"  avg chunk length: {sum(lengths) / len(lengths):.0f} chars",
+        repair_summary,
     ]
     return "\n".join(lines)
 
@@ -87,7 +99,7 @@ def main() -> int:
         out_path = PARSED_DIR / f"{manual_id}.json"
         out_path.write_text(json.dumps([c.model_dump() for c in chunks], indent=2))
 
-        print(summarize(manual_id, chunks))
+        print(summarize(manual_id, chunks, pdf_path))
         print(f"  written to {out_path.relative_to(REPO_ROOT)}")
         print()
 

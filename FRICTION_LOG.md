@@ -273,3 +273,120 @@ Template for each entry:
   check) as candidates for an OCR fallback pass, since PDF font/ToUnicode
   corruption like this appears to not be rare across real manufacturer PDFs
   (it showed up in 2 of 5 manuals here, from two different manufacturers).
+
+### 2026-09-23 — the corruption offset differs by manual, confirmed empirically before writing any repair code
+
+- **Tool/SDK**: PyMuPDF span metadata (`ge-gfe28gynfs-refrigerator.pdf`,
+  `lg-dlex8000w-dryer.pdf`).
+- **Task attempted**: Before writing `text_repair.py`, verify the hypothesis
+  that both manuals' corruption is a constant character-code offset (per the
+  task's own worked example: ")LOWHU FDUWULGJH" -> "Filter cartridge" via
+  +29), and check whether that offset is the same in both manuals.
+- **Steps taken**: Pulled raw span text (not just `page.get_text()`, which
+  hides the actual bytes) via `page.get_text("dict")`, inspected the font
+  name and the literal control-character byte each corrupted run uses as its
+  space substitute, then brute-force-swept offsets -40..+40 scoring
+  "does this look like English" to find the true winner independently for
+  each manual, rather than trusting arithmetic done by eye.
+- **Expected**: Confirm or refute +29 as a shared constant.
+- **Actual**: Confirmed the constant-offset hypothesis, but the offset is
+  **not** shared: GE's refrigerator manual (font `ArialMT`) uses `\x03` as
+  its space substitute, decoding at **+29**
+  (`)LOWHU\x03FDUWULGJH` -> "Filter cartridge"); LG's dryer manual (font
+  `MyriadPro-Bold`/`MyriadPro-Regular`) uses `\x01`, decoding at **+31**
+  (`3FNPWF\x01UIF\x01ESZJOH\x01SBDL` -> "Remove the drying rack"). Verified
+  across ~17,000 lines total, not just the two example runs: >99% of every
+  actually-corrupted line in each manual lands on its manual's single
+  offset, and zero false positives were found scanning the three manuals
+  with no known corruption.
+- **Severity**: N/A (this was the confirmation step, not friction) --
+  logged because the task explicitly asked to record what this step found
+  before proceeding. It directly justified per-run offset inference over
+  hardcoding, which a single-manual test would have hidden.
+- **Actionable suggestion**: N/A.
+
+### 2026-09-23 — a naive "does it look like English" score kept getting fooled, three different ways
+
+- **Tool/SDK**: `fixit_mcp.ingestion.text_repair` (this project's own code).
+- **Task attempted**: Score candidate offsets by English-likelihood to pick
+  the right one per run, per the task's design ("no dictionary needed --
+  letter-frequency or a small common-words set is fine").
+- **Steps taken**: Iteratively built and stress-tested the scorer against
+  real corpus samples plus deliberately adversarial inputs (short random
+  strings, text mixing clean and corrupted content in one run) before
+  trusting it -- three distinct false-accepts surfaced this way, each fixed
+  before moving on:
+  1. **Printable-ratio-only scoring accepted consonant salad.** An early
+     version scored mostly on "fraction of printable characters," which a
+     wrong offset can satisfy just as well as the right one (shifted noise
+     is often still printable ASCII). Fixed by switching the primary signal
+     to a classical cipher-breaking technique -- average log-likelihood
+     under standard English letter frequencies -- plus hard, independent
+     gates (noise ratio, letter frequency, word-match count) instead of one
+     blended score.
+  2. **Offsets of exactly +/-32 "fixed" already-clean text by only
+     toggling ASCII letter case** (`'a'`-`'A'` are 32 apart), and since
+     every score here is case-insensitive, `'system'` -> `'SYSTEM'` looked
+     like a legitimate competing candidate purely by relabeling. Fixed by
+     requiring a competing offset to strictly *beat* the unshifted
+     baseline's score, not merely pass the gates independently -- a tie
+     (which is all a pure case-swap can produce) no longer counts as a win.
+  3. **Adding substring word-matching (to catch corrupted runs with no
+     space character at all, e.g. `pressstartbutton`) let a coincidental
+     4-letter substring outscore a genuinely correct 7-letter exact word.**
+     `1SPCMFN` -> `Problem` (the correct decode, offset 31) was being
+     rejected because "Problem"'s average letter frequency (-3.24) fell
+     just under the general threshold (-3.0) -- normal for a single 7-letter
+     sample, not a sign of wrongness -- while a wrong offset's `Sureohp`
+     cleared the threshold on luck and picked up 4 points from "sure" as a
+     substring. Fixed by letting a strong word-match (one long exact word,
+     or enough cumulative word evidence) waive the letter-frequency gate,
+     since that's independent, stronger evidence than raw letter statistics
+     on a short sample.
+- **Severity**: Medium -- none of these ever shipped (each was caught by
+  testing against real samples and adversarial cases before moving to the
+  next step), but collectively they took more iteration than the repair
+  logic itself, and each is a natural mistake to make with this class of
+  heuristic.
+- **Workaround**: See `src/fixit_mcp/ingestion/text_repair.py`'s module
+  docstring and `_passes_gates`/`repair_run` for the final design; regression
+  tests for all three cases are in `tests/unit/test_text_repair.py`.
+- **Actionable suggestion**: When scoring "which decoding looks most like
+  real English," always test against (a) already-clean input, (b) inputs
+  differing only by case or another group-symmetry of your transform, and
+  (c) short single-token samples -- each broke a scorer that looked correct
+  on ordinary multi-word sentences.
+
+### 2026-09-23 — repair correctly declines to touch text that mixes clean and corrupted content, at the cost of a still-fragmented chunk
+
+- **Tool/SDK**: `fixit_mcp.ingestion.parser` + `text_repair` interaction on
+  `ge-gfe28gynfs-refrigerator.pdf`, page 47.
+- **Task attempted**: Get the refrigerator's dispenser "Error message -> See
+  page 14" line to land inside the same table-flagged chunk as the rest of
+  its "Problem / Possible Causes / What to Do" row.
+- **Steps taken**: Re-ran `make parse-manuals` after wiring in text_repair
+  and inspected the resulting chunks around that content.
+- **Expected**: With the font corruption repaired, the whole troubleshooting
+  table on that page would merge into one coherent, table-flagged chunk.
+- **Actual**: Improved, but not fully: the line just before "Error message"
+  is `AUTO FILL<corrupted tail with no separating space>` -- clean text
+  glued directly onto a corrupted run with no space between them. Per the
+  design (a wrong fix on clean text is worse than no fix), `repair_run`
+  correctly refuses to touch this mixed run, since shifting it by any
+  offset corrupts the clean "AUTO FILL" prefix. But the untouched, partially
+  garbled line still gets misdetected as an ALL-CAPS-style heading (it
+  starts with a real letter, so the earlier letter-start guard doesn't catch
+  it), which splits the section right before "Error message," landing it in
+  its own small, non-table-flagged chunk instead of the main table chunk.
+- **Severity**: Low -- the content is present and legible (not lost), just
+  in a smaller neighboring chunk rather than the main one.
+- **Workaround**: None applied; documenting as a known limitation rather
+  than reaching for a riskier fix (e.g. attempting to repair a suffix of a
+  mixed run) that could introduce the exact "wrong fix on clean text"
+  failure mode this step was designed to avoid.
+- **Actionable suggestion**: A future pass could detect "clean prefix +
+  corrupted suffix with no separator" runs specifically (e.g. scan for the
+  first position where noise starts climbing and try repairing only the
+  tail) rather than an all-or-nothing whole-line decision -- worth doing if
+  this pattern turns out to be common across a larger manual corpus, not
+  worth the added complexity for the two manuals seen so far.

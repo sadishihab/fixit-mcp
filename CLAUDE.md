@@ -77,6 +77,19 @@ Alexa+ MCP Toolkit and helps customers with home appliances:
   real failure modes hit (bold-at-body-size false headings, source-PDF font
   corruption) and how they were mitigated. This module is offline tooling
   only, never imported by the running server.
+- `fixit_mcp.ingestion.text_repair` fixes two manuals' broken font encoding
+  (a constant character-code offset per manual — +29 for
+  `ge-gfe28gynfs-refrigerator.pdf`, +31 for `lg-dlex8000w-dryer.pdf` —
+  confirmed empirically, never hardcoded as a shared value) before heading
+  detection runs. It only repairs a run when a candidate offset clears hard
+  gates (noise ratio, English letter-frequency, common-word evidence) *and*
+  strictly beats leaving the run alone — a wrong "fix" on already-clean text
+  is treated as worse than no fix. `repair_run()` returns a confidence so
+  callers can flag uncertain repairs; it does not gate acceptance by itself.
+  See `FRICTION_LOG.md` for the false-accept cases hit while tuning this
+  (case-swap offsets, substring-match coincidences) and the known remaining
+  limitation (a clean-prefix + corrupted-suffix run with no separating space
+  is correctly left untouched rather than partially repaired).
 
 ## Testing
 

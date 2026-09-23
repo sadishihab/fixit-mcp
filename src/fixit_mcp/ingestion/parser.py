@@ -43,6 +43,8 @@ from pathlib import Path
 import pymupdf
 from pydantic import BaseModel, Field
 
+from fixit_mcp.ingestion.text_repair import repair_run
+
 # PyMuPDF span flag bit for bold text (see pymupdf docs: TextPage.extractDICT).
 _BOLD_FLAG = 1 << 4
 
@@ -107,6 +109,9 @@ class Line:
     text: str
     font_size: float
     is_bold: bool
+    # Set only when text_repair.repair_run() repaired this line's text (see
+    # _extract_lines_by_page). None means either untouched or not attempted.
+    repair_confidence: float | None = None
 
 
 @dataclass
@@ -326,18 +331,42 @@ def _extract_lines_by_page(doc: pymupdf.Document) -> list[list[Line]]:
                     continue
                 font_size = max(s["size"] for s in spans)
                 is_bold = any(s["flags"] & _BOLD_FLAG for s in spans)
-                lines.append(Line(page_no=page.number + 1, text=text, font_size=font_size, is_bold=is_bold))
+
+                repair_confidence = None
+                repair = repair_run(text)
+                if repair.was_repaired:
+                    text = repair.text
+                    repair_confidence = repair.confidence
+
+                lines.append(
+                    Line(
+                        page_no=page.number + 1,
+                        text=text,
+                        font_size=font_size,
+                        is_bold=is_bold,
+                        repair_confidence=repair_confidence,
+                    )
+                )
         pages.append(lines)
     return pages
 
 
-def parse_manual(pdf_path: str | Path, manual_meta: ManualMeta) -> list[ManualChunk]:
-    """Parse one manual PDF into section-aware chunks."""
+def extract_lines(pdf_path: str | Path) -> list[list[Line]]:
+    """Open a manual PDF and extract its lines (with text-repair already
+    applied). Exposed separately from parse_manual so callers can inspect
+    per-line repair_confidence -- e.g. to report how many lines were
+    repaired, and at what confidence -- without duplicating the extraction
+    logic."""
     doc = pymupdf.open(pdf_path)
     try:
-        pages = _extract_lines_by_page(doc)
+        return _extract_lines_by_page(doc)
     finally:
         doc.close()
+
+
+def parse_manual(pdf_path: str | Path, manual_meta: ManualMeta) -> list[ManualChunk]:
+    """Parse one manual PDF into section-aware chunks."""
+    pages = extract_lines(pdf_path)
 
     boilerplate = find_boilerplate(pages)
     pages = strip_boilerplate(pages, boilerplate)
