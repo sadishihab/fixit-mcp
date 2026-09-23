@@ -573,3 +573,76 @@ Template for each entry:
   (like step 4 above) before a real batch job is worth doing by default, not
   just when troubleshooting -- it turned a potentially confusing failure
   partway through a 5-manual run into a single, clear, upfront answer.
+
+### 2026-09-23 — a working Bedrock call still needed two more account-specific fixes: bare model id, then inference profile
+
+- **Tool/SDK**: `boto3`, Amazon Bedrock, model id `us.anthropic.claude-sonnet-4-5-20250929-v1:0`.
+- **Task attempted**: Once the account's initial verification cleared, get a
+  real `converse()` call working end to end before trusting a full
+  extraction run to it.
+- **Steps taken**: `list_foundation_models` had shown the configured default
+  (a bare id, `anthropic.claude-sonnet-5`) as `ACTIVE`. A live test call with
+  that id nonetheless failed. Tried several other bare ids, all failing
+  differently; tried the same ids with a `us.` cross-region-inference-profile
+  prefix.
+- **Actual**: Two distinct, separately-diagnosed failures before success:
+  1. The bare id `anthropic.claude-sonnet-5` (and `claude-fable-5`,
+     `claude-fable-5-1`) returned `AccessDeniedException`: "... is not
+     available for this account" -- being listed as `ACTIVE` in the region's
+     catalog is not the same as this account having entitlement to it.
+  2. Dated/legacy-style bare ids (`anthropic.claude-sonnet-4-5-20250929-v1:0`,
+     etc.) returned a *different* error: `ValidationException`, "Invocation
+     of model ID ... with on-demand throughput isn't supported. Retry your
+     request with the ID or ARN of an inference profile." Prefixing the same
+     id with `us.` (a cross-region inference profile id) fixed this one
+     immediately -- and even then, one specific model (`us.anthropic.claude-sonnet-4-20250514-v1:0`)
+     still failed as "marked by provider as Legacy," a third distinct
+     failure mode.
+  A `us.`-prefixed, non-legacy, dated model
+  (`us.anthropic.claude-sonnet-4-5-20250929-v1:0`) finally worked.
+- **Severity**: Medium -- three visually-similar-looking model-access errors
+  in a row, each requiring a different fix, would be easy to misdiagnose as
+  "still broken" rather than "broken for three different reasons in
+  sequence" without reading each error message closely.
+- **Workaround**: Set the project default to the verified-working
+  `us.anthropic.claude-sonnet-4-5-20250929-v1:0` and documented the three
+  distinct failure modes directly in `ExtractionSettings.bedrock_model_id`'s
+  comment, so the next person who hits one of them recognizes it immediately
+  instead of re-diagnosing from scratch.
+- **Actionable suggestion**: Bedrock's model-access error messages are
+  already fairly clear individually, but there's no single command that
+  answers "which model ids can I actually invoke, in what form, right now" --
+  `list_foundation_models` shows catalog status, not per-account invoke
+  entitlement or the on-demand-vs-inference-profile requirement. A
+  `bedrock list-invokable-models` (bare ids and inference-profile ids both
+  checked) would have turned three round-trips into one.
+
+### 2026-09-23 — guessed Bedrock pricing understated real cost by ~3x
+
+- **Tool/SDK**: `scripts/extract_codes.py` (this project's own code).
+- **Task attempted**: Report real token usage and an accurate estimated cost
+  for the LG dryer extraction run, per the task's explicit ask.
+- **Steps taken**: The cost estimate constants
+  (`ESTIMATED_INPUT_COST_PER_1K`/`ESTIMATED_OUTPUT_COST_PER_1K`) were set from
+  memory as "approximate Sonnet-class pricing" ($0.003/$0.015 per 1K) when
+  `BedrockExtractor` was first built, before a model was ever actually
+  invoked. Looked up real, current Bedrock on-demand pricing for the model
+  actually used (`claude-sonnet-4-5`) before reporting a cost figure to the
+  user, rather than trusting the unverified guess.
+- **Actual**: Real pricing is $9.00 / $45.00 per 1M input/output tokens
+  ($0.009 / $0.045 per 1K) -- exactly 3x the guessed figures for both input
+  and output. The run's real cost was **$0.1054** (6,581 input + 1,026
+  output tokens), not the $0.0351 the unverified constants would have
+  reported.
+- **Severity**: Medium -- a systematically-wrong cost estimate is worse than
+  an obviously-missing one, since it looks trustworthy while quietly being
+  wrong every time, and would compound directly with usage across a full
+  five-manual run or repeated re-runs.
+- **Workaround**: Corrected both constants and cited the source pricing and
+  verification date directly in the code comment, so a future model change
+  is a visible prompt to re-verify rather than a silent staleness risk.
+- **Actionable suggestion**: Never ship a cost estimate based on
+  from-memory pricing recall for a fast-moving, frequently-repriced API
+  surface -- verify against a current source at the moment the number is
+  first going to be shown to someone making a real spending decision, not
+  just at implementation time.

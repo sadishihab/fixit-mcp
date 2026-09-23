@@ -148,11 +148,17 @@ class ExtractionSettings(BaseSettings):
 
     extractor: Literal["bedrock", "stub"] = "stub"
     bedrock_region: str = "us-east-1"
-    # A bare (non-inference-profile) Bedrock model id that works with
-    # on-demand throughput as of 2026-09; if your account only exposes this
-    # model behind a cross-region inference profile, override with e.g.
-    # "us.anthropic.claude-sonnet-5" instead.
-    bedrock_model_id: str = "anthropic.claude-sonnet-5"
+    # Verified working in this project's dev AWS account (2026-09) via a
+    # live converse() call. Model access on Bedrock is per-account/region:
+    # a bare id like "anthropic.claude-sonnet-5" can be listed as ACTIVE by
+    # list_foundation_models yet still be denied for a given account
+    # ("not available for this account"), and a dated/legacy-style id
+    # (e.g. "anthropic.claude-sonnet-4-5-20250929-v1:0") is rejected for
+    # on-demand throughput and needs a cross-region inference profile
+    # ("us."/"eu."/... prefix) instead -- see FRICTION_LOG.md. If this
+    # default isn't enabled in your account, run `aws bedrock
+    # list-foundation-models` and try candidates with a "us." prefix.
+    bedrock_model_id: str = "us.anthropic.claude-sonnet-4-5-20250929-v1:0"
     extractor_max_retries: int = 2
 
 

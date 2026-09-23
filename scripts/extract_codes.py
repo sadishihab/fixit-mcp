@@ -36,11 +36,13 @@ CACHE_DIR = INDEX_DIR / ".extract_cache"
 
 _TROUBLESHOOTING_HEADING_RE = re.compile(r"troubleshoot|error code|fault code|before you call", re.I)
 
-# Rough estimate only, for the printed cost figure -- update if the
-# configured model differs. Approximate Sonnet-class Bedrock on-demand
-# pricing per 1K tokens as of 2026-09.
-ESTIMATED_INPUT_COST_PER_1K = 0.003
-ESTIMATED_OUTPUT_COST_PER_1K = 0.015
+# Amazon Bedrock on-demand pricing for Claude Sonnet 4.5 (the default
+# bedrock_model_id), per 1K tokens, confirmed 2026-09 -- update if you
+# change the configured model. $9.00 / $45.00 per 1M input/output tokens.
+# An earlier, unverified guess here (0.003 / 0.015) understated real cost
+# by ~3x -- see FRICTION_LOG.md.
+ESTIMATED_INPUT_COST_PER_1K = 0.009
+ESTIMATED_OUTPUT_COST_PER_1K = 0.045
 
 
 def is_worth_extracting_from(chunk: ManualChunk) -> bool:

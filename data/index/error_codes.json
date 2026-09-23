@@ -222,16 +222,20 @@
     "appliance_type": "dryer",
     "error_code": "tE1",
     "code_normalized": "TE1",
-    "meaning": "",
-    "likely_causes": [],
-    "repair_steps": [],
+    "meaning": "Temperature sensor failure",
+    "likely_causes": [
+      "Temperature sensor failure"
+    ],
+    "repair_steps": [
+      "Turn off the dryer and call for service"
+    ],
     "parts_needed": [],
     "safety_warnings": [],
-    "difficulty": null,
+    "difficulty": "call_service",
     "source_page": 31,
     "source_section": "Installation test (Exhaust check) (cont.)",
     "source_chunk_id": "lg-dlex8000w-dryer::chunk-0196",
-    "extraction_confidence": 0.3
+    "extraction_confidence": 0.95
   },
   {
     "manual_id": "lg-dlex8000w-dryer",
@@ -240,16 +244,42 @@
     "appliance_type": "dryer",
     "error_code": "tE2",
     "code_normalized": "TE2",
-    "meaning": "",
-    "likely_causes": [],
-    "repair_steps": [],
+    "meaning": "Temperature sensor failure",
+    "likely_causes": [
+      "Temperature sensor failure"
+    ],
+    "repair_steps": [
+      "Turn off the dryer and call for service"
+    ],
     "parts_needed": [],
     "safety_warnings": [],
-    "difficulty": null,
+    "difficulty": "call_service",
     "source_page": 31,
     "source_section": "Installation test (Exhaust check) (cont.)",
     "source_chunk_id": "lg-dlex8000w-dryer::chunk-0196",
-    "extraction_confidence": 0.3
+    "extraction_confidence": 0.95
+  },
+  {
+    "manual_id": "lg-dlex8000w-dryer",
+    "brand": "LG",
+    "model": "DLEX8000W",
+    "appliance_type": "dryer",
+    "error_code": "HS",
+    "code_normalized": "HS",
+    "meaning": "Humidity Sensor failure",
+    "likely_causes": [
+      "Humidity Sensor failure"
+    ],
+    "repair_steps": [
+      "Turn off the dryer and call for service"
+    ],
+    "parts_needed": [],
+    "safety_warnings": [],
+    "difficulty": "call_service",
+    "source_page": 31,
+    "source_section": "Installation test (Exhaust check) (cont.)",
+    "source_chunk_id": "lg-dlex8000w-dryer::chunk-0196",
+    "extraction_confidence": 0.95
   },
   {
     "manual_id": "lg-dlex8000w-dryer",
@@ -259,15 +289,23 @@
     "error_code": "PS",
     "code_normalized": "PS",
     "meaning": "",
-    "likely_causes": [],
-    "repair_steps": [],
+    "likely_causes": [
+      "Electric dryer power cord is not connected correctly, or house power supply is incorrect",
+      "House fuse is blown, circuit breaker has tripped, or power outage has occurred"
+    ],
+    "repair_steps": [
+      "Check the power supply or the connection of power cord to the terminal block. Refer to the Connecting Electric Dryers section of this manual for complete instructions",
+      "Reset circuit breaker or replace fuse. Do not increase the fuse capacity. If the problem is a circuit overload, have it corrected by a qualified electrician"
+    ],
     "parts_needed": [],
-    "safety_warnings": [],
-    "difficulty": null,
+    "safety_warnings": [
+      "Do not increase the fuse capacity"
+    ],
+    "difficulty": "moderate",
     "source_page": 31,
     "source_section": "Installation test (Exhaust check) (cont.)",
     "source_chunk_id": "lg-dlex8000w-dryer::chunk-0196",
-    "extraction_confidence": 0.3
+    "extraction_confidence": 0.7
   },
   {
     "manual_id": "lg-dlex8000w-dryer",
@@ -277,15 +315,23 @@
     "error_code": "PF",
     "code_normalized": "PF",
     "meaning": "",
-    "likely_causes": [],
-    "repair_steps": [],
+    "likely_causes": [
+      "Electric dryer power cord is not connected correctly, or house power supply is incorrect",
+      "House fuse is blown, circuit breaker has tripped, or power outage has occurred"
+    ],
+    "repair_steps": [
+      "Check the power supply or the connection of power cord to the terminal block. Refer to the Connecting Electric Dryers section of this manual for complete instructions",
+      "Reset circuit breaker or replace fuse. Do not increase the fuse capacity. If the problem is a circuit overload, have it corrected by a qualified electrician"
+    ],
     "parts_needed": [],
-    "safety_warnings": [],
-    "difficulty": null,
+    "safety_warnings": [
+      "Do not increase the fuse capacity"
+    ],
+    "difficulty": "moderate",
     "source_page": 31,
     "source_section": "Installation test (Exhaust check) (cont.)",
     "source_chunk_id": "lg-dlex8000w-dryer::chunk-0196",
-    "extraction_confidence": 0.3
+    "extraction_confidence": 0.7
   },
   {
     "manual_id": "lg-dlex8000w-dryer",
@@ -295,32 +341,22 @@
     "error_code": "nP",
     "code_normalized": "NP",
     "meaning": "",
-    "likely_causes": [],
-    "repair_steps": [],
+    "likely_causes": [
+      "Electric dryer power cord is not connected correctly, or house power supply is incorrect",
+      "House fuse is blown, circuit breaker has tripped, or power outage has occurred"
+    ],
+    "repair_steps": [
+      "Check the power supply or the connection of power cord to the terminal block. Refer to the Connecting Electric Dryers section of this manual for complete instructions",
+      "Reset circuit breaker or replace fuse. Do not increase the fuse capacity. If the problem is a circuit overload, have it corrected by a qualified electrician"
+    ],
     "parts_needed": [],
-    "safety_warnings": [],
-    "difficulty": null,
+    "safety_warnings": [
+      "Do not increase the fuse capacity"
+    ],
+    "difficulty": "moderate",
     "source_page": 31,
     "source_section": "Installation test (Exhaust check) (cont.)",
     "source_chunk_id": "lg-dlex8000w-dryer::chunk-0196",
-    "extraction_confidence": 0.3
-  },
-  {
-    "manual_id": "lg-dlex8000w-dryer",
-    "brand": "LG",
-    "model": "DLEX8000W",
-    "appliance_type": "dryer",
-    "error_code": "HS",
-    "code_normalized": "HS",
-    "meaning": "",
-    "likely_causes": [],
-    "repair_steps": [],
-    "parts_needed": [],
-    "safety_warnings": [],
-    "difficulty": null,
-    "source_page": 31,
-    "source_section": "Installation test (Exhaust check) (cont.)",
-    "source_chunk_id": "lg-dlex8000w-dryer::chunk-0196",
-    "extraction_confidence": 0.3
+    "extraction_confidence": 0.7
   }
 ]
