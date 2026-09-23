@@ -1,4 +1,4 @@
-.PHONY: run test lint format inspector tunnel fetch-manuals
+.PHONY: run test lint format inspector tunnel fetch-manuals parse-manuals
 
 run:
 	uv run python -m fixit_mcp
@@ -27,3 +27,8 @@ tunnel:
 # Pass FORCE=1 to re-download files that already exist.
 fetch-manuals:
 	uv run python scripts/fetch_manuals.py $(if $(FORCE),--force,)
+
+# Parses every PDF in data/manuals/pdf/ into section-aware chunks, written to
+# data/manuals/parsed/<manual_id>.json. Run `make fetch-manuals` first.
+parse-manuals:
+	uv run python scripts/parse_manuals.py

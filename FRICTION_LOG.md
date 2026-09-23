@@ -175,3 +175,101 @@ Template for each entry:
   automated manifest-validation step, not just a one-time manual check —
   manufacturer CDNs mix spec sheets, install guides, and full manuals under
   similar-looking filenames.
+
+### 2026-09-23 — pdfplumber's table detector mangled a rotated sidebar into a phantom table
+
+- **Tool/SDK**: `pdfplumber` 0.11.10 (evaluated, not adopted).
+- **Task attempted**: Deciding which PDF library to use for
+  `fixit_mcp/ingestion/parser.py`; tried `pdfplumber.Page.extract_tables()` on
+  the GE range manual's actual "Problem / Possible Causes / What To Do"
+  troubleshooting page to see if it could give real table structure for free.
+- **Steps taken**: Ran `extract_tables()` on that page and inspected the result.
+- **Expected**: A 3-column table (Problem / Possible Causes / What To Do), or
+  at worst a failure to detect anything.
+- **Actual**: It returned two "tables" — the second was a corrupted mess
+  missing 2 of the table's 3 columns, and the *first* was pure garbage: a
+  rotated vertical sidebar of chapter names elsewhere on the page got picked
+  up as its own "table" with every line's characters in reversed order
+  (`snoitcurtsnI\nytefaS` for "Safety Instructions"). On a different manual's
+  error-code page (LG dryer), the same function worked reasonably well. No
+  way to know in advance which behavior a given page would get.
+- **Severity**: Medium — didn't block anything since it wasn't adopted, but
+  cost real investigation time, and would have been a nasty silent-data-
+  quality bug if trusted without checking real output.
+- **Workaround**: Didn't use `pdfplumber`'s table extraction at all. Used
+  PyMuPDF for extraction and a much simpler content heuristic
+  (`looks_like_table()`: does the section's plain reading-order text pair a
+  problem-side phrase with a solution-side phrase) instead of any geometric
+  table reconstruction. See `docs/pdf-extraction-library-choice.md`.
+- **Actionable suggestion**: Never trust a PDF table-extraction library's
+  output on a new document type without inspecting a real result first —
+  "table detected" and "table detected correctly" are very different claims,
+  and the failure mode (silently wrong columns, reversed text) isn't obviously
+  wrong at a glance.
+
+### 2026-09-23 — bold text at body size falsely triggered heading detection, shredding the exact content we need
+
+- **Tool/SDK**: `fixit_mcp.ingestion.parser` (this project's own code).
+- **Task attempted**: Detecting section headings via font size/weight, per
+  the step's own design ("layout signals (font size/weight if available)").
+- **Steps taken**: First implementation treated any bold line as a heading
+  candidate. Ran it on `ge-jbp26-range.pdf`'s actual F-code troubleshooting
+  table and inspected the output chunks.
+- **Expected**: The troubleshooting table (the single most important piece of
+  content in this whole step) would stay as one coherent, readable section.
+- **Actual**: GE typesets the "Problem"/"Possible Causes" half of that table
+  in **bold at the same font size as body text**. Treating bold alone as a
+  heading signal meant nearly every other line in the table was detected as
+  a new section heading, fragmenting the F-code entry across dozens of
+  one-line "sections" and producing 356 chunks for a 28-page manual.
+- **Severity**: High — this directly broke the content the entire ingestion
+  step exists to preserve, and would have silently shipped a garbage
+  "error-code table" chunk if the raw output hadn't been inspected before
+  moving on, as the task explicitly asked for.
+- **Workaround**: Stopped trusting bold alone. A line only counts as a
+  heading via the font-based signal when it's notably *larger* than body text
+  (ratio ≥ 1.3), or bold *and* at least somewhat larger (ratio ≥ 1.2 with
+  bold) — never bold at 100% body size alone. See `heading_info()` and its
+  regression test `test_heading_info_ignores_bold_at_body_size`.
+- **Actionable suggestion**: When building heading/structure detection from
+  font metadata, always test against a real table or form with a bolded
+  column header, not just prose headings — that's the case that breaks a
+  naive "bold = heading" rule, and it's a common enough manual layout that it
+  will show up in a real corpus, not just as an edge case.
+
+### 2026-09-23 — corrupted font encoding in two manuals feeds bogus heading detection, compounding the damage
+
+- **Tool/SDK**: `pymupdf` extraction of `ge-gfe28gynfs-refrigerator.pdf` and
+  `lg-dlex8000w-dryer.pdf` (also affects `pypdf`, `pdfplumber` — see the
+  fetch-step friction entries above for the base issue).
+- **Task attempted**: Chunking these two manuals' troubleshooting/error-code
+  sections without cutting the actual error content into fragments.
+- **Steps taken**: These two PDFs have text runs whose extracted output is
+  garbled (e.g. `)LOWHU FDUWULGJH` for "Filter cartridge", or `U&` for what
+  should be a real LG dryer code like `tE1`) because of a broken font
+  ToUnicode mapping in the source PDF. Inspected the resulting chunks around
+  each manual's actual error/fault-code table.
+- **Expected**: Garbled text would just look garbled inline within otherwise
+  normal chunks.
+- **Actual**: The garbled runs are *also* usually mostly-uppercase, which fed
+  directly into the ALL-CAPS heading heuristic and got misdetected as new
+  section headings — splitting the GE fridge's dispenser "Error message"
+  reference and the LG dryer's Error Code table across several extra chunks
+  they shouldn't have been split across. One data-quality problem in the
+  source PDF compounded into a second, structural one in our own parsing.
+- **Severity**: Medium — the affected content is still present and legible
+  in the resulting chunks (nothing is silently lost), just spread across a
+  couple more, smaller chunks than it should be.
+- **Workaround**: Added a cheap guard to `is_allcaps_heading()`: reject
+  candidates that don't start with an actual letter, since these corrupted
+  runs typically start with a stray digit/punctuation glyph standing in for
+  the real first letter. This measurably reduced (but did not eliminate —
+  a garbled run that happens to start with a real letter, e.g. "AUTO
+  FILLXQGHUILOOQRILOO", still slips through) the over-fragmentation. Did
+  **not** attempt to fix the underlying font/glyph corruption itself
+  (e.g. via OCR or CMap-offset detection) — out of scope for this step.
+- **Actionable suggestion**: A real ingestion pipeline should flag pages with
+  a high proportion of non-dictionary "words" (a cheap language-model-free
+  check) as candidates for an OCR fallback pass, since PDF font/ToUnicode
+  corruption like this appears to not be rare across real manufacturer PDFs
+  (it showed up in 2 of 5 manuals here, from two different manufacturers).

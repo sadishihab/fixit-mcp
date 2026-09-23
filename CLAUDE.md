@@ -68,6 +68,15 @@ Alexa+ MCP Toolkit and helps customers with home appliances:
   Seeded `Appliance` records (`fixit_mcp.repository.in_memory`) link to a
   manifest entry via `manual_id`; brand+model must match the manifest entry
   they reference.
+- `fixit_mcp.ingestion.parser` (`scripts/parse_manuals.py`, `make
+  parse-manuals`) parses downloaded manual PDFs into section-aware
+  `ManualChunk`s, written to `data/manuals/parsed/<manual_id>.json`
+  (gitignored, derived data). Extraction is PyMuPDF-based; see
+  `docs/pdf-extraction-library-choice.md` for why. Heading/table detection
+  here is heuristic and best-effort by design — see `FRICTION_LOG.md` for the
+  real failure modes hit (bold-at-body-size false headings, source-PDF font
+  corruption) and how they were mitigated. This module is offline tooling
+  only, never imported by the running server.
 
 ## Testing
 
@@ -85,6 +94,9 @@ Alexa+ MCP Toolkit and helps customers with home appliances:
 
 ## What's explicitly out of scope for the current milestone
 
-RAG/ingestion pipeline, auth/account linking, AWS deployment, MCP Apps UI, and
-any web client. See `docs/alexa-plus-requirements.md` for the full
+Manual PDFs are now fetched (`fixit_mcp.repository`, step 2a) and parsed into
+chunks (`fixit_mcp.ingestion.parser`, step 2b), but nothing downstream of
+that yet: no embeddings, no retrieval/RAG, no error-code extraction tool, no
+Bedrock/Strands, no AWS deployment, no auth/account linking, no MCP Apps UI,
+no web client. See `docs/alexa-plus-requirements.md` for the full
 done/todo/not-needed checklist against the Alexa+ MCP Toolkit requirements.
