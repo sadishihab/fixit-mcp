@@ -4,7 +4,9 @@ from fixit_mcp.config import Settings
 from fixit_mcp.logging import configure_logging
 from fixit_mcp.repository.base import ApplianceRepository
 from fixit_mcp.repository.in_memory import InMemoryApplianceRepository
+from fixit_mcp.retrieval.codes import ErrorCodeIndex, load_index
 from fixit_mcp.tools.appliances import register_appliance_tools
+from fixit_mcp.tools.diagnose import register_diagnose_tool
 
 SERVER_INSTRUCTIONS = (
     "FixIt helps customers diagnose appliance error codes, remembers which "
@@ -18,8 +20,14 @@ SERVER_INSTRUCTIONS = (
 def create_server(
     settings: Settings | None = None,
     repository: ApplianceRepository | None = None,
+    error_code_index: ErrorCodeIndex | None = None,
 ) -> FastMCP:
-    """Build the FixIt FastMCP server: Streamable HTTP, stateless, with tools registered."""
+    """Build the FixIt FastMCP server: Streamable HTTP, stateless, with tools registered.
+
+    error_code_index is loaded from data/index/error_codes.json exactly once,
+    here at startup -- not per-request (rule 4, the <500ms budget). Callers
+    (tests) can inject a smaller index built from a fixture instead.
+    """
     settings = settings or Settings()
     configure_logging(settings.log_level)
 
@@ -33,7 +41,11 @@ def create_server(
         json_response=settings.json_response,
     )
 
-    register_appliance_tools(mcp, repository or InMemoryApplianceRepository())
+    repository = repository or InMemoryApplianceRepository()
+    error_code_index = error_code_index or load_index()
+
+    register_appliance_tools(mcp, repository)
+    register_diagnose_tool(mcp, repository, error_code_index)
 
     return mcp
 

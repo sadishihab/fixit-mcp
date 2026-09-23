@@ -726,6 +726,41 @@ Template for each entry:
   artifact that's invisible until you look at a real multi-page code table
   with overlap enabled, which single-chunk unit tests can't surface.
 
+### 2026-09-23 — the record schema needed by both sides lived on the wrong side of the offline/online boundary
+
+- **Tool/SDK**: `fixit_mcp.ingestion.extraction`, `fixit_mcp.retrieval.codes` (this
+  project's own code).
+- **Task attempted**: Load `data/index/error_codes.json` into memory at server
+  startup (step 3b), which needs to `pydantic.model_validate()` each row back
+  into `ErrorCodeRecord`.
+- **Steps taken**: Went to import `ErrorCodeRecord`/`normalize_code` for the
+  new `fixit_mcp.retrieval.codes` module and found both defined in
+  `fixit_mcp.ingestion.extraction` -- which `CLAUDE.md` explicitly documents
+  as "offline tooling only, never imported by the running server."
+- **Expected**: N/A -- this was step 3a's own design, written before a
+  server-side consumer existed, so the conflict wasn't visible until step 3b
+  actually tried to be that consumer.
+- **Actual**: Importing from `ingestion` would violate the project's own
+  standing architecture rule the moment the running server needed the same
+  schema `extraction.py` already defined -- two legitimate owners for one
+  type, on the wrong side of a boundary that's supposed to be one-directional
+  (offline -> committed JSON -> online, never online -> offline module).
+- **Severity**: Medium -- caught before writing any server code that would
+  have depended on the bad import, not shipped and then found by lint/tests.
+- **Workaround**: Moved `ErrorCodeRecord` and `normalize_code` into
+  `fixit_mcp.domain.models` (the existing neutral layer already shared by
+  both `Appliance`/`ApplianceList`), and had `fixit_mcp.ingestion.extraction`
+  re-export both via `__all__` so step 3a's existing tests and call sites
+  keep working unchanged. The running server now only ever imports from
+  `domain`, never `ingestion`.
+- **Actionable suggestion**: When a step defines a schema that a *future*
+  step's other side of an architectural boundary will obviously also need
+  (here: any record written to a committed JSON artifact will eventually be
+  read back by something), put it in the neutral/domain layer from the
+  start, even if only one side uses it yet -- moving it later is cheap, but
+  only if the conflict is caught before other code (or tests) accumulate on
+  the wrong side of it.
+
 ### 2026-09-23 — a manual's own generic/range placeholder gets extracted as if it were one real code
 
 - **Tool/SDK**: `fixit_mcp.ingestion.extraction.BedrockExtractor`.
@@ -759,3 +794,36 @@ Template for each entry:
   than a literal code, and fall back to full-text search or a "call service,
   the manual doesn't give a specific code for this" response instead of a
   failed lookup.
+
+### 2026-09-23 — my own illustrative docstring example wasn't real corpus data, and I almost demoed it as if it were
+
+- **Tool/SDK**: N/A (self-caught during manual verification of `diagnose_error`).
+- **Task attempted**: Demonstrate the `diagnose_error` tool's normalization +
+  Bosch-match behavior using the code `"E24"`, per the step's own requested
+  demo list.
+- **Steps taken**: Called `diagnose_error(error_code="E24")` against the real
+  running server with the real committed index, expecting a Bosch match,
+  before reporting results.
+- **Expected**: A found result, matching a real Bosch code.
+- **Actual**: `not_found`. `"E24"`/`"E:24-00"` was never real data -- it's an
+  example I wrote myself in `ErrorCodeRecord`'s docstring back in step 3a/3b
+  to illustrate the *format* of a real-looking code, and it doesn't
+  correspond to anything actually extracted from a manual. The real Bosch
+  codes in the committed index are E:20-60, E:30-00, E:31-00, E:32-00,
+  E:34-00, E:61-02, E:61-03, E:90-01, E:92-40. This is correct tool behavior
+  (never inventing a match), but reporting it without explanation would have
+  looked like the tool failed the requested demo rather than that the demo
+  request itself referenced a code that was never real.
+- **Severity**: Low -- caught before reporting to the user, by actually
+  running the demo rather than assuming a hand-written docstring example was
+  interchangeable with real corpus data.
+- **Workaround**: Reported the honest `not_found` result for `"E24"` as
+  requested, and additionally ran `"e20 60"` (a real Bosch code, in its
+  natural-language-ish spoken form) to actually demonstrate normalization +
+  a real Bosch match, flagging the discrepancy explicitly rather than
+  silently substituting one for the other.
+- **Actionable suggestion**: A schema docstring's illustrative example should
+  be visibly fake (e.g. `"E:XX-00"` or a clearly-invented brand) rather than
+  a plausible-looking real code format, specifically so it can never later
+  be mistaken for -- or accidentally used as -- a real test/demo value once
+  actual corpus data exists.

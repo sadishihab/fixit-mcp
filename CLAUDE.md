@@ -131,6 +131,41 @@ Alexa+ MCP Toolkit and helps customers with home appliances:
   that doesn't make sense as part of a code. Per-chunk extraction is cached
   by content hash (`data/index/.extract_cache/`, gitignored) so re-runs cost
   nothing once a chunk hasn't changed.
+- `ErrorCodeRecord` and `normalize_code` live in `fixit_mcp.domain.models`
+  (the neutral layer), not in `fixit_mcp.ingestion.extraction` where they
+  were first written in step 3a — `fixit_mcp.retrieval.codes` (below) needs
+  the same schema at server startup, and the running server must never
+  import from `ingestion`. `extraction.py` re-exports both via `__all__` so
+  existing call sites are unaffected. See `FRICTION_LOG.md` for why this
+  moved.
+- `fixit_mcp.retrieval.codes` loads `data/index/error_codes.json` into memory
+  **once**, at server startup (`load_index()`, called from `create_server()`)
+  — no file I/O or network in the request path, per rule 3/4. It also fixes
+  two gaps left open in step 3a's committed index, entirely at load time
+  (never by editing the committed JSON, so re-extraction stays idempotent):
+  (1) deduplicates by `(manual_id, code_normalized)`, preferring the record
+  with more populated content fields, then higher `extraction_confidence`
+  (see `FRICTION_LOG.md`'s Bosch `E:34-00` chunk-boundary entry, step 3a);
+  (2) routes records whose `error_code` is a manual's own range/placeholder
+  description (e.g. `"E:01-00 to E:90-10"`, `"F— and a number or letter"` —
+  see `FRICTION_LOG.md`, step 3a) into a separate `family_by_manual` view
+  (`is_lookupable()`: normalized length or an English placeholder word in
+  the original text) instead of `lookupable_by_code`, so they can never be
+  returned as if they were a match for the specific code queried.
+- `fixit_mcp.tools.diagnose` registers the `diagnose_error` tool. Resolution
+  order: normalize the query code → exact match against
+  `ErrorCodeIndex.by_code()` → if `household_id` is given, narrow to the
+  household's owned appliances whose manual actually has that code (exactly
+  one → `found`; several → structured `ambiguous_appliance`, never guess;
+  none → fall back to brand/model filtering of the raw candidates) → no
+  match at all → structured `not_found` with `nearest_codes()`
+  (`difflib`-based, no LLM) and, if exactly one household appliance was
+  resolved, that manual's `family_note` if it has a range/placeholder entry.
+  A single response model (`status: Literal["found","ambiguous_appliance","not_found"]`)
+  is used instead of a `Union`, for simpler structured-output schema
+  generation. Never fabricates: an empty index field (e.g. LG's PS/PF/nP
+  codes, which the manual never explains) stays empty in the response rather
+  than being filled in.
 
 ## Testing
 
@@ -149,10 +184,12 @@ Alexa+ MCP Toolkit and helps customers with home appliances:
 ## What's explicitly out of scope for the current milestone
 
 Manual PDFs are fetched (`fixit_mcp.repository`, step 2a), parsed into chunks
-(`fixit_mcp.ingestion.parser`, step 2b-2e), and structured error codes are
-extracted into a committed index (`fixit_mcp.ingestion.extraction`, step
-3a) -- but nothing downstream of that yet: no MCP tool reads
-`data/index/error_codes.json`, no embeddings, no retrieval/RAG beyond exact
-code lookup, no Strands, no AWS deployment, no auth/account linking, no MCP
-Apps UI, no web client. See `docs/alexa-plus-requirements.md` for the full
-done/todo/not-needed checklist against the Alexa+ MCP Toolkit requirements.
+(`fixit_mcp.ingestion.parser`, step 2b-2e), structured error codes are
+extracted into a committed index (`fixit_mcp.ingestion.extraction`, step 3a),
+and the first tool (`diagnose_error`, step 3b) serves exact-code lookups from
+that index (`fixit_mcp.retrieval.codes`) — but nothing beyond that yet: no
+embeddings, no fuzzy/semantic retrieval beyond `difflib` nearest-match
+suggestions, no Strands, no AWS deployment, no auth/account linking, no MCP
+Apps UI, no web client, no parts-ordering or maintenance-scheduling tools.
+See `docs/alexa-plus-requirements.md` for the full done/todo/not-needed
+checklist against the Alexa+ MCP Toolkit requirements.

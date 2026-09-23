@@ -28,51 +28,21 @@ import json
 import re
 from typing import Literal, Protocol
 
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from fixit_mcp.domain.models import ErrorCodeRecord, normalize_code
 from fixit_mcp.ingestion.parser import ManualChunk
 
-
-class ErrorCodeRecord(BaseModel):
-    """One extracted, cited error-code record.
-
-    Every field beyond error_code/code_normalized/extraction_confidence is
-    extracted *only* from what the manual's text actually states -- a
-    missing field is an empty list/string, never a guess.
-    """
-
-    manual_id: str
-    brand: str
-    model: str
-    appliance_type: str
-    error_code: str = Field(description="The manufacturer's exact spelling, e.g. 'E:24-00' or 'tE1'.")
-    code_normalized: str = Field(description="Uppercased, separator-stripped error_code, for lookup.")
-    meaning: str = Field(default="", description="What the code means, per the manual. Empty if not stated.")
-    likely_causes: list[str] = Field(default_factory=list)
-    repair_steps: list[str] = Field(default_factory=list, description="In the order the manual gives them.")
-    parts_needed: list[str] = Field(default_factory=list)
-    safety_warnings: list[str] = Field(
-        default_factory=list, description="Carried over verbatim in substance."
-    )
-    difficulty: Literal["easy", "moderate", "call_service"] | None = Field(
-        default=None, description="Only set when the manual's own guidance clearly implies one."
-    )
-    source_page: int
-    source_section: str | None
-    source_chunk_id: str
-    extraction_confidence: float = Field(ge=0.0, le=1.0)
-
-
-def normalize_code(code: str) -> str:
-    """Uppercased, separator-stripped form of a manufacturer error code.
-
-    "E:24-00" -> "E2400", "tE1" -> "TE1", "E24" -> "E24" -- lets a lookup key
-    on a consistent form without claiming that differently-formatted codes
-    for the same fault are the same string (they aren't collapsed further
-    than stripping punctuation and case).
-    """
-    return re.sub(r"[^A-Za-z0-9]", "", code).upper()
+__all__ = [
+    "ErrorCodeRecord",
+    "normalize_code",
+    "ErrorCodeExtractor",
+    "StubExtractor",
+    "BedrockExtractor",
+    "ExtractionSettings",
+    "make_extractor",
+]
 
 
 class ErrorCodeExtractor(Protocol):
