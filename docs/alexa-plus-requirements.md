@@ -1,0 +1,23 @@
+# Alexa+ MCP Toolkit requirements checklist
+
+Compiled from the official Alexa+ MCP Toolkit docs. Status reflects this
+repo's state as of the initial scaffolding step (`0.1.0`).
+
+Sources:
+- [MCP Toolkit overview](https://developer.amazon.com/docs/alexaplus/add-ons/mcp-toolkit-overview.html)
+- [MCP Toolkit quickstart](https://developer.amazon.com/docs/alexaplus/add-ons/mcp-toolkit-quickstart.html)
+- [MCP Toolkit client lifecycle](https://developer.amazon.com/docs/alexaplus/add-ons/mcp-toolkit-client-lifecycle.html)
+
+| Requirement | Status | Notes |
+|---|---|---|
+| Streamable HTTP transport | **Done** | `FastMCP(..., stateless_http=True)`, served at `/mcp`. See `src/fixit_mcp/server.py`. |
+| MCP spec 2025-11-25 support | **Done** | `mcp==1.30.0`'s `LATEST_PROTOCOL_VERSION`. Verified by `tests/integration/test_server_protocol.py`. |
+| Negotiate older client protocol versions (docs show client sending `2025-03-26`) | **Done** | SDK echoes back any version in `SUPPORTED_PROTOCOL_VERSIONS`. Verified by `tests/integration/test_server_legacy_protocol.py`. |
+| Round-trip tool latency < 500ms | **Done** (local) | `tests/integration/test_latency.py` asserts p95 < 100ms locally over 50 calls, well inside the 500ms budget. Real-world latency once deployed remotely still needs re-validation. |
+| Server reachable via a remote HTTPS URL | **Todo** | Not deployed yet. `make tunnel` gives a temporary HTTPS URL via cloudflared for local demos; a durable URL needs the future AgentCore Runtime deployment. |
+| MCP Apps extension (visual repair cards) | **Not built this step** | Explicitly out of scope for this scaffolding step per project plan. Planned for a later milestone (see `CLAUDE.md`). |
+| OAuth 2.1 + PKCE account linking | **Not built this step** | No auth in this step by design — single unauthenticated tool, no per-customer account linking yet. Required before any customer-specific/write tool ships. |
+| `resource` parameter (RFC 8707) on auth requests | **Not needed yet** | Depends on OAuth account linking above. |
+| Checkout / payment handoff (for ordering parts) | **Not built this step** | Part-ordering tool is a future milestone; checkout flow depends on it. |
+| `addon.json` manifest (store listing, icons, MCP endpoint URL) | **Todo** | Needed at submission/certification time, not for local dev. Requires: name/description (≤123 chars), example phrases, privacy policy + terms URLs, 6 icon sizes (72/64/88/126/180/241 px), and the HTTPS MCP endpoint URL. |
+| Deploy/register via Agent Skill or Alexa AI CLI (`alexa-ai deploy`) | **Todo** | Depends on the remote HTTPS URL and `addon.json` above. |
