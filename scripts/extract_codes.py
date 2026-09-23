@@ -2,9 +2,12 @@
 """Extract structured error-code records from data/manuals/parsed/*.json.
 
 Writes data/index/error_codes.json -- COMMIT this file, it's the artifact
-the running MCP server will eventually load. Caches per chunk by a content
-hash (data/index/.extract_cache/, gitignored) so re-runs cost nothing once a
-chunk's text hasn't changed.
+the running MCP server will eventually load. Caches per chunk by a hash of
+(chunk text + which extractor/model produced it) in data/index/.extract_cache/
+(gitignored), so a re-run with the *same* extractor costs nothing once a
+chunk's text hasn't changed -- but switching FIXIT_EXTRACTOR (e.g. stub ->
+bedrock) always misses the cache and re-extracts for real, rather than
+silently serving another extractor's stale output (see FRICTION_LOG.md).
 
 Usage:
     FIXIT_EXTRACTOR=stub uv run python scripts/extract_codes.py
@@ -56,10 +59,23 @@ def is_worth_extracting_from(chunk: ManualChunk) -> bool:
     return bool(_TROUBLESHOOTING_HEADING_RE.search(chunk.section_heading or ""))
 
 
-def chunk_cache_key(chunk: ManualChunk) -> str:
-    """Content hash of the chunk text -- a re-run after re-parsing costs
-    nothing as long as the chunk's text hasn't actually changed."""
-    return hashlib.sha256(chunk.text.encode("utf-8")).hexdigest()[:16]
+def extractor_tag(settings: ExtractionSettings) -> str:
+    """Identifies which extractor+model produced a cached result. Mixed into
+    the cache key so switching FIXIT_EXTRACTOR (or bedrock_model_id) can
+    never silently serve another extractor's stale cached output -- see
+    FRICTION_LOG.md for the real incident this fixes."""
+    if settings.extractor == "stub":
+        return "stub"
+    return f"bedrock:{settings.bedrock_model_id}"
+
+
+def chunk_cache_key(chunk: ManualChunk, tag: str) -> str:
+    """Content hash of the chunk text plus the extractor tag -- a re-run
+    with the same extractor after re-parsing costs nothing as long as the
+    chunk's text hasn't actually changed, but switching extractors always
+    misses the cache and re-extracts for real."""
+    payload = f"{tag}::{chunk.text}"
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 
 
 def load_chunks(manual_id: str) -> list[ManualChunk]:
@@ -78,7 +94,7 @@ def write_cached_records(cache_path: Path, records: list[ErrorCodeRecord]) -> No
     cache_path.write_text(json.dumps([r.model_dump() for r in records], indent=2))
 
 
-def process_manual(manual_id: str, extractor, force: bool) -> tuple[list[ErrorCodeRecord], dict]:
+def process_manual(manual_id: str, extractor, tag: str, force: bool) -> tuple[list[ErrorCodeRecord], dict]:
     chunks = load_chunks(manual_id)
     candidates = [c for c in chunks if is_worth_extracting_from(c)]
 
@@ -89,7 +105,7 @@ def process_manual(manual_id: str, extractor, force: bool) -> tuple[list[ErrorCo
     output_tokens = 0
 
     for chunk in candidates:
-        cache_path = CACHE_DIR / f"{chunk_cache_key(chunk)}.json"
+        cache_path = CACHE_DIR / f"{chunk_cache_key(chunk, tag)}.json"
         cached = None if force else load_cached_records(cache_path)
         if cached is not None:
             records.extend(cached)
@@ -129,6 +145,7 @@ def main() -> int:
 
     settings = ExtractionSettings()
     extractor = make_extractor(settings)
+    tag = extractor_tag(settings)
 
     all_manual_ids = sorted(p.stem for p in PARSED_DIR.glob("*.json"))
     if not all_manual_ids:
@@ -150,7 +167,7 @@ def main() -> int:
     total_output_tokens = 0
 
     for manual_id in target_manual_ids:
-        records, stats = process_manual(manual_id, extractor, args.force)
+        records, stats = process_manual(manual_id, extractor, tag, args.force)
         new_records.extend(records)
         total_input_tokens += stats["input_tokens"]
         total_output_tokens += stats["output_tokens"]

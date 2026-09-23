@@ -646,3 +646,116 @@ Template for each entry:
   surface -- verify against a current source at the moment the number is
   first going to be shown to someone making a real spending decision, not
   just at implementation time.
+
+### 2026-09-23 — the extraction cache was keyed only by chunk content, not by which extractor produced it
+
+- **Tool/SDK**: `scripts/extract_codes.py` (this project's own code).
+- **Task attempted**: Run `BedrockExtractor` on the four manuals that had
+  previously only been run through `StubExtractor` (during the earlier
+  pipeline smoke test), without re-paying for the LG dryer manual already
+  verified.
+- **Steps taken**: Noticed before running anything: `chunk_cache_key()`
+  hashed only `chunk.text`, with no reference to which extractor (or model)
+  produced the cached result.
+- **Expected**: N/A -- caught by inspection before it caused a real problem.
+- **Actual**: Running `FIXIT_EXTRACTOR=bedrock` without `--force` on the four
+  remaining manuals would have silently hit the *stub* extractor's cached
+  results for every one of their already-considered chunks (populated during
+  the very first `FIXIT_EXTRACTOR=stub` run), since the cache had no way to
+  tell "this chunk's result came from a regex match, not a real model call."
+  The run would have reported "0 sent, N cache hits" and produced the stub's
+  code-only records while claiming to be a Bedrock run -- wrong in a way
+  that wouldn't have been obvious from the output alone.
+- **Severity**: High if shipped -- a silently-wrong data source is worse
+  than an obviously-missing one, and this exact scenario (switching
+  extractors on a corpus already processed by the other one) is precisely
+  what step 3a's own design -- try stub first, then Bedrock -- guarantees
+  will happen on every real use of this tool.
+- **Workaround**: Fixed properly rather than patched around with `--force`:
+  `chunk_cache_key()` now hashes `extractor_tag + chunk.text` together
+  (`extractor_tag()` returns `"stub"` or `f"bedrock:{model_id}"`), so
+  switching extractors or models always misses the cache and re-extracts for
+  real, while re-running the *same* extractor+model on unchanged text still
+  costs nothing. Verified directly: the four-manual Bedrock run reported
+  "0 cache hits" for every manual except two chunks with byte-identical text
+  processed twice within the same run (legitimate same-run dedup, not stale
+  cross-extractor reuse).
+- **Actionable suggestion**: Any cache keyed by "content hash" alone is
+  implicitly claiming the *function* that produced the cached value is
+  fixed. The moment that function becomes configurable (a different
+  extractor, a different model, a different prompt version), the function's
+  identity has to be part of the key too -- worth a standing checklist item
+  for any content-hash cache added to this project going forward (the
+  chunk-cache-key pattern also appears in `scripts/fetch_manuals.py` and
+  should be checked if that ever becomes configurable).
+
+### 2026-09-23 — chunk overlap produced two records for the same code, one incomplete
+
+- **Tool/SDK**: `fixit_mcp.ingestion.extraction.BedrockExtractor` interacting
+  with `fixit_mcp.ingestion.parser`'s chunk-overlap design (step 2b).
+- **Task attempted**: Verify every field of the Bosch dishwasher's 13
+  extracted records traces to source text, per the user's explicit accuracy
+  check.
+- **Steps taken**: Compared each record against its `source_chunk_id`'s
+  exact text. `E:34-00` appeared as *two* separate records.
+- **Actual**: Both are faithful to their own chunk, but incomplete/complete
+  differently: `E:34-00`'s entry falls right at the boundary between
+  `chunk-0276` and `chunk-0277`. Chunk 276 ends mid-entry (captures only
+  "Water is continuously running into the appliance. / 1. Turn off the water
+  faucet.", cutting off before step 2), so that record's `repair_steps` has
+  only one step (confidence 0.95). Chunk 277 starts with the same entry
+  reproduced via chunking's 200-char overlap (which exists precisely so
+  context isn't lost at a boundary) and *does* include step 2 ("Call
+  customer service"), so that record is complete (confidence 1.0). Neither
+  record is wrong -- each is a correct read of what its chunk actually
+  contains -- but the same code now has two entries in
+  `data/index/error_codes.json`, one strictly worse than the other.
+- **Severity**: Medium -- not a fabrication (the explicit thing this step
+  was checking for), but a real completeness/dedup gap: a lookup by
+  `code_normalized` today would need to pick between two candidates, and
+  naively picking the first would sometimes get the incomplete one.
+- **Workaround**: None applied this step -- documenting rather than
+  reaching for a fix under time pressure, since the right fix depends on
+  what a future lookup tool actually needs (merge by normalized code and
+  keep the highest-confidence/most-complete record? keep both and let the
+  caller decide? re-chunk with code-table rows never split at all?).
+- **Actionable suggestion**: A future step should deduplicate
+  `data/index/error_codes.json` by `(manual_id, code_normalized)`, preferring
+  the record with more populated fields and/or higher
+  `extraction_confidence` -- this is exactly the kind of chunk-boundary
+  artifact that's invisible until you look at a real multi-page code table
+  with overlap enabled, which single-chunk unit tests can't surface.
+
+### 2026-09-23 — a manual's own generic/range placeholder gets extracted as if it were one real code
+
+- **Tool/SDK**: `fixit_mcp.ingestion.extraction.BedrockExtractor`.
+- **Task attempted**: Understand why `ge-jbp26-range` (the GE range, whose
+  manual only ever describes error codes generically, see step 2b's
+  friction log) went from 0 codes found (stub) to 1 (Bedrock), and whether
+  that 1 is real.
+- **Actual**: The extracted `error_code` is the literal string `"F— and a
+  number or letter"` -- the manual's own placeholder description ("'F— and a
+  number or letter' flash in the display... you have a function error
+  code"), not an instantiated code like `"F1"`. Bosch's dishwasher manual has
+  the same pattern for its catch-all case: `error_code: "E:01-00 to
+  E:90-10"`, a *range*, not a single code. Both are faithful, verbatim
+  transcriptions of what the manual actually prints as the identifying label
+  for that troubleshooting entry -- not fabricated -- but `code_normalized`
+  for both is a long, non-lookup-able mangled string
+  (`FANDANUMBERORLETTER`, `E0100TOE9010`), so neither is usable the way a
+  real `code_normalized` match (`E2060`, `TE1`) is.
+- **Severity**: Low -- correctly follows the "preserve the manufacturer's
+  exact spelling" instruction to its logical conclusion; the manual itself
+  never gives GE range owners a concrete code to look up, so there's no more
+  specific truth to extract. Worth knowing about, not a bug to fix.
+- **Workaround**: None needed -- flagging for awareness rather than changing
+  behavior, since inventing a fake instantiated code family (e.g.
+  synthesizing `"F1"`..`"F9"` records) would be exactly the kind of guess
+  this project's design explicitly forbids.
+- **Actionable suggestion**: A future consumer of `error_codes.json` that
+  does exact-match lookup on `code_normalized` should treat a very long
+  normalized value (or one containing common English words once stripped of
+  punctuation) as a signal that this is a described range/pattern rather
+  than a literal code, and fall back to full-text search or a "call service,
+  the manual doesn't give a specific code for this" response instead of a
+  failed lookup.
