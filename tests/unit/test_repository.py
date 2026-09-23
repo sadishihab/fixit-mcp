@@ -9,8 +9,24 @@ def test_list_by_household_returns_seeded_appliances() -> None:
 
     appliances = repo.list_by_household("house-001")
 
-    assert len(appliances) == 2
-    assert {a.brand for a in appliances} == {"Whirlpool", "Bosch"}
+    assert len(appliances) == 3
+    assert {a.brand for a in appliances} == {"GE", "Bosch"}
+    assert {a.appliance_type for a in appliances} == {"refrigerator", "dishwasher", "oven"}
+
+
+def test_list_by_household_appliances_link_to_a_manual_id() -> None:
+    repo = InMemoryApplianceRepository()
+
+    appliances = repo.list_by_household("house-001") + repo.list_by_household("house-002")
+
+    assert all(a.manual_id for a in appliances)
+    assert {a.manual_id for a in appliances} == {
+        "ge-gfe28gynfs-refrigerator",
+        "bosch-she53b75uc-dishwasher",
+        "ge-jbp26-range",
+        "ge-gtw680bsjws-washer",
+        "lg-dlex8000w-dryer",
+    }
 
 
 def test_list_by_household_unknown_household_returns_empty_list() -> None:
@@ -29,6 +45,7 @@ def test_list_by_household_uses_injected_seed() -> None:
                 appliance_type="refrigerator",
                 purchase_date=date(2020, 1, 1),
                 warranty_end_date=date(2022, 1, 1),
+                manual_id="samsung-rf28-refrigerator",
             )
         ]
     }
@@ -46,4 +63,4 @@ def test_list_by_household_returns_copy_not_internal_list() -> None:
     appliances = repo.list_by_household("house-001")
     appliances.clear()
 
-    assert len(repo.list_by_household("house-001")) == 2
+    assert len(repo.list_by_household("house-001")) == 3

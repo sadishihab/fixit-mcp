@@ -45,5 +45,5 @@ async def test_tool_call_still_works_with_legacy_protocol_version(server_url: st
 
             assert result.isError is False
             assert result.structuredContent["household_id"] == "house-002"
-            assert len(result.structuredContent["appliances"]) == 1
-            assert result.structuredContent["appliances"][0]["brand"] == "LG"
+            assert len(result.structuredContent["appliances"]) == 2
+            assert {a["brand"] for a in result.structuredContent["appliances"]} == {"GE", "LG"}

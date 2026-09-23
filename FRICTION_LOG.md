@@ -112,3 +112,66 @@ Template for each entry:
   the deprecated name).
 - **Actionable suggestion**: Update AWS's sample code to the current function
   name.
+
+### 2026-09-23 — whirlpool.com blocks all programmatic PDF fetches with a bare 403
+
+- **Tool/SDK**: whirlpool.com's document CDN (`whirlpool.com/content/dam/global/documents/...`).
+- **Task attempted**: Building `data/manuals/manifest.yaml` (step 2a), wanted
+  to keep the household's original seed appliances (a Whirlpool refrigerator
+  and dryer) and link them to their real, official manuals.
+- **Steps taken**: Found several correct-looking `whirlpool.com/content/dam/...`
+  PDF URLs via search (owner's manuals, spec sheets, repair parts lists).
+  Verified each with `curl` first, including with a realistic Chrome
+  `User-Agent` and an explicit `Referer: https://www.whirlpool.com/` header,
+  both as `HEAD` and full `GET` requests.
+- **Expected**: A `200` with `Content-Type: application/pdf`, same as every
+  other manufacturer CDN checked in this step.
+- **Actual**: Every single `whirlpool.com/content/dam/...` URL returned `403`
+  with a small `text/html` body, regardless of URL, method, or headers —
+  including URLs whose PDFs clearly exist and are linked from whirlpool.com's
+  own pages. This looks like bot/IP-based blocking (e.g. Akamai) rather than
+  anything about the specific request, since varying headers changed nothing.
+- **Severity**: High for this task specifically — it eliminated an entire
+  manufacturer (and the appliances already seeded from step 1) from being
+  usable, not because the manuals don't exist or aren't free, but because the
+  CDN won't serve them to a non-browser client from this environment.
+- **Workaround**: Dropped Whirlpool from the manifest entirely and re-picked
+  brands/models (GE, Bosch, LG) whose document CDNs served plain `curl`
+  requests without issue. Updated the seed appliance data in
+  `src/fixit_mcp/repository/in_memory.py` to match.
+- **Actionable suggestion**: For the real ingestion pipeline (not this
+  scaffolding step), don't assume "manufacturer publishes a free PDF" implies
+  "that PDF is fetchable by a script" — verify with the exact fetch method
+  (headless script, not a browser) that will run in production, and keep a
+  fallback list of alternate sources (or manual re-hosting) for manufacturers
+  known to block bots, Whirlpool included.
+
+### 2026-09-23 — a filename/title match isn't proof the PDF is the right manual
+
+- **Tool/SDK**: N/A (manual-sourcing research, `media3.bosch-home.com`).
+- **Task attempted**: Verifying a Bosch dishwasher manual PDF found via search
+  actually matches model `SHXM4AY55N` and contains an error-code table, before
+  adding it to the manifest.
+- **Steps taken**: Search returned `https://media3.bosch-home.com/Documents/MCDOC02675188_SHXM4AY55N.pdf`
+  — model number literally in the filename. Downloaded it and checked with
+  `pdfinfo`/`pdftotext` instead of trusting the filename.
+- **Expected**: A full use-and-care manual with a troubleshooting/error-code
+  section, matching the filename's implied model.
+- **Actual**: It's a real, valid PDF for that exact model — but only a 3-page
+  spec/tech-sheet (wattage, cycle count, dBA rating, etc.), with no
+  troubleshooting or error-code content at all. Filename match was a false
+  signal.
+- **Severity**: Medium — would have silently shipped a manifest entry with a
+  "manual" that's useless for the stated purpose (extracting error codes) if
+  content hadn't been checked.
+- **Workaround**: Actually opened every candidate PDF with `pdfinfo`/`pdftotext`
+  and grepped for model numbers and error/fault/troubleshooting keywords
+  before adding it to the manifest, rather than trusting search result titles
+  or filenames. Switched the dishwasher entry to a different Bosch model
+  (SHE53B75UC) whose manual is the real 60-page use-and-care guide with a
+  troubleshooting chapter.
+- **Actionable suggestion**: For the future ingestion pipeline, always run
+  this same "does it actually contain what we need" content check as an
+  automated manifest-validation step, not just a one-time manual check —
+  manufacturer CDNs mix spec sheets, install guides, and full manuals under
+  similar-looking filenames.

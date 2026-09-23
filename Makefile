@@ -1,4 +1,4 @@
-.PHONY: run test lint format inspector tunnel
+.PHONY: run test lint format inspector tunnel fetch-manuals
 
 run:
 	uv run python -m fixit_mcp
@@ -22,3 +22,8 @@ inspector:
 # which is what Alexa+'s MCP Toolkit needs since it requires a remote HTTPS endpoint.
 tunnel:
 	cloudflared tunnel --url http://localhost:8000
+
+# Downloads manuals listed in data/manuals/manifest.yaml to data/manuals/pdf/.
+# Pass FORCE=1 to re-download files that already exist.
+fetch-manuals:
+	uv run python scripts/fetch_manuals.py $(if $(FORCE),--force,)

@@ -23,8 +23,8 @@ async def test_list_my_appliances_over_streamable_http(server_url: str) -> None:
             assert result.isError is False
             assert result.structuredContent is not None
             assert result.structuredContent["household_id"] == "house-001"
-            assert len(result.structuredContent["appliances"]) == 2
-            assert {a["brand"] for a in result.structuredContent["appliances"]} == {"Whirlpool", "Bosch"}
+            assert len(result.structuredContent["appliances"]) == 3
+            assert {a["brand"] for a in result.structuredContent["appliances"]} == {"GE", "Bosch"}
 
 
 async def test_list_my_appliances_unknown_household_returns_empty_list(server_url: str) -> None:

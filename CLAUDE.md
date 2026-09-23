@@ -60,6 +60,14 @@ Alexa+ MCP Toolkit and helps customers with home appliances:
 - Tool descriptions are written for an LLM client (Alexa+) to read, not for
   humans skimming API docs: state plainly when to call the tool and what it needs.
 - Ruff for linting and formatting (`make lint`, `make format`).
+- Real appliance manuals are tracked as metadata only, in
+  `data/manuals/manifest.yaml` (id, brand, model, appliance_type, source_url,
+  source_note). The actual PDFs are downloaded on demand by
+  `scripts/fetch_manuals.py` (`make fetch-manuals`) into `data/manuals/pdf/`,
+  which is gitignored — **never commit manual PDFs**, only the manifest.
+  Seeded `Appliance` records (`fixit_mcp.repository.in_memory`) link to a
+  manifest entry via `manual_id`; brand+model must match the manifest entry
+  they reference.
 
 ## Testing
 

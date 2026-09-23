@@ -1,0 +1,74 @@
+# Manifest of real appliance manuals used to seed FixIt's manual-derived data.
+#
+# Every source_url was verified (2026-09-23) to resolve directly to a PDF
+# (HTTP 200, Content-Type: application/pdf) with a real GET request, and its
+# content was inspected with pdfinfo/pdftotext to confirm it's the manual it
+# claims to be. See scripts/fetch_manuals.py to download these locally.
+#
+# id: stable identifier, referenced by Appliance.manual_id in the seed data.
+# source_note: where the URL came from and why it's freely downloadable.
+
+- id: bosch-she53b75uc-dishwasher
+  brand: Bosch
+  model: SHE53B75UC
+  appliance_type: dishwasher
+  source_url: https://media3.bosch-home.com/Documents/9001798974_A.pdf
+  source_note: >
+    Hosted on media3.bosch-home.com, Bosch's own public document CDN for
+    consumer "Use and Care Manual" downloads -- no login required, linked
+    from Bosch's US product support pages. 60-page manual with a dedicated
+    "Troubleshooting" chapter that walks through display fault indications
+    ("Electronics have detected a fault", "give the error code") the way
+    Bosch dishwashers surface faults to the user.
+
+- id: ge-gfe28gynfs-refrigerator
+  brand: GE
+  model: GFE28GYNFS
+  appliance_type: refrigerator
+  source_url: https://images.salsify.com/image/upload/s--170s5gi6--/d0b4e5f8e545a0f8fac0aae3c6a2061c3c5de582.pdf
+  source_note: >
+    Linked directly from GE Appliances' own product support page
+    (products.geappliances.com/appliance/gea-specs/GFE28GYNFS/support) --
+    GE serves its manual PDFs from Salsify, its product-content-management
+    CDN, but the link is public and requires no login. Combined 168-page
+    owner's manual/installation guide covering the GFE/GFS/GNE/GFD French
+    door and bottom-freezer families (includes GFE28GYNFS); has a dispenser
+    "Error" message section for models with electronic dispenser controls.
+
+- id: ge-jbp26-range
+  brand: GE
+  model: JBP26
+  appliance_type: oven
+  source_url: https://www.geappliances.com/content/older-pdfs/49-80038.PDF
+  source_note: >
+    Hosted directly on geappliances.com's own public "older-pdfs" literature
+    archive -- no login required. Owner's manual for the JBP24/JBP26/JBP30/
+    JBP35 self-cleaning electric range family; has an explicit numeric fault
+    code system ("F-- and a number or letter flash in the display... you
+    have a function error code") with a troubleshooting table, the strongest
+    fault-code table of the five manuals in this manifest.
+
+- id: ge-gtw680bsjws-washer
+  brand: GE
+  model: GTW680BSJWS
+  appliance_type: washing_machine
+  source_url: https://images.salsify.com/image/upload/s--1qftSm-6--/bp1mjtmv6vaa0zz812ww.pdf
+  source_note: >
+    Linked directly from GE Appliances' own product support page
+    (products.geappliances.com/appliance/gea-specs/GTW680BSJWS/support), same
+    Salsify CDN pattern as the GFE28GYNFS manual above, public and login-free.
+    60-page owner's manual naming GTW680 explicitly; troubleshooting is
+    symptom-based ("Troubleshooting Tips") rather than a numeric code table --
+    this top-load model has no digital fault-code display.
+
+- id: lg-dlex8000w-dryer
+  brand: LG
+  model: DLEX8000W
+  appliance_type: dryer
+  source_url: https://www.lg.com/us/support/products/documents/DLGX8001.pdf
+  source_note: >
+    Hosted directly on lg.com's own public support document path
+    (lg.com/us/support/products/documents/), no login required. 48-page
+    owner's manual jointly covering the electric DLEX8000W/DLEX8000V and gas
+    DLGX8001W/DLGX8001V dryers; has a dedicated numeric "Error Code" table
+    ("Other problems may also be shown with error codes...").

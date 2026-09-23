@@ -10,3 +10,6 @@ build/
 .coverage
 htmlcov/
 .DS_Store
+
+# Downloaded manual PDFs (fetched by scripts/fetch_manuals.py) -- never commit these.
+data/manuals/pdf/
