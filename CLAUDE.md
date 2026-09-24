@@ -53,7 +53,7 @@ Alexa+ MCP Toolkit and helps customers with home appliances:
 - Storage is accessed through repository interfaces (e.g.
   `fixit_mcp.repository.base.ApplianceRepository`), never directly, so the
   backend can be swapped without touching callers -- see the persistence
-  bullet below for the two implementations that currently exist.
+  bullet below for the three implementations that currently exist.
 - Config via `pydantic-settings` (`fixit_mcp.config.Settings`), env-prefixed
   `FIXIT_*`.
 - Structured (JSON) logging via `structlog`; every tool call logs its latency in
@@ -173,20 +173,20 @@ Alexa+ MCP Toolkit and helps customers with home appliances:
 - **Household appliance persistence** (step 3c). `Appliance.purchase_date`/
   `warranty_end_date` are optional, and `manual_id` defaults to `""` (no
   manual on file yet), since a customer adding an appliance rarely knows all
-  of this upfront. Two `ApplianceRepository` implementations:
+  of this upfront. Three `ApplianceRepository` implementations:
   `InMemoryApplianceRepository` (`fixit_mcp.repository.in_memory`, plain
   dict, used by unit tests and available as the `FIXIT_REPOSITORY_BACKEND=memory`
   runtime option) and `SqliteApplianceRepository`
-  (`fixit_mcp.repository.sqlite`, the default runtime backend). SQLite (via
+  (`fixit_mcp.repository.sqlite`, the default runtime backend), plus
+  `AgentCoreMemoryApplianceRepository` (step 4b, see its own bullet
+  below). SQLite (via
   stdlib `sqlite3`, no new dependency) was chosen over a flat JSON file
   because each add/remove is one atomic transactional statement -- a crash
   mid-write can't corrupt a whole household's data the way rewriting an
   entire JSON file can -- and per-household lookups use a real index instead
   of parsing the whole store on every call. **This is the dev/demo
-  persistence layer only**: production is intended to run on **Amazon
-  Bedrock AgentCore Memory** instead, behind this same
-  `ApplianceRepository` interface, once deployed to AgentCore Runtime (see
-  the Architecture goals section above). `Settings.repository_backend`
+  persistence layer only**: on AgentCore Runtime local disk is per-session,
+  so production uses the `agentcore` backend (AgentCore Memory) instead. `Settings.repository_backend`
   (`FIXIT_REPOSITORY_BACKEND`, default `"sqlite"`) and `Settings.sqlite_path`
   (`FIXIT_SQLITE_PATH`, default `data/state/appliances.db`, gitignored)
   select and locate it. A fresh/empty store is seeded from the same default
@@ -252,10 +252,35 @@ Alexa+ MCP Toolkit and helps customers with home appliances:
   `scripts/smoke_test.py` is the end-to-end check for any running server URL
   (container now, AgentCore in step 4b). Use `--skip-latency` under QEMU
   emulation, because the latency it reports there is QEMU's, not the server's
-  (see `FRICTION_LOG.md`). **Open decision before step 4b:** on AgentCore
-  every session is a fresh microVM, so the SQLite store is neither durable
-  nor shared across conversations. See `FRICTION_LOG.md`'s step-4a "OPEN
-  DECISION" entry.
+  (see `FRICTION_LOG.md`). On AgentCore every session is a fresh microVM,
+  so the SQLite store is neither durable nor shared across conversations
+  (step 4a finding). That's why the deployed image must run the `agentcore`
+  backend, below.
+- **AgentCore Memory household store** (step 4b,
+  `fixit_mcp.repository.agentcore_memory`, `FIXIT_REPOSITORY_BACKEND=agentcore`).
+  Uses AgentCore Memory **short-term events** as a keyed record store:
+  actorId = household_id, one fixed registry sessionId
+  (`FIXIT_AGENTCORE_REGISTRY_SESSION_ID`), one event per appliance with a
+  `json` payload (`schema: fixit.appliance.v1`), and `extractionMode="SKIP"`
+  so nothing ever reaches LLM-driven long-term extraction. Long-term memory
+  records were rejected: they're built for semantic retrieval, use prefix
+  namespace matching, and have a 30 TPS account-wide list quota. The
+  accepted cost is that **events expire after at most 365 days** (the
+  memory's `eventExpiryDuration`). list/add are one AgentCore call each;
+  remove is two (ListEvents + DeleteEvent). Every call's latency is logged
+  as `agentcore_memory_call`. The boto3 client has tight timeouts (1s
+  connect, 2s read, at most 2 attempts), and the repository does one warm-up
+  read at startup. AWS errors propagate as tool errors, never as an empty
+  list. `clientToken` is a fresh uuid per `add()` call, never derived from
+  appliance_id, because AWS silently ignores a repeated token, which would
+  swallow a legitimate re-add. **Never seeds at runtime**: the demo
+  households go in via `scripts/seed_agentcore_memory.py` (`make
+  seed-agentcore`, idempotent by appliance_id, `RESET=1` clears only demo
+  households). See `FRICTION_LOG.md` (step 4b) for the reasoning. boto3 is a
+  runtime dependency as of this step. Unit tests use
+  `tests/fakes.FakeAgentCoreMemoryClient`. Live tests
+  (`tests/integration/test_agentcore_memory_live.py`) are opt-in via
+  `FIXIT_AGENTCORE_TESTS=1` + `FIXIT_AGENTCORE_MEMORY_ID`.
 
 ## Testing
 
@@ -279,13 +304,14 @@ extracted into a committed index (`fixit_mcp.ingestion.extraction`, step 3a),
 `diagnose_error` (step 3b) serves exact-code lookups from that index
 (`fixit_mcp.retrieval.codes`), a household's appliances are now real,
 persistent state the customer can add to and remove via `add_appliance`/
-`remove_appliance` (step 3c, `fixit_mcp.repository.sqlite`), and
+`remove_appliance` (step 3c, `fixit_mcp.repository.sqlite`; step 4b adds
+an AgentCore Memory backend for deployment), and
 `diagnose_error` has its first MCP Apps visual card (step 3d,
 `fixit_mcp.apps`) — but nothing beyond that yet: no embeddings, no
 fuzzy/semantic retrieval beyond `difflib` nearest-match suggestions, no
 Strands, no AWS deployment yet (the arm64 container image is built and
-verified locally, step 4a, but nothing is deployed; the SQLite store is a
-dev/demo stand-in for AgentCore Memory, see the persistence bullet above), no auth/account
+verified locally, step 4a, and household data can live in AgentCore
+Memory, step 4b, but nothing is deployed), no auth/account
 linking, no visual cards for any other tool, no web client, no
 parts-ordering or maintenance-scheduling tools. See
 `docs/alexa-plus-requirements.md` for the full done/todo/not-needed

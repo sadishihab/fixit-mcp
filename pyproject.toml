@@ -12,6 +12,9 @@ dependencies = [
     "pydantic-settings>=2.15.0",
     "structlog>=26.1.0",
     "pyyaml>=6.0.3",
+    # Runtime dependency since step 4b: the "agentcore" repository backend
+    # (AgentCore Memory) talks to AWS via the bedrock-agentcore data plane.
+    "boto3>=1.43.100",
 ]
 
 [build-system]
@@ -20,7 +23,6 @@ build-backend = "uv_build"
 
 [dependency-groups]
 dev = [
-    "boto3>=1.43.100",
     "httpx>=0.28.1",
     "pymupdf>=1.28.2",
     "pypdf>=6.19.0",

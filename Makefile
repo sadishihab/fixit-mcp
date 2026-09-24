@@ -1,5 +1,5 @@
 .PHONY: run test lint format inspector tunnel fetch-manuals parse-manuals extract-codes \
-	docker-build docker-run docker-smoke
+	docker-build docker-run docker-smoke docker-run-agentcore seed-agentcore
 
 run:
 	uv run python -m fixit_mcp
@@ -60,6 +60,17 @@ docker-run:
 	docker run --rm --name fixit-mcp --platform $(DOCKER_PLATFORM) -p 8000:8000 \
 		-v $(DOCKER_STATE_VOLUME):/app/data/state $(DOCKER_IMAGE)
 
+# The image on the "agentcore" backend, i.e. how it will run on AgentCore
+# Runtime: household data in real AgentCore Memory, nothing on local disk.
+# Local-only credential passing (host ~/.aws, read-only); on AgentCore
+# Runtime the execution role supplies credentials instead.
+docker-run-agentcore:
+	@test -n "$(FIXIT_AGENTCORE_MEMORY_ID)" || (echo "set FIXIT_AGENTCORE_MEMORY_ID" && exit 1)
+	docker run --rm --name fixit-mcp --platform $(DOCKER_PLATFORM) -p 8000:8000 \
+		-v $(HOME)/.aws:/aws:ro -e AWS_CONFIG_FILE=/aws/config -e AWS_SHARED_CREDENTIALS_FILE=/aws/credentials \
+		-e FIXIT_REPOSITORY_BACKEND=agentcore -e FIXIT_AGENTCORE_MEMORY_ID=$(FIXIT_AGENTCORE_MEMORY_ID) \
+		$(DOCKER_IMAGE)
+
 # Runs scripts/smoke_test.py against a server already listening on
 # localhost:8000 (e.g. `make docker-run` in another terminal). Skips the p95
 # latency check automatically when the image's platform differs from the
@@ -69,3 +80,11 @@ DOCKER_HOST_ARCH := $(shell uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64/ar
 docker-smoke:
 	uv run python scripts/smoke_test.py --url http://localhost:8000/mcp --wait 90 \
 		$(if $(filter linux/$(DOCKER_HOST_ARCH),$(DOCKER_PLATFORM)),,--skip-latency)
+
+# --- AgentCore Memory (household appliances, "agentcore" backend) ------------
+# Idempotently puts the demo households (house-001/002) into the memory
+# resource named by FIXIT_AGENTCORE_MEMORY_ID. The backend never seeds at
+# runtime (see FRICTION_LOG.md, step 4b). RESET=1 first clears everything in
+# the demo households (e.g. appliances added while rehearsing a demo).
+seed-agentcore:
+	uv run python scripts/seed_agentcore_memory.py $(if $(RESET),--reset,)

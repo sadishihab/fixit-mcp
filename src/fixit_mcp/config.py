@@ -21,6 +21,15 @@ class Settings(BaseSettings):
     json_response: bool = True
     # "sqlite" persists appliances across restarts (data/state/, gitignored) --
     # the default, so the demo works out of the box. "memory" is for tests and
-    # for anyone who wants a clean slate every run.
-    repository_backend: Literal["memory", "sqlite"] = "sqlite"
+    # for anyone who wants a clean slate every run. "agentcore" stores them in
+    # Amazon Bedrock AgentCore Memory -- the only backend whose data is shared
+    # across AgentCore Runtime sessions (each session is its own microVM, see
+    # FRICTION_LOG.md step 4a). Needs agentcore_memory_id and AWS credentials.
+    repository_backend: Literal["memory", "sqlite", "agentcore"] = "sqlite"
     sqlite_path: Path = DEFAULT_SQLITE_PATH
+    # The memory resource's id (not its ARN or name), e.g. "FixItHouseholds-a1B2c3D4e5".
+    agentcore_memory_id: str = ""
+    agentcore_region: str = "us-east-1"
+    # The one fixed AgentCore Memory sessionId each household's appliance
+    # events live under (actorId = household_id).
+    agentcore_registry_session_id: str = "appliance-registry"

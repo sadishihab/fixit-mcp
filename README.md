@@ -96,7 +96,8 @@ your local server.
 The `Dockerfile` builds the image Amazon Bedrock AgentCore Runtime will run:
 `linux/arm64`, non-root (UID 1000), prod dependencies only, serving
 `0.0.0.0:8000/mcp` in stateless mode, the same defaults as `make run`, so
-nothing is overridden. It's about 59 MB compressed and about 200 MB unpacked.
+nothing is overridden. It's about 76 MB compressed and about 235 MB unpacked
+(boto3 is included for the `agentcore` backend).
 
 ```bash
 # x86_64 hosts only, once per boot: register QEMU so arm64 images can build/run.
@@ -114,13 +115,64 @@ makes each call about 10x slower than native. Set `DOCKER_PLATFORM=linux/amd64`
 for a native local build if you need real latency numbers. The container
 tests are opt-in: `FIXIT_DOCKER_TESTS=1 uv run pytest tests/integration/test_container.py`.
 
-> **State persistence caveat.** The SQLite household store lives at
+### Household data in AgentCore Memory (`agentcore` backend)
+
+On AgentCore Runtime, local disk belongs to a single session, so household
+appliances are stored in **Amazon Bedrock AgentCore Memory** instead
+(`FIXIT_REPOSITORY_BACKEND=agentcore`). Each household is an actor, and each
+appliance is one event under a fixed `appliance-registry` session. See
+`src/fixit_mcp/repository/agentcore_memory.py` for the storage model, and
+`FRICTION_LOG.md` (step 4b) for why events rather than long-term records.
+**Events expire after at most 365 days.**
+
+One-time setup (region `us-east-1`):
+
+1. **Create the memory resource**: *Amazon Bedrock AgentCore → Memory →
+   Create memory*. Name it `FixItHouseholds`, set event expiry to **365 days**
+   (the maximum), and add **no strategies**, since this is short-term memory
+   only and no LLM extraction should run. Wait for status **ACTIVE**, then
+   copy the **memory ID** (e.g. `FixItHouseholds-a1B2c3D4e5`, not the ARN).
+2. **Grant the identity that runs the server** (your local IAM user now, the
+   AgentCore Runtime execution role later) exactly these three actions on
+   that one memory:
+
+   ```json
+   {
+     "Version": "2012-10-17",
+     "Statement": [{
+       "Sid": "FixItHouseholdAppliances",
+       "Effect": "Allow",
+       "Action": ["bedrock-agentcore:CreateEvent", "bedrock-agentcore:ListEvents", "bedrock-agentcore:DeleteEvent"],
+       "Resource": "arn:aws:bedrock-agentcore:us-east-1:<ACCOUNT_ID>:memory/<MEMORY_ID>"
+     }]
+   }
+   ```
+
+   Creating the memory (step 1) additionally needs
+   `bedrock-agentcore:CreateMemory` / `GetMemory` / `ListMemories` for
+   whoever does it. Those are one-time setup permissions that the server
+   itself never needs. No VPC is needed: the data plane is a public
+   regional endpoint.
+3. **Seed the demo households and verify**:
+
+   ```bash
+   export FIXIT_AGENTCORE_MEMORY_ID=<MEMORY_ID>
+   make seed-agentcore           # idempotent; RESET=1 clears demo-household rehearsal data first
+   FIXIT_AGENTCORE_TESTS=1 uv run pytest tests/integration/test_agentcore_memory_live.py -v -s
+   FIXIT_REPOSITORY_BACKEND=agentcore make run      # or: make docker-run-agentcore
+   ```
+
+The backend **never seeds at runtime**. A household with no events is
+simply empty. `make seed-agentcore` is the only way the demo households
+get into AgentCore Memory.
+
+> **State persistence caveat (default `sqlite` backend).** The SQLite household store lives at
 > `/app/data/state/appliances.db` inside the container. Locally,
 > `make docker-run` mounts a named volume there so data survives `docker rm`.
 > **AgentCore Runtime has no such volume by default.** Every new session
 > runs in a fresh microVM created from the image, so appliances added in one
-> Alexa+ conversation are gone in the next. This needs a decision before
-> deploying (step 4b). See `FRICTION_LOG.md` (step 4a) for the options.
+> Alexa+ conversation are gone in the next. Deploy with the `agentcore`
+> backend (below) instead, which keeps household data outside the container.
 
 ## Running tests
 
@@ -144,12 +196,23 @@ Test suite:
   (startup data files copied in, editable install, non-root, port 8000).
 - `tests/integration/test_container.py` — opt-in (`FIXIT_DOCKER_TESTS=1`):
   runs the real image and checks the smoke suite plus state persistence.
+  Its two agentcore tests also need `FIXIT_AGENTCORE_TESTS=1`.
+- `tests/unit/test_agentcore_memory_repository.py` — the `agentcore` backend
+  against a fake AgentCore Memory client (no AWS).
+- `tests/integration/test_agentcore_backend_server.py` — the full smoke suite
+  over real Streamable HTTP on the `agentcore` backend, with only AWS faked.
+- `tests/integration/test_agentcore_memory_live.py` — opt-in
+  (`FIXIT_AGENTCORE_TESTS=1`): real AgentCore Memory, including measured
+  per-operation and per-tool latency.
 
 ## AWS services used
 
-None yet at runtime — this milestone runs entirely locally. Planned: Amazon
-Bedrock AgentCore Runtime (hosting), Amazon Bedrock + Strands (offline
-ingestion pipeline for manual parsing / RAG).
+- **Amazon Bedrock AgentCore Memory**: household appliance storage at
+  runtime, when `FIXIT_REPOSITORY_BACKEND=agentcore`. Short-term events only,
+  with no LLM extraction strategies.
+- **Amazon Bedrock** (Claude): offline error-code extraction from manuals
+  (`FIXIT_EXTRACTOR=bedrock`), never at request time.
+- Planned: Amazon Bedrock AgentCore Runtime (hosting).
 
 ## Open-source components
 

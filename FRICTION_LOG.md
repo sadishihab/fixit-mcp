@@ -1160,3 +1160,145 @@ Template for each entry:
   conversation belongs in an external store behind a repository interface.
   The runtime docs could say "per-session" more prominently in the MCP
   guide itself, not only in the sessions page.
+
+### 2026-09-24 — AgentCore Memory is designed around conversations; using it as a household record store means choosing between two imperfect models
+
+- **Tool/SDK**: Amazon Bedrock AgentCore Memory (data plane
+  `bedrock-agentcore` 2024-02-28, boto3 1.43.100), docs at
+  docs.aws.amazon.com/bedrock-agentcore (memory types, short-term API,
+  `CreateMemory`, `BatchCreateMemoryRecords`, `ListMemoryRecords`, quotas).
+- **Task attempted**: Replace the per-microVM SQLite store (step 4a's open
+  decision) with AgentCore Memory, behind the unchanged
+  `ApplianceRepository` interface: exact-key list/add/remove of a
+  household's appliances, well inside the 500ms tool budget.
+- **Steps taken**: Read the memory type, short-term event, and long-term
+  record docs plus the API references and the quotas page. Inspected the
+  installed boto3 service model directly to see what the shipping SDK
+  actually supports.
+- **Expected**: A durable per-user key/value or document store with an
+  "agent memory" layer on top.
+- **Actual**: Two storage models, each a partial fit:
+  - **Short-term events** (`CreateEvent`/`ListEvents`/`DeleteEvent`): exact
+    reads by (actorId, sessionId), 200 TPS account quotas for create and
+    list, and a structured `json` payload type in current boto3, which the
+    devguide doesn't mention. But **every event expires**:
+    `eventExpiryDuration` is a *required* field capped at **365 days**, with
+    no "never" option. The API reference says the minimum is 3 days; the
+    quotas page says 7. Events are also immutable, so there's no update,
+    only delete and re-create.
+  - **Long-term records** (`BatchCreateMemoryRecords`, written directly
+    with no LLM extraction): no documented expiry. But they're designed
+    for semantic retrieval. `ListMemoryRecords` filters by namespace
+    **prefix** (`households/house-1` also matches `house-10` unless every
+    namespace ends in `/`), the list quota is **30 TPS account-wide**, and
+    the docs don't say how soon a written record becomes listable.
+- **Severity**: Medium. Neither model is wrong, but the obvious "just use
+  Memory" leads either to silent data expiry or to a search index used as
+  a database.
+- **Workaround**: Chose **short-term events**. Deterministic, exact-key,
+  higher quotas, and the path where read-after-write can be checked
+  directly (the live test does). Mapping: actorId = household_id, one
+  fixed registry session, one event per appliance, appliance_id in event
+  metadata. `extractionMode="SKIP"` keeps the store free of LLM
+  extraction. The memory is created with 365-day expiry and no strategies.
+  **The 365-day expiry is accepted and documented, not solved.** An
+  appliance registered and never touched again disappears after a year.
+  Fine for a hackathon demo, not for production; a production fix is
+  either periodic re-writes of old events or DynamoDB behind the same
+  interface.
+- **Actionable suggestion**: AWS could offer a non-expiring event option
+  (or document long-term records as a first-class direct-write store with
+  exact-match reads and stated consistency). It should also reconcile the
+  3-vs-7-day minimum between the API reference and the quotas page, and
+  document the `json` payload type in the devguide, not only the SDK model.
+
+### 2026-09-24 — AgentCore Memory silently ignores a repeated clientToken, which would have made demo resets silently no-op
+
+- **Tool/SDK**: AgentCore Memory `CreateEvent` (`clientToken`).
+- **Task attempted**: Make `add()` safe to retry (boto3 retries throttled
+  and 5xx calls automatically).
+- **Steps taken**: First draft derived the token from the data:
+  `clientToken=f"{household_id}:{appliance_id}"`. Then re-read the
+  parameter doc: "If this token matches a previous request, AgentCore
+  ignores the request, but does not return an error."
+- **Expected**: Idempotency tokens scoped to one logical request.
+- **Actual**: A data-derived token also dedupes *future, legitimate*
+  requests. Remove `app-001` from house-001, then re-add it (exactly what
+  `make seed-agentcore RESET=1` does), and the re-add returns success
+  while writing nothing. The appliance silently stays gone. No error to
+  catch, and a unit test with a naive fake would never see it.
+- **Severity**: Medium. Caught before it ever ran, but it's a silent
+  data-loss shape.
+- **Workaround**: Fresh `uuid4` token per `add()` call. boto3 resends the
+  same kwargs on its own retries, so those stay idempotent, while distinct
+  calls never collide. `FakeAgentCoreMemoryClient` models the documented
+  ignore-repeated-token behavior, and
+  `test_re_adding_an_appliance_after_removing_it_is_not_swallowed` pins it.
+- **Actionable suggestion**: When an API documents "matching token →
+  ignored, no error", make the test fake implement that literally. Never
+  derive idempotency tokens from business keys unless dedupe forever is
+  genuinely intended.
+
+### 2026-09-24 — Latency: AgentCore Memory publishes no numbers, and the bigger threat to the 500ms budget is Runtime itself
+
+- **Tool/SDK**: AgentCore Memory (data plane), AgentCore Runtime.
+- **Task attempted**: Before building, establish whether real read latency
+  could break the 500ms Alexa+ budget, the one finding that would force a
+  different storage choice.
+- **Steps taken**: Searched the devguide, API reference, quotas page, and
+  observability docs for latency figures. Searched for third-party
+  benchmarks.
+- **Expected**: Some published p50/p99, or at least a stated design target.
+- **Actual**: **None for Memory.** CloudWatch exposes a per-operation
+  `Latency` metric, but nothing documents expected values. The only
+  concrete numbers found concern **AgentCore Runtime**, not Memory: a
+  re:Post article (HTTP 403 to automated fetch, so seen only via search
+  summaries and **unverified at the source**) reports warm-session
+  requests at roughly 200ms p50 / under 500ms p99 and new-session starts
+  around 2.9s average. AWS's "new AgentCore runtime" blog says container
+  deployments keep a warm pool of about 10 VMs with sub-second starts.
+  If those hold, Runtime's own invocation overhead takes a large share of
+  the 500ms before any tool code runs, and a cold session start blows the
+  budget regardless of storage.
+- **Severity**: High as a risk, unconfirmed as a fact. Nothing here shows
+  Memory is too slow; nothing shows it's fast enough either.
+- **Workaround**: Designed to minimize Memory round trips (one call for
+  list/add, two for remove). Tight client timeouts, one startup warm-up
+  read, and every call's latency logged (`agentcore_memory_call`).
+  `tests/integration/test_agentcore_memory_live.py` measures per-op and
+  per-tool p50/p95 against a real memory and asserts the 500ms tool
+  budget. **Run it before committing to this design for deployment.**
+  Measured from a laptop, the numbers include internet RTT to us-east-1,
+  so they're pessimistic versus in-region Runtime.
+- **Actionable suggestion**: AWS should publish expected Memory data-plane
+  latency (even a same-region p50/p99 target) and put the Runtime
+  warm/cold latency figures in the Runtime docs rather than a re:Post
+  article.
+
+### 2026-09-24 — Seeding: why the AgentCore backend never seeds at runtime
+
+- **Tool/SDK**: `fixit_mcp.repository.agentcore_memory`,
+  `scripts/seed_agentcore_memory.py`.
+- **Task attempted**: Decide whether the agentcore backend should seed the
+  demo households the way `SqliteApplianceRepository` seeds an empty store.
+- **Steps taken**: Compared what "empty" means for each backend.
+- **Expected**: Carry over SQLite's "seed if empty".
+- **Actual**: SQLite's rule is safe because emptiness is a property of one
+  local file checked once at startup. With AgentCore Memory:
+  - There's no cheap "is the whole store empty" check. The per-household
+    version ("seed this household if it has no events") is **wrong**,
+    because it can't tell "new demo" from "a customer removed everything",
+    so it would resurrect deleted appliances.
+  - Every session's fresh microVM would run the check, concurrently, with
+    no uniqueness constraint on events.
+  - It would add AWS writes to startup or the request path, against the
+    latency budget.
+- **Severity**: Low. A design decision, recorded so it isn't "fixed" back
+  later.
+- **Workaround**: Runtime never seeds. `make seed-agentcore` is an explicit,
+  offline, idempotent (by appliance_id) step that only touches
+  `DEFAULT_SEED`'s household ids. `RESET=1` clears rehearsal data in the
+  demo households only, never a real customer's.
+- **Actionable suggestion**: For any shared remote store, keep demo/fixture
+  seeding out of the serving path entirely. It's an operator action with
+  an explicit blast radius, not a startup side effect.

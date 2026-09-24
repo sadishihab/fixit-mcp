@@ -3,6 +3,10 @@ from mcp.server.fastmcp import FastMCP
 from fixit_mcp.catalog.manifest import ManualCatalog, load_manual_catalog
 from fixit_mcp.config import Settings
 from fixit_mcp.logging import configure_logging
+from fixit_mcp.repository.agentcore_memory import (
+    AgentCoreMemoryApplianceRepository,
+    make_agentcore_memory_client,
+)
 from fixit_mcp.repository.base import ApplianceRepository
 from fixit_mcp.repository.in_memory import InMemoryApplianceRepository
 from fixit_mcp.repository.sqlite import SqliteApplianceRepository
@@ -32,8 +36,10 @@ def create_server(
     (tests) can inject a smaller index built from a fixture instead. Likewise
     repository defaults to settings.repository_backend ("sqlite" persists
     across restarts at settings.sqlite_path; "memory" is a fresh
-    InMemoryApplianceRepository each time) and manual_catalog is loaded from
-    data/manuals/manifest.yaml exactly once, unless a caller injects either.
+    InMemoryApplianceRepository each time; "agentcore" is AgentCore Memory,
+    warmed up with one read here so the first tool call doesn't pay for it)
+    and manual_catalog is loaded from data/manuals/manifest.yaml exactly
+    once, unless a caller injects either.
     """
     settings = settings or Settings()
     configure_logging(settings.log_level)
@@ -49,10 +55,7 @@ def create_server(
     )
 
     if repository is None:
-        if settings.repository_backend == "sqlite":
-            repository = SqliteApplianceRepository(settings.sqlite_path)
-        else:
-            repository = InMemoryApplianceRepository()
+        repository = _make_repository(settings)
     error_code_index = error_code_index or load_index()
     manual_catalog = manual_catalog or load_manual_catalog()
 
@@ -60,6 +63,20 @@ def create_server(
     register_diagnose_tool(mcp, repository, error_code_index)
 
     return mcp
+
+
+def _make_repository(settings: Settings) -> ApplianceRepository:
+    if settings.repository_backend == "sqlite":
+        return SqliteApplianceRepository(settings.sqlite_path)
+    if settings.repository_backend == "agentcore":
+        repository = AgentCoreMemoryApplianceRepository(
+            memory_id=settings.agentcore_memory_id,
+            client=make_agentcore_memory_client(settings.agentcore_region),
+            registry_session_id=settings.agentcore_registry_session_id,
+        )
+        repository.warm_up()
+        return repository
+    return InMemoryApplianceRepository()
 
 
 def main() -> None:

@@ -6,11 +6,12 @@ from fixit_mcp.domain.models import Appliance
 class ApplianceRepository(Protocol):
     """Storage-agnostic interface for a household's appliances.
 
-    Two implementations exist: `InMemoryApplianceRepository` (tests, and the
-    "memory" backend for local runs) and `SqliteApplianceRepository` (the
-    default backend -- see CLAUDE.md for why SQLite was chosen and its
-    intended replacement, AgentCore Memory, in production). Callers only
-    depend on this protocol, so swapping backends never touches them.
+    Three implementations exist: `InMemoryApplianceRepository` (tests, and
+    the "memory" backend for local runs), `SqliteApplianceRepository` (the
+    default local backend), and `AgentCoreMemoryApplianceRepository` (the
+    "agentcore" backend, for AgentCore Runtime, where local disk is
+    per-session) -- see CLAUDE.md. Callers only depend on this protocol, so
+    swapping backends never touches them.
     """
 
     def list_by_household(self, household_id: str) -> list[Appliance]:

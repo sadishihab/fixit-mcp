@@ -8,9 +8,10 @@ lookups use a real index instead of scanning and re-parsing an entire JSON
 blob on every call, which matters once diagnose_error's <500ms budget
 depends on list_by_household being cheap (see CLAUDE.md rule 4).
 
-This is the dev/demo implementation behind ApplianceRepository. Production
-is intended to run on **Amazon Bedrock AgentCore Memory** instead, behind
-the same interface -- see CLAUDE.md.
+This is the dev/demo implementation behind ApplianceRepository. On AgentCore
+Runtime (one microVM per session) production uses the AgentCore Memory
+backend instead, behind the same interface -- see
+fixit_mcp.repository.agentcore_memory and CLAUDE.md.
 """
 
 from __future__ import annotations
