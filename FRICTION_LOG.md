@@ -1305,6 +1305,8 @@ Template for each entry:
 
 ### 2026-09-24 — First live AgentCore Memory run: functionally correct; latency from this laptop is dominated by distance to us-east-1
 
+> **Resolved:** in-region measurements confirm this was network distance only. See [the resolution entry](#2026-09-24--resolution-in-region-agentcore-memory-latency-is-well-under-budget-laptop-failures-were-rtt-only).
+
 - **Tool/SDK**: AgentCore Memory `FixItHouseholds-6DbWhxEuY7` (us-east-1,
   365-day expiry, no strategies), `tests/integration/test_agentcore_memory_live.py`.
 - **Task attempted**: First verification of the `agentcore` backend against
@@ -1352,3 +1354,48 @@ Template for each entry:
   to one call by caching appliance_id → eventId from the last list in the
   same process (AgentCore routes a conversation to one sticky microVM),
   falling back to ListEvents on a cache miss.
+
+### 2026-09-24 — Resolution: in-region AgentCore Memory latency is well under budget (laptop failures were RTT only)
+
+- **Resolves**: [First live AgentCore Memory run: …latency from this laptop is dominated by distance to us-east-1](#2026-09-24--first-live-agentcore-memory-run-functionally-correct-latency-from-this-laptop-is-dominated-by-distance-to-us-east-1).
+- **Tool/SDK**: Same memory resource (`FixItHouseholds-6DbWhxEuY7`,
+  us-east-1), `tests/integration/test_agentcore_memory_live.py`, run from
+  **AWS CloudShell in us-east-1**, the same region as the memory.
+- **Task attempted**: Get an in-region latency verdict for the `agentcore`
+  backend, which the laptop run couldn't give (~280ms of RTT per call).
+- **Steps taken**: Ran the same four live tests, unchanged, from
+  CloudShell.
+- **Expected**: The laptop numbers minus roughly one RTT per AgentCore call.
+- **Actual**: **All 4 live tests pass.**
+
+  | Operation | p50 | p95 | Laptop p95 (for comparison) |
+  |---|---|---|---|
+  | add (CreateEvent) | 86.6ms | 146.2ms | 386ms |
+  | list (ListEvents) | 92.2ms | 103.0ms | 408ms |
+  | remove (ListEvents + DeleteEvent) | 134.4ms | 144.7ms | 752ms |
+  | `diagnose_error` tool (with household) | — | 138.4ms | 412ms |
+  | `add_appliance` tool | — | 109.9ms | 438ms |
+  | `remove_appliance` tool | — | 119.8ms | 718ms |
+
+  Per-call service time is in line with the laptop-derived estimate
+  (60–120ms). Remove, the two-call path, lands at ~145ms p95, well inside
+  budget. The laptop failures were entirely RTT to us-east-1, not an
+  AgentCore Memory problem.
+- **Severity**: Resolved.
+- **Workaround**: None needed. The single-call remove optimization
+  proposed in the laptop entry (caching appliance_id → eventId) was
+  **never built**, and is now explicitly not needed: ~355ms of headroom on
+  the slowest tool is enough margin.
+- **Still unverified**: This confirms **AgentCore Memory's** contribution
+  only, measured from a CloudShell host in-region, not the full
+  Alexa+ → AgentCore Runtime → server → Memory path. Runtime's own
+  invocation overhead (the unverified ~200ms warm-p50 estimate from the
+  earlier latency entry) and cold-session starts still need measuring
+  once the server is actually deployed (step 4c). Rough composition,
+  assuming ~200ms Runtime overhead: ~340ms p95 for `diagnose_error`,
+  ~345ms for `remove_appliance`. That's under 500ms, but not by a wide
+  margin, and with no cold-start allowance.
+- **Actionable suggestion**: Measure latency budgets from inside the
+  target region before optimizing. The laptop numbers alone would have
+  justified a caching layer that the real numbers show is unnecessary.
+
