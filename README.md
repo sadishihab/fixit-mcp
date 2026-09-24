@@ -166,6 +166,39 @@ The backend **never seeds at runtime**. A household with no events is
 simply empty. `make seed-agentcore` is the only way the demo households
 get into AgentCore Memory.
 
+### Deploying to AgentCore Runtime
+
+The **direct path** (no CDK and no AgentCore CLI; see `FRICTION_LOG.md`,
+step 4c):
+1. Push the already-tested local image to ECR, unchanged.
+2. Create or update the runtime with `CreateAgentRuntime`, pinned to that
+   image's **digest**.
+
+The runtime runs with the `agentcore` backend and **IAM (SigV4) inbound
+auth**. Alexa+ can't call it until OAuth/JWT is added.
+
+> ## 🛑 Stop paying for it: `make teardown-runtime`
+>
+> This deletes the runtime, its endpoint, and every session, which stops
+> **all** Runtime compute charges. It's safe to re-run.
+> `make teardown-runtime-all` also deletes the `fixit-mcp` ECR repository
+> and its images (~$0.01/month).
+> Neither touches the AgentCore Memory resource (household data) or the
+> IAM role and policies. Delete those in the console if you want them gone.
+
+One-time IAM setup: `make iam-policies` renders `deploy/iam/*.json` with
+your account's values into `build/iam/` (gitignored). `deploy/iam/README.md`
+says which file attaches where.
+
+```bash
+export FIXIT_AGENTCORE_MEMORY_ID=<MEMORY_ID>
+make docker-build        # if not already built and tested
+make docker-push         # push that exact image (no rebuild) -> ECR fixit-mcp
+make deploy-runtime      # create or update the runtime; prints its ARN (idempotent)
+make runtime-smoke   RUNTIME_ARN=<arn>   # scripts/smoke_test.py, SigV4-signed
+make runtime-latency RUNTIME_ARN=<arn>   # cold vs warm latency, with the Runtime overhead split out
+```
+
 > **State persistence caveat (default `sqlite` backend).** The SQLite household store lives at
 > `/app/data/state/appliances.db` inside the container. Locally,
 > `make docker-run` mounts a named volume there so data survives `docker rm`.

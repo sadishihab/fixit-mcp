@@ -1,5 +1,6 @@
 .PHONY: run test lint format inspector tunnel fetch-manuals parse-manuals extract-codes \
-	docker-build docker-run docker-smoke docker-run-agentcore seed-agentcore
+	docker-build docker-run docker-smoke docker-run-agentcore seed-agentcore \
+	iam-policies docker-push deploy-runtime runtime-smoke runtime-latency teardown-runtime teardown-runtime-all
 
 run:
 	uv run python -m fixit_mcp
@@ -88,3 +89,39 @@ docker-smoke:
 # the demo households (e.g. appliances added while rehearsing a demo).
 seed-agentcore:
 	uv run python scripts/seed_agentcore_memory.py $(if $(RESET),--reset,)
+
+# --- AgentCore Runtime deployment (step 4c, direct path: ECR + CreateAgentRuntime) ---
+# See README's "Deploying to AgentCore Runtime" section. All of these need AWS
+# credentials; deploy/runtime targets also need FIXIT_AGENTCORE_MEMORY_ID.
+# RUNTIME_ARN is printed by `make deploy-runtime`.
+
+# Fill deploy/iam/*.json templates with this account's values -> build/iam/.
+iam-policies:
+	uv run python scripts/render_iam_policies.py
+
+# Push the already-built, already-tested local image (make docker-build) to
+# ECR. No rebuild -- this is the "deploy exactly what was tested" step.
+docker-push:
+	uv run python scripts/push_image.py --local-image $(DOCKER_IMAGE)
+
+# Create or update the runtime, pinned to the pushed image's digest. Idempotent.
+deploy-runtime:
+	uv run python scripts/deploy_runtime.py
+
+runtime-smoke:
+	@test -n "$(RUNTIME_ARN)" || (echo "set RUNTIME_ARN (printed by make deploy-runtime)" && exit 1)
+	uv run python scripts/smoke_test.py --agent-arn $(RUNTIME_ARN) --wait 5
+
+runtime-latency:
+	@test -n "$(RUNTIME_ARN)" || (echo "set RUNTIME_ARN (printed by make deploy-runtime)" && exit 1)
+	uv run python scripts/measure_runtime_latency.py --agent-arn $(RUNTIME_ARN)
+
+# STOP PAYING: deletes the runtime (all sessions, the endpoint, all compute
+# charges). Keeps the ECR image (~$0.01/month) and AgentCore Memory data.
+teardown-runtime:
+	uv run python scripts/deploy_runtime.py --delete
+
+# Same, plus the ECR repository and every image in it. Still keeps the
+# AgentCore Memory resource (household data) and the IAM roles/policies.
+teardown-runtime-all:
+	uv run python scripts/deploy_runtime.py --delete --delete-image-repo

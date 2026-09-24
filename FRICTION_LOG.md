@@ -1477,3 +1477,60 @@ Template for each entry:
   front that a hosted MCP server is never anonymously reachable, and
   point to the OAuth path for consumer MCP clients (Alexa+, Claude, etc.)
   that can't sign SigV4.
+
+### 2026-09-24 — "Deploy exactly what was tested" needs a way to check it: the tested image differs from HEAD by two docstrings
+
+- **Tool/SDK**: Docker (containerd image store), `scripts/push_image.py`.
+- **Task attempted**: Push the image the 4a/4b container tests ran against
+  (`fixit-mcp:latest`, image id `fc68db80…`, built 2026-09-24 17:57 +06:00)
+  to ECR without rebuilding, and be able to say precisely how it relates
+  to the committed source.
+- **Steps taken**: Added a pre-push check to `push_image.py`. It hashes
+  every `.py`/`.html` under `/app/src` inside the image and compares them
+  with the working tree. Ran it before any AWS step.
+- **Expected**: Either an exact match, or a clear list of differences.
+- **Actual**: 26 files in the image. Exactly **two differ**:
+  `repository/base.py` and `repository/sqlite.py`. Both changed only in
+  docstrings, edited in step 4b's docs pass *after* that build. No code
+  difference. Without the check, "we deployed what we tested" would have
+  been an assumption either way.
+- **Severity**: Low. Behaviorally identical, and now visible instead of
+  assumed.
+- **Workaround**: Push the tested image as-is, per the requirement.
+  `push_image.py` prints the drift on every push, so a future
+  *behavioral* drift can't slip through silently. `deploy_runtime.py`
+  pins the runtime to the pushed **digest** (`repo@sha256:…`), never the
+  mutable `latest` tag.
+- **Actionable suggestion**: When the policy is "promote the tested
+  artifact", record the artifact's content (source hashes, digest) at
+  test time and compare at promote time. A build timestamp or tag alone
+  says nothing about what's inside.
+
+### 2026-09-24 — ~17ms of every tool call is FixIt's own stateless MCP request stack, not the handler
+
+- **Tool/SDK**: `mcp` 1.30 FastMCP (`stateless_http=True`,
+  `json_response=True`), uvicorn, the MCP Python client.
+- **Task attempted**: Build `scripts/measure_runtime_latency.py`, which
+  splits a deployed call into network RTT, AgentCore Runtime overhead,
+  and handler time. Before trusting that split, sanity-checked it
+  against the local dev server, where RTT is ~0.
+- **Steps taken**: Ran the script locally. Then timed a raw `tools/call`
+  with `curl` (fresh connection each time) and with a keep-alive `httpx`
+  client, which bypasses the MCP client library.
+- **Expected**: Round trip ≈ handler time (~1.4ms, per the server's own
+  `tool_call_completed` log line) + a millisecond or two.
+- **Actual**: MCP client round trip ~45ms. Raw curl/httpx ~18–21ms. So
+  about **17ms per request is server-side stack outside the handler**
+  (stateless mode builds a fresh server session per request), and about
+  25ms more is the MCP Python client. Not Nagle/delayed-ACK: curl on
+  fresh connections shows the same number.
+- **Severity**: Low for the 500ms budget. High for interpretation: the
+  deployed container pays the same ~17ms (probably different on
+  Graviton), so "client − RTT − handler" is **Runtime overhead + ~17ms of
+  ours**, not pure Runtime overhead.
+- **Workaround**: The latency script labels the remainder as exactly
+  that, rather than calling it "Runtime overhead". Not optimized here:
+  it's 3–4% of the budget, and the deployed image stays the tested one.
+- **Actionable suggestion**: Log whole-request latency at the ASGI layer
+  as well as per-tool latency, so server time can be split without
+  assumptions. That's a candidate for the next image, not this deploy.
