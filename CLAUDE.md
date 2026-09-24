@@ -51,8 +51,9 @@ Alexa+ MCP Toolkit and helps customers with home appliances:
 
 - Python 3.12, `src/` layout, package `fixit_mcp`, dependency management via `uv`.
 - Storage is accessed through repository interfaces (e.g.
-  `fixit_mcp.repository.base.ApplianceRepository`), never directly, so in-memory
-  seed stores can be swapped for real databases later without touching callers.
+  `fixit_mcp.repository.base.ApplianceRepository`), never directly, so the
+  backend can be swapped without touching callers -- see the persistence
+  bullet below for the two implementations that currently exist.
 - Config via `pydantic-settings` (`fixit_mcp.config.Settings`), env-prefixed
   `FIXIT_*`.
 - Structured (JSON) logging via `structlog`; every tool call logs its latency in
@@ -165,7 +166,41 @@ Alexa+ MCP Toolkit and helps customers with home appliances:
   is used instead of a `Union`, for simpler structured-output schema
   generation. Never fabricates: an empty index field (e.g. LG's PS/PF/nP
   codes, which the manual never explains) stays empty in the response rather
-  than being filled in.
+  than being filled in. If `household_id` is given but resolves to no owned
+  appliance at all, the not_found response also sets
+  `suggest_add_appliance: true` rather than dead-ending -- the household may
+  simply not have registered that appliance yet (`add_appliance`, below).
+- **Household appliance persistence** (step 3c). `Appliance.purchase_date`/
+  `warranty_end_date` are optional, and `manual_id` defaults to `""` (no
+  manual on file yet), since a customer adding an appliance rarely knows all
+  of this upfront. Two `ApplianceRepository` implementations:
+  `InMemoryApplianceRepository` (`fixit_mcp.repository.in_memory`, plain
+  dict, used by unit tests and available as the `FIXIT_REPOSITORY_BACKEND=memory`
+  runtime option) and `SqliteApplianceRepository`
+  (`fixit_mcp.repository.sqlite`, the default runtime backend). SQLite (via
+  stdlib `sqlite3`, no new dependency) was chosen over a flat JSON file
+  because each add/remove is one atomic transactional statement -- a crash
+  mid-write can't corrupt a whole household's data the way rewriting an
+  entire JSON file can -- and per-household lookups use a real index instead
+  of parsing the whole store on every call. **This is the dev/demo
+  persistence layer only**: production is intended to run on **Amazon
+  Bedrock AgentCore Memory** instead, behind this same
+  `ApplianceRepository` interface, once deployed to AgentCore Runtime (see
+  the Architecture goals section above). `Settings.repository_backend`
+  (`FIXIT_REPOSITORY_BACKEND`, default `"sqlite"`) and `Settings.sqlite_path`
+  (`FIXIT_SQLITE_PATH`, default `data/state/appliances.db`, gitignored)
+  select and locate it. A fresh/empty store is seeded from the same default
+  household data `InMemoryApplianceRepository` uses
+  (`fixit_mcp.repository.in_memory.DEFAULT_SEED`), so the demo works out of
+  the box on a clean checkout; a store that already has data is never
+  reseeded. `fixit_mcp.catalog.manifest` loads
+  `data/manuals/manifest.yaml` once at startup (same no-file-I/O-per-request
+  rule as the error-code index) so `add_appliance` can link a newly-added
+  appliance to its manual by brand+model, matched case-insensitively.
+  `add_appliance`/`remove_appliance` (`fixit_mcp.tools.appliances`) are the
+  corresponding tools; adding an appliance with no matching manual still
+  saves it, but the response says diagnosis coverage will be limited rather
+  than silently pretending it's fully supported.
 
 ## Testing
 
@@ -186,10 +221,14 @@ Alexa+ MCP Toolkit and helps customers with home appliances:
 Manual PDFs are fetched (`fixit_mcp.repository`, step 2a), parsed into chunks
 (`fixit_mcp.ingestion.parser`, step 2b-2e), structured error codes are
 extracted into a committed index (`fixit_mcp.ingestion.extraction`, step 3a),
-and the first tool (`diagnose_error`, step 3b) serves exact-code lookups from
-that index (`fixit_mcp.retrieval.codes`) — but nothing beyond that yet: no
-embeddings, no fuzzy/semantic retrieval beyond `difflib` nearest-match
-suggestions, no Strands, no AWS deployment, no auth/account linking, no MCP
-Apps UI, no web client, no parts-ordering or maintenance-scheduling tools.
-See `docs/alexa-plus-requirements.md` for the full done/todo/not-needed
-checklist against the Alexa+ MCP Toolkit requirements.
+`diagnose_error` (step 3b) serves exact-code lookups from that index
+(`fixit_mcp.retrieval.codes`), and a household's appliances are now real,
+persistent state the customer can add to and remove via `add_appliance`/
+`remove_appliance` (step 3c, `fixit_mcp.repository.sqlite`) — but nothing
+beyond that yet: no embeddings, no fuzzy/semantic retrieval beyond `difflib`
+nearest-match suggestions, no Strands, no AWS deployment (the SQLite store is
+a dev/demo stand-in for AgentCore Memory, see the persistence bullet above),
+no auth/account linking, no MCP Apps UI, no web client, no parts-ordering or
+maintenance-scheduling tools. See `docs/alexa-plus-requirements.md` for the
+full done/todo/not-needed checklist against the Alexa+ MCP Toolkit
+requirements.

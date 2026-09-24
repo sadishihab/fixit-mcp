@@ -3,8 +3,9 @@ from datetime import date
 from fixit_mcp.domain.models import Appliance
 
 # Brand/model pairs here match data/manuals/manifest.yaml entries (same
-# brand + model), linked via manual_id.
-_SEED_DATA: dict[str, list[Appliance]] = {
+# brand + model), linked via manual_id. Shared with SqliteApplianceRepository
+# as the data it seeds a fresh, empty store with (see repository/sqlite.py).
+DEFAULT_SEED: dict[str, list[Appliance]] = {
     "house-001": [
         Appliance(
             appliance_id="app-001",
@@ -58,10 +59,34 @@ _SEED_DATA: dict[str, list[Appliance]] = {
 
 
 class InMemoryApplianceRepository:
-    """ApplianceRepository backed by an in-memory seed dict."""
+    """ApplianceRepository backed by a plain in-memory dict. Used by tests
+    (deterministic, no filesystem) and available as the "memory" backend for
+    local runs where persistence across restarts isn't wanted.
+
+    Deep-copies its seed on init (rather than aliasing the module-level
+    DEFAULT_SEED directly) so that `add`/`remove` on one instance -- or
+    across repeated test runs using the default seed -- never mutate shared
+    state another instance or test would also see.
+    """
 
     def __init__(self, seed: dict[str, list[Appliance]] | None = None) -> None:
-        self._data = seed if seed is not None else _SEED_DATA
+        source = seed if seed is not None else DEFAULT_SEED
+        self._data: dict[str, list[Appliance]] = {
+            household_id: list(appliances) for household_id, appliances in source.items()
+        }
 
     def list_by_household(self, household_id: str) -> list[Appliance]:
         return list(self._data.get(household_id, []))
+
+    def add(self, household_id: str, appliance: Appliance) -> None:
+        self._data.setdefault(household_id, []).append(appliance)
+
+    def remove(self, household_id: str, appliance_id: str) -> bool:
+        appliances = self._data.get(household_id)
+        if not appliances:
+            return False
+        for index, appliance in enumerate(appliances):
+            if appliance.appliance_id == appliance_id:
+                del appliances[index]
+                return True
+        return False

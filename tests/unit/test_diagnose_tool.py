@@ -242,3 +242,39 @@ def test_diagnose_no_family_note_without_a_single_resolved_appliance() -> None:
 
     assert result.status == "not_found"
     assert result.family_note is None
+
+
+# --- suggest_add_appliance -------------------------------------------------
+
+
+def test_diagnose_suggests_adding_appliance_when_household_has_no_matching_appliance() -> None:
+    index = make_index([make_record(error_code="E12", code_normalized="E12")])
+    repo = InMemoryApplianceRepository(seed={"house-1": []})
+
+    result = diagnose(index, repo, "E13", household_id="house-1")
+
+    assert result.status == "not_found"
+    assert result.suggest_add_appliance is True
+    assert "add_appliance" in result.message
+
+
+def test_diagnose_does_not_suggest_adding_appliance_without_a_household() -> None:
+    index = make_index([make_record(error_code="E12", code_normalized="E12")])
+
+    result = diagnose(index, EMPTY_REPO, "E13")
+
+    assert result.suggest_add_appliance is False
+
+
+def test_diagnose_does_not_suggest_adding_appliance_when_one_is_already_registered() -> None:
+    """A registered appliance whose manual just doesn't document this code
+    isn't the same problem as an unregistered appliance -- no suggestion."""
+    record = make_record(manual_id="acme-widget", error_code="E12", code_normalized="E12")
+    index = make_index([record])
+    appliance = make_appliance("app-1", "Acme", "W100", "widget", "acme-widget")
+    repo = InMemoryApplianceRepository(seed={"house-1": [appliance]})
+
+    result = diagnose(index, repo, "E99", household_id="house-1")
+
+    assert result.status == "not_found"
+    assert result.suggest_add_appliance is False

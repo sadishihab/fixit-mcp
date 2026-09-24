@@ -1,4 +1,10 @@
+from pathlib import Path
+from typing import Literal
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_SQLITE_PATH = REPO_ROOT / "data" / "state" / "appliances.db"
 
 
 class Settings(BaseSettings):
@@ -13,3 +19,8 @@ class Settings(BaseSettings):
     # Plain JSON responses (instead of SSE) since our tools are fast, non-streaming
     # lookups with no server-initiated messages to push.
     json_response: bool = True
+    # "sqlite" persists appliances across restarts (data/state/, gitignored) --
+    # the default, so the demo works out of the box. "memory" is for tests and
+    # for anyone who wants a clean slate every run.
+    repository_backend: Literal["memory", "sqlite"] = "sqlite"
+    sqlite_path: Path = DEFAULT_SQLITE_PATH

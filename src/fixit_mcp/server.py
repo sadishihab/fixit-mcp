@@ -1,9 +1,11 @@
 from mcp.server.fastmcp import FastMCP
 
+from fixit_mcp.catalog.manifest import ManualCatalog, load_manual_catalog
 from fixit_mcp.config import Settings
 from fixit_mcp.logging import configure_logging
 from fixit_mcp.repository.base import ApplianceRepository
 from fixit_mcp.repository.in_memory import InMemoryApplianceRepository
+from fixit_mcp.repository.sqlite import SqliteApplianceRepository
 from fixit_mcp.retrieval.codes import ErrorCodeIndex, load_index
 from fixit_mcp.tools.appliances import register_appliance_tools
 from fixit_mcp.tools.diagnose import register_diagnose_tool
@@ -21,12 +23,17 @@ def create_server(
     settings: Settings | None = None,
     repository: ApplianceRepository | None = None,
     error_code_index: ErrorCodeIndex | None = None,
+    manual_catalog: ManualCatalog | None = None,
 ) -> FastMCP:
     """Build the FixIt FastMCP server: Streamable HTTP, stateless, with tools registered.
 
     error_code_index is loaded from data/index/error_codes.json exactly once,
     here at startup -- not per-request (rule 4, the <500ms budget). Callers
-    (tests) can inject a smaller index built from a fixture instead.
+    (tests) can inject a smaller index built from a fixture instead. Likewise
+    repository defaults to settings.repository_backend ("sqlite" persists
+    across restarts at settings.sqlite_path; "memory" is a fresh
+    InMemoryApplianceRepository each time) and manual_catalog is loaded from
+    data/manuals/manifest.yaml exactly once, unless a caller injects either.
     """
     settings = settings or Settings()
     configure_logging(settings.log_level)
@@ -41,10 +48,15 @@ def create_server(
         json_response=settings.json_response,
     )
 
-    repository = repository or InMemoryApplianceRepository()
+    if repository is None:
+        if settings.repository_backend == "sqlite":
+            repository = SqliteApplianceRepository(settings.sqlite_path)
+        else:
+            repository = InMemoryApplianceRepository()
     error_code_index = error_code_index or load_index()
+    manual_catalog = manual_catalog or load_manual_catalog()
 
-    register_appliance_tools(mcp, repository)
+    register_appliance_tools(mcp, repository, manual_catalog)
     register_diagnose_tool(mcp, repository, error_code_index)
 
     return mcp

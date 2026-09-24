@@ -34,7 +34,9 @@ DIAGNOSE_ERROR_DESCRIPTION = (
     "this exact code, the response asks which appliance rather than "
     "guessing -- relay that question to the customer. If the code isn't in "
     "our index, the response says so plainly and never invents a diagnosis; "
-    "it may suggest the closest known codes instead."
+    "it may suggest the closest known codes instead. If household_id is given "
+    "but no registered appliance matches, the response flags that the "
+    "appliance may not be registered yet and suggests calling add_appliance."
 )
 
 
@@ -90,6 +92,13 @@ class DiagnoseErrorResult(BaseModel):
     family_note: str | None = Field(
         default=None,
         description="Set when the relevant manual describes a general code family, not this exact code.",
+    )
+    suggest_add_appliance: bool = Field(
+        default=False,
+        description=(
+            "Set when household_id was given but no registered appliance matched -- the "
+            "appliance may simply not be registered yet. Suggest calling add_appliance."
+        ),
     )
 
 
@@ -228,13 +237,22 @@ def diagnose(
                 f"{family_record.meaning}"
             )
 
+    suggest_add_appliance = household_id is not None and not owned
+    message = f"No manual in our index documents an error code matching {error_code!r}."
+    if suggest_add_appliance:
+        message += (
+            " We don't see a matching appliance registered for this household -- it may not be "
+            "registered yet. Consider calling add_appliance."
+        )
+
     return DiagnoseErrorResult(
         status="not_found",
-        message=f"No manual in our index documents an error code matching {error_code!r}.",
+        message=message,
         error_code=error_code,
         code_normalized=code_normalized,
         nearest_matches=index.nearest_codes(code_normalized),
         family_note=family_note,
+        suggest_add_appliance=suggest_add_appliance,
     )
 
 

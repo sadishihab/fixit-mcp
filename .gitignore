@@ -20,3 +20,7 @@ data/manuals/parsed/
 # Per-chunk extraction cache (scripts/extract_codes.py) -- derived, not the
 # artifact. data/index/error_codes.json itself IS committed.
 data/index/.extract_cache/
+
+# Local SQLite persistence for household appliance state (dev/demo backend --
+# see CLAUDE.md; production is intended to use AgentCore Memory instead).
+data/state/

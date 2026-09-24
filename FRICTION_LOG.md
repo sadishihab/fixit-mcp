@@ -827,3 +827,40 @@ Template for each entry:
   a plausible-looking real code format, specifically so it can never later
   be mistaken for -- or accidentally used as -- a real test/demo value once
   actual corpus data exists.
+
+### 2026-09-24 — a read-only repository's "safe" default seed became a shared-mutable-state bug the moment writes were added
+
+- **Tool/SDK**: `fixit_mcp.repository.in_memory.InMemoryApplianceRepository`
+  (this project's own code, written in step 1, modified in step 3c).
+- **Task attempted**: Add `add()`/`remove()` to `InMemoryApplianceRepository`
+  for step 3c (household appliances are now mutable, persistent state).
+- **Steps taken**: Before writing the new methods, re-read the existing
+  `__init__`: `self._data = seed if seed is not None else _SEED_DATA` --
+  aliasing the module-level `_SEED_DATA` dict directly (not copying it) when
+  no seed is given. This was harmless in steps 1-3b, since every existing
+  method only ever read `self._data`. Wrote a test
+  (`test_default_seed_is_not_mutated_by_add_on_one_instance`) before trusting
+  the new `add()` method, specifically to check this.
+- **Expected**: N/A -- written defensively, expecting to catch a real bug.
+- **Actual**: Confirmed the bug the test was written to catch: two separate
+  `InMemoryApplianceRepository()` instances (e.g., two different tests, or
+  two requests in the same process) built with no explicit seed would have
+  shared the *same* underlying lists once any instance called `add()` or
+  `remove()` -- one test adding an appliance would silently leak it into
+  every other test's "fresh" default repository for the rest of the test
+  session.
+- **Severity**: High if shipped -- a classic mutable-default-object bug that
+  is invisible in a read-only repository and only becomes a real, silent
+  cross-test/cross-request data leak the moment write methods are added,
+  exactly what step 3c does.
+- **Workaround**: Fixed at the root: `__init__` now always builds a fresh
+  per-instance copy (`{h: list(apps) for h, apps in source.items()}`) from
+  whichever source dict is used (custom seed or the module-level default,
+  now named `DEFAULT_SEED`), so no two instances -- and no instance and the
+  module constant -- ever share a mutable list.
+- **Actionable suggestion**: Any class that accepts "a mutable object, or a
+  module-level default if none is given" in its constructor should audit
+  that default for aliasing the moment the class gains its first mutating
+  method -- a pattern that's completely safe in a read-only class becomes a
+  shared-state bug retroactively, with no change to the constructor itself
+  needed to trigger it.

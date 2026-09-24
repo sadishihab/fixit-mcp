@@ -12,10 +12,19 @@ class Appliance(BaseModel):
     brand: str = Field(description="Manufacturer brand, e.g. 'GE'.")
     model: str = Field(description="Manufacturer model number, e.g. 'GFE28GYNFS'.")
     appliance_type: str = Field(description="Category of appliance, e.g. 'refrigerator', 'dishwasher'.")
-    purchase_date: date = Field(description="Date the appliance was purchased.")
-    warranty_end_date: date = Field(description="Date the manufacturer warranty expires.")
+    purchase_date: date | None = Field(
+        default=None, description="Date the appliance was purchased, if known."
+    )
+    warranty_end_date: date | None = Field(
+        default=None, description="Date the manufacturer warranty expires, if known."
+    )
     manual_id: str = Field(
-        description="Id of the manual entry (data/manuals/manifest.yaml) for this appliance."
+        default="",
+        description=(
+            "Id of the manual entry (data/manuals/manifest.yaml) for this appliance. Empty "
+            "string if no manual matches this brand/model yet -- diagnose_error can't cite a "
+            "manual for it until one is added to the manifest."
+        ),
     )
 
 

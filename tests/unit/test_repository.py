@@ -64,3 +64,69 @@ def test_list_by_household_returns_copy_not_internal_list() -> None:
     appliances.clear()
 
     assert len(repo.list_by_household("house-001")) == 3
+
+
+def make_appliance(appliance_id: str = "app-x", **overrides) -> Appliance:
+    defaults = dict(
+        appliance_id=appliance_id,
+        brand="Samsung",
+        model="RF28",
+        appliance_type="refrigerator",
+        purchase_date=date(2020, 1, 1),
+        warranty_end_date=date(2022, 1, 1),
+        manual_id="samsung-rf28-refrigerator",
+    )
+    defaults.update(overrides)
+    return Appliance(**defaults)
+
+
+# --- add / remove -------------------------------------------------
+
+
+def test_add_appends_to_an_existing_household() -> None:
+    repo = InMemoryApplianceRepository()
+
+    repo.add("house-001", make_appliance())
+
+    assert len(repo.list_by_household("house-001")) == 4
+
+
+def test_add_creates_a_new_household_that_did_not_exist() -> None:
+    repo = InMemoryApplianceRepository(seed={})
+
+    repo.add("house-new", make_appliance())
+
+    assert len(repo.list_by_household("house-new")) == 1
+
+
+def test_remove_returns_true_and_deletes_the_appliance() -> None:
+    repo = InMemoryApplianceRepository(seed={})
+    repo.add("house-1", make_appliance(appliance_id="app-to-remove"))
+
+    removed = repo.remove("house-1", "app-to-remove")
+
+    assert removed is True
+    assert repo.list_by_household("house-1") == []
+
+
+def test_remove_returns_false_for_unknown_appliance_id() -> None:
+    repo = InMemoryApplianceRepository()
+
+    assert repo.remove("house-001", "does-not-exist") is False
+
+
+def test_remove_returns_false_for_unknown_household() -> None:
+    repo = InMemoryApplianceRepository(seed={})
+
+    assert repo.remove("no-such-house", "app-1") is False
+
+
+def test_default_seed_is_not_mutated_by_add_on_one_instance() -> None:
+    """Regression test: two instances built from the default seed must not
+    share mutable state -- adding to one must never leak into another."""
+    first = InMemoryApplianceRepository()
+    first.add("house-001", make_appliance())
+
+    second = InMemoryApplianceRepository()
+
+    assert len(second.list_by_household("house-001")) == 3
