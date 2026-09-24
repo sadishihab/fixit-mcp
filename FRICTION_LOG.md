@@ -1302,3 +1302,53 @@ Template for each entry:
 - **Actionable suggestion**: For any shared remote store, keep demo/fixture
   seeding out of the serving path entirely. It's an operator action with
   an explicit blast radius, not a startup side effect.
+
+### 2026-09-24 — First live AgentCore Memory run: functionally correct; latency from this laptop is dominated by distance to us-east-1
+
+- **Tool/SDK**: AgentCore Memory `FixItHouseholds-6DbWhxEuY7` (us-east-1,
+  365-day expiry, no strategies), `tests/integration/test_agentcore_memory_live.py`.
+- **Task attempted**: First verification of the `agentcore` backend against
+  real AgentCore Memory: seed, read-after-write, smoke suite, measured latency.
+- **Steps taken**: `make seed-agentcore` (house-001: 3 added, house-002: 2
+  added). Ran the live tests. Separately measured raw network cost to
+  `bedrock-agentcore.us-east-1.amazonaws.com` with `curl -w` (5 samples).
+- **Expected**: Functional pass. Latency unknown, since AWS publishes none.
+- **Actual**:
+  - **Functional: pass.** Read-after-write with zero delay is consistent,
+    and the full smoke suite passes against real Memory.
+  - **Latency from this laptop** (p50 / p95, 20 samples):
+
+    | Operation | p50 | p95 |
+    |---|---|---|
+    | CreateEvent (add) | 372ms | 386ms |
+    | ListEvents (list) | 375ms | 408ms |
+    | remove (ListEvents + DeleteEvent) | 695ms | 752ms |
+    | `diagnose_error` tool with household | — | 412ms |
+    | `add_appliance` tool | 400ms | 438ms |
+    | `remove_appliance` tool | 699ms | **718ms (over 500ms)** |
+
+  - **Network baseline**: TCP connect alone is 245–408ms (~280ms typical),
+    and TLS setup completes at ~570ms, so this machine is roughly 280ms of
+    round-trip time from us-east-1. Each warm (keep-alive) call is about
+    one RTT plus service time, so **estimated AgentCore service time is
+    ~60–120ms per call**. ICMP is blocked, so ping gives nothing.
+- **Severity**: Medium. Nothing is wrong with the backend, but the two
+  latency assertions fail here for geographic reasons, and `remove`
+  (two sequential calls) is the path that would stay tightest even
+  in-region.
+- **Workaround**: None applied yet. Estimated in-region cost: list/add
+  about 60–120ms, remove about 120–240ms. On top of that, add Runtime's
+  own overhead (unverified: roughly 200ms p50 warm). list/add look
+  comfortably inside 500ms; remove is plausible but tight. The live test's
+  500ms assertion is left as-is rather than weakened. A laptop far from
+  the region can't pass it, and that's a true statement about that
+  vantage point, not a test bug. A real verdict needs an **in-region**
+  run (e.g. AWS CloudShell in us-east-1, or from the Runtime itself in
+  4c).
+- **Actionable suggestion**: When validating a latency budget against a
+  managed AWS API, always measure the bare TCP/TLS baseline from the same
+  vantage point alongside the API call. Otherwise a geography number reads
+  as a service number. If remove proves too slow in-region, it can drop
+  to one call by caching appliance_id → eventId from the last list in the
+  same process (AgentCore routes a conversation to one sticky microVM),
+  falling back to ListEvents on a cache miss.
