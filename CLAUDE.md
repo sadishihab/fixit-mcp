@@ -201,6 +201,34 @@ Alexa+ MCP Toolkit and helps customers with home appliances:
   corresponding tools; adding an appliance with no matching manual still
   saves it, but the response says diagnosis coverage will be limited rather
   than silently pretending it's fully supported.
+- **MCP Apps visual card** (step 3d, `fixit_mcp.apps`). `diagnose_error`
+  declares a companion `ui://fixit-mcp/diagnose-error-card` resource per the
+  current MCP Apps spec (`modelcontextprotocol/ext-apps`,
+  `specification/2026-01-26/apps.mdx`): `_meta.ui.resourceUri` is set on the
+  **tool definition** (`@mcp.tool(..., meta={"ui": {"resourceUri": ...}})`),
+  static and shared by every call -- the spec has no per-call UI metadata on
+  a tool *result* at all, only on the tool itself. The resource
+  (`fixit_mcp.apps.diagnose_card.html`, loaded once at import time, never
+  read from disk per request) is a single self-contained HTML5 document,
+  MIME type `text/html;profile=mcp-app`, with a small inline `<script>` that
+  (a) implements the spec's postMessage handshake (`ui/initialize`, then
+  listens for the host's `ui/notifications/tool-result`) -- no network
+  fetching anywhere in it, all data arrives pushed from the host -- and (b)
+  a pure, DOM-free `buildCardHtml(result)` function that renders the error
+  code, appliance, meaning, numbered repair steps, a visually distinct
+  safety-warnings block, and citation. Because the resourceUri can't be
+  conditionally attached per call (it's static), "only show a real card on
+  `found`" is implemented *inside* `buildCardHtml`: it returns `""` for any
+  other `status`, same never-fabricate discipline as the JSON result itself
+  (an empty `meaning` stays empty, an empty `safety_warnings` list renders no
+  warning block). The plain `content`/`structuredContent` the tool already
+  returned is completely unmodified by any of this -- the card is a fully
+  separate, additive discovery path. `buildCardHtml` is unit-tested by
+  actually running it in Node (it's pure/DOM-free by design, so no jsdom or
+  browser needed), skipped rather than failed if `node` isn't on PATH. See
+  `FRICTION_LOG.md` for why a literal "per-call resourceUri, fully
+  pre-rendered server-side, zero client-side JS" reading of the request
+  isn't what any current MCP Apps host looks for.
 
 ## Testing
 
@@ -222,13 +250,16 @@ Manual PDFs are fetched (`fixit_mcp.repository`, step 2a), parsed into chunks
 (`fixit_mcp.ingestion.parser`, step 2b-2e), structured error codes are
 extracted into a committed index (`fixit_mcp.ingestion.extraction`, step 3a),
 `diagnose_error` (step 3b) serves exact-code lookups from that index
-(`fixit_mcp.retrieval.codes`), and a household's appliances are now real,
+(`fixit_mcp.retrieval.codes`), a household's appliances are now real,
 persistent state the customer can add to and remove via `add_appliance`/
-`remove_appliance` (step 3c, `fixit_mcp.repository.sqlite`) — but nothing
-beyond that yet: no embeddings, no fuzzy/semantic retrieval beyond `difflib`
-nearest-match suggestions, no Strands, no AWS deployment (the SQLite store is
-a dev/demo stand-in for AgentCore Memory, see the persistence bullet above),
-no auth/account linking, no MCP Apps UI, no web client, no parts-ordering or
-maintenance-scheduling tools. See `docs/alexa-plus-requirements.md` for the
-full done/todo/not-needed checklist against the Alexa+ MCP Toolkit
+`remove_appliance` (step 3c, `fixit_mcp.repository.sqlite`), and
+`diagnose_error` has its first MCP Apps visual card (step 3d,
+`fixit_mcp.apps`) — but nothing beyond that yet: no embeddings, no
+fuzzy/semantic retrieval beyond `difflib` nearest-match suggestions, no
+Strands, no AWS deployment (the SQLite store is a dev/demo stand-in for
+AgentCore Memory, see the persistence bullet above), no auth/account
+linking, no visual cards for any other tool, no web client, no
+parts-ordering or maintenance-scheduling tools. See
+`docs/alexa-plus-requirements.md` for the full done/todo/not-needed
+checklist against the Alexa+ MCP Toolkit
 requirements.

@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Diagnosis card</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --fg: #1a1a1a;
+    --bg: #ffffff;
+    --muted: #5a5a5a;
+    --border: #e2e2e2;
+    --accent: #0b5fff;
+    --warning-bg: #fff4e5;
+    --warning-border: #f3a13b;
+    --warning-fg: #7a4a00;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fg: #f2f2f2;
+      --bg: #1c1c1e;
+      --muted: #a0a0a0;
+      --border: #3a3a3c;
+      --accent: #4d8dff;
+      --warning-bg: #3a2c10;
+      --warning-border: #b8791f;
+      --warning-fg: #ffcf8a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 12px;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 14px;
+    color: var(--fg);
+    background: var(--bg);
+  }
+  .card {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+  .error-code {
+    font-size: 20px;
+    font-weight: 700;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  .appliance {
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .difficulty {
+    margin-left: auto;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--border);
+    color: var(--fg);
+  }
+  .difficulty-call_service { background: #ffe1e1; color: #8a1f1f; }
+  .difficulty-moderate { background: #fff2cc; color: #7a5b00; }
+  .difficulty-easy { background: #e2f7e2; color: #1f6e1f; }
+  .meaning { margin: 0 0 12px; }
+  h3 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    margin: 14px 0 6px;
+  }
+  ul, ol { margin: 0; padding-left: 20px; }
+  li { margin-bottom: 4px; }
+  .safety-warnings {
+    margin-top: 14px;
+    padding: 10px 12px;
+    border: 1px solid var(--warning-border);
+    background: var(--warning-bg);
+    border-radius: 8px;
+  }
+  .safety-warnings-title {
+    font-weight: 700;
+    color: var(--warning-fg);
+    margin-bottom: 4px;
+  }
+  .safety-warnings ul { color: var(--warning-fg); }
+  .citation {
+    margin-top: 14px;
+    padding-top: 10px;
+    border-top: 1px solid var(--border);
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .empty {
+    color: var(--muted);
+    font-style: italic;
+  }
+</style>
+</head>
+<body>
+<div id="root"><div class="empty">Waiting for a diagnosis...</div></div>
+<script>
+  // Pure, DOM-free by design so it's directly testable (e.g. via a Node
+  // driver script) without a browser -- see tests/unit/test_diagnose_card.py.
+  function esc(value) {
+    return String(value).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  function listHtml(items) {
+    return (items || []).map(function (item) { return "<li>" + esc(item) + "</li>"; }).join("");
+  }
+
+  // Builds the card's inner HTML from a diagnose_error DiagnoseErrorResult.
+  // Returns "" when there is nothing to show (status != "found") -- the only
+  // gate on when a real visual appears, per CLAUDE.md rule 3 (no LLM, no
+  // guessing: this never renders content the tool result didn't provide).
+  function buildCardHtml(result) {
+    if (!result || result.status !== "found") {
+      return "";
+    }
+
+    var appliance = result.appliance;
+    var applianceLine = appliance ? esc(appliance.brand) + " " + esc(appliance.model) : "";
+    var difficultyHtml = result.difficulty
+      ? '<span class="difficulty difficulty-' + esc(result.difficulty) + '">' +
+        esc(result.difficulty.replace(/_/g, " ")) + "</span>"
+      : "";
+    var causesHtml = listHtml(result.likely_causes);
+    var stepsHtml = listHtml(result.repair_steps);
+    var partsHtml = listHtml(result.parts_needed);
+    var warnings = result.safety_warnings || [];
+    var warningsHtml = warnings.length
+      ? '<div class="safety-warnings"><div class="safety-warnings-title">⚠ Safety warnings</div><ul>' +
+        listHtml(warnings) + "</ul></div>"
+      : "";
+    var citation = result.citation;
+    var citationHtml = citation
+      ? '<div class="citation">Source: ' + esc(citation.brand) + " " + esc(citation.model) +
+        " manual, p. " + esc(citation.page) + (citation.section ? " — " + esc(citation.section) : "") +
+        "</div>"
+      : "";
+
+    return (
+      '<div class="card">' +
+        '<div class="card-header">' +
+          '<span class="error-code">' + esc(result.error_code) + "</span>" +
+          (applianceLine ? '<span class="appliance">' + applianceLine + "</span>" : "") +
+          difficultyHtml +
+        "</div>" +
+        (result.meaning ? '<p class="meaning">' + esc(result.meaning) + "</p>" : "") +
+        (causesHtml ? "<h3>Likely causes</h3><ul>" + causesHtml + "</ul>" : "") +
+        (stepsHtml ? "<h3>Repair steps</h3><ol>" + stepsHtml + "</ol>" : "") +
+        (partsHtml ? "<h3>Parts needed</h3><ul>" + partsHtml + "</ul>" : "") +
+        warningsHtml +
+        citationHtml +
+      "</div>"
+    );
+  }
+
+  function render(result) {
+    var root = document.getElementById("root");
+    var html = buildCardHtml(result);
+    root.innerHTML = html || '<div class="empty">No visual card for this result.</div>';
+  }
+
+  // MCP Apps handshake: this view is itself an MCP client talking to the
+  // host over postMessage (spec: Communication Protocol). No network
+  // fetching anywhere in this file -- all data arrives via postMessage.
+  (function () {
+    var nextId = 1;
+    function sendRequest(method, params) {
+      var id = nextId++;
+      window.parent.postMessage({ jsonrpc: "2.0", id: id, method: method, params: params }, "*");
+      return new Promise(function (resolve, reject) {
+        window.addEventListener("message", function listener(event) {
+          if (event.data && event.data.id === id) {
+            window.removeEventListener("message", listener);
+            if (event.data.result) resolve(event.data.result);
+            else if (event.data.error) reject(new Error(event.data.error));
+          }
+        });
+      });
+    }
+
+    window.addEventListener("message", function (event) {
+      var data = event.data;
+      if (data && data.method === "ui/notifications/tool-result" && data.params) {
+        render(data.params.structuredContent || null);
+      }
+    });
+
+    sendRequest("ui/initialize", {
+      capabilities: {},
+      clientInfo: { name: "fixit-mcp-diagnose-card", version: "0.1.0" },
+      protocolVersion: "2026-01-26",
+    }).catch(function () {
+      // Host doesn't speak MCP Apps -- this view is never shown, and the
+      // tool's plain content/structuredContent is used as-is (rule: always
+      // ship the plain result too, never only the visual).
+    });
+  })();
+</script>
+</body>
+</html>

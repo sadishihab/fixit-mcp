@@ -864,3 +864,93 @@ Template for each entry:
   method -- a pattern that's completely safe in a read-only class becomes a
   shared-state bug retroactively, with no change to the constructor itself
   needed to trigger it.
+
+### 2026-09-24 — the task's own framing of MCP Apps ("returns a resourceUri", "no client-side") doesn't match the current spec
+
+- **Tool/SDK**: `modelcontextprotocol/ext-apps` specification
+  (`specification/2026-01-26/apps.mdx`), the current MCP Apps spec.
+- **Task attempted**: Add a visual card to `diagnose_error` per the step's
+  own description: "when diagnose_error finds a result, it also returns a
+  resourceUri... static HTML/SVG templated from DiagnoseErrorResult
+  fields... no client-side fetching."
+- **Steps taken**: Per the step's own explicit instruction to confirm before
+  building, fetched and read the actual current spec (github.com/
+  modelcontextprotocol/ext-apps), the hosted API docs
+  (apps.extensions.modelcontextprotocol.io), and Alexa+'s own MCP Toolkit
+  docs, rather than building from the task's paraphrase of them.
+- **Expected**: A tool result can carry its own `resourceUri`, chosen
+  per-call, with the resource itself pre-rendered server-side from that
+  call's data and no JS involved -- matching the task's plain-English
+  description.
+- **Actual**: Two mismatches, confirmed directly against spec text: (1)
+  `_meta.ui.resourceUri` is defined only on the **Tool definition** (visible
+  in `tools/list`, one shared template per tool) -- the spec has no UI
+  metadata field on `CallToolResult` at all, so a resource can't be
+  attached-or-omitted per individual call the way "only on found" implies.
+  (2) The spec's canonical rendering lifecycle requires the UI resource's own
+  small JS to act as an MCP client over `postMessage` (`ui/initialize`, then
+  react to the host's pushed `ui/notifications/tool-result`) specifically
+  *because* the same resource is shared across every call and needs some way
+  to learn which call's data to show -- a fully static, zero-JS,
+  pre-rendered-per-call resource isn't a documented pattern any current host
+  (Claude Desktop, VS Code Copilot, etc.) is built to look for.
+- **Severity**: Medium -- would have shipped a card that renders fine in our
+  own bespoke test harness but not in any real MCP Apps host, silently
+  failing the actual goal (Alexa+/Claude Desktop showing a visual) while
+  looking correct in isolation.
+- **Workaround**: Stopped and presented both the spec-conformant design and
+  the literal-but-non-conformant one to the user via a direct question
+  before writing any implementation, per the task's own "tell me before
+  building around a guess" instruction. User chose spec-conformant. Built:
+  one static `ui://fixit-mcp/diagnose-error-card` resource declared via
+  `@mcp.tool(..., meta={"ui": {"resourceUri": ...}})`, containing the spec's
+  postMessage handshake plus a pure, DOM-free `buildCardHtml(result)`
+  function; "only render on found" is implemented *inside* that function
+  (returns `""` for any other status) rather than by conditionally attaching
+  metadata to the call result, since the latter isn't how the mechanism
+  works.
+- **Actionable suggestion**: A fast-moving extension spec (this one changed
+  its own dated version, `2025-11-21` draft blog post to a `2026-01-26`
+  specification) is exactly the case where a task description's plain-English
+  paraphrase of "how it works" is most likely to already be stale or
+  simplified -- worth fetching the actual current spec directly before
+  writing code every time one of these comes up, even when the paraphrase
+  sounds precise and actionable on its own.
+
+### 2026-09-24 — testing a template's JS logic without adding a JS test framework to a Python project
+
+- **Tool/SDK**: `tests/unit/test_diagnose_card.py`, Node.js (already an
+  implicit project dependency via `make inspector`'s `npx`).
+- **Task attempted**: Unit-test `diagnose_card.html`'s rendering logic
+  (which fields show, numbered steps, safety-warning styling, XSS escaping,
+  "nothing renders for non-found statuses") without either (a) trusting a
+  Python reimplementation of the same logic to stay in sync with the actual
+  shipped JS, or (b) pulling in a browser-automation/jsdom dependency for
+  one small template.
+- **Steps taken**: Designed `buildCardHtml(result)` to be pure and DOM-free
+  from the start (no `document`, no `postMessage` inside it -- those live
+  only in the surrounding handshake code) specifically so it can run in a
+  plain `node -e` subprocess with no browser context at all. Verified `node`
+  is already implicitly expected by this repo (the Makefile's `inspector`
+  target requires `npx`) before relying on it further.
+- **Actual**: Works cleanly -- tests extract just the pure part of the
+  `<script>` block via a string split on a marker comment
+  (`// MCP Apps handshake`), append a `console.log(buildCardHtml(<fixture>))`
+  call, and run it via `subprocess.run([node, "-e", js])`, asserting on
+  stdout. This exercises the literal bytes shipped in the resource, not a
+  parallel Python copy of the rendering rules.
+- **Severity**: Low -- resolved cleanly, logging the pattern rather than a
+  real problem.
+- **Workaround**: Guarded every such test with
+  `@pytest.mark.skipif(shutil.which("node") is None, ...)` so `make test`
+  still passes cleanly (skips, doesn't fail) on a machine without Node --
+  the static-file/string-content tests in the same file (valid HTML5, `ui://`
+  scheme, no `fetch(`) still run unconditionally and don't need it.
+- **Actionable suggestion**: When a Python project's server ships a small
+  amount of embedded client-side JS (a UI template, a script tag), prefer
+  writing that JS's core logic as a pure, dependency-free function and
+  testing it by literally executing it in the runtime it's shipped for
+  (Node, here) rather than either skipping real coverage of it or
+  reimplementing its logic a second time in Python to test in isolation --
+  the reimplementation is the more common choice but is exactly the kind of
+  thing that silently drifts from the real behavior over time.

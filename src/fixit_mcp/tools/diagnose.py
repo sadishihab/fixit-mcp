@@ -14,6 +14,7 @@ from typing import Literal
 from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel, Field
 
+from fixit_mcp.apps.resources import DIAGNOSE_CARD_HTML, DIAGNOSE_CARD_RESOURCE_URI
 from fixit_mcp.domain.models import Appliance, ErrorCodeRecord, normalize_code
 from fixit_mcp.logging import log_tool_latency
 from fixit_mcp.repository.base import ApplianceRepository
@@ -257,9 +258,40 @@ def diagnose(
 
 
 def register_diagnose_tool(mcp: FastMCP, repository: ApplianceRepository, index: ErrorCodeIndex) -> None:
-    """Register the diagnose_error tool on the given FastMCP server."""
+    """Register the diagnose_error tool, and its MCP Apps visual card, on the
+    given FastMCP server.
 
-    @mcp.tool(name="diagnose_error", description=DIAGNOSE_ERROR_DESCRIPTION)
+    Per the current MCP Apps spec, the card's ui:// resource is declared
+    once, statically, on the tool's own `_meta.ui.resourceUri` -- not
+    per-call -- and is shared by every diagnose_error invocation. See
+    fixit_mcp.apps.resources and diagnose_card.html for why: the resource
+    itself never changes per call; its own JS renders differently depending
+    on the specific result the host pushes to it, so it still only shows a
+    real card for a `found` result and nothing for `not_found`/
+    `ambiguous_appliance` -- gated inside the template, not by whether the
+    resourceUri is attached to a given response (it always is; the plain
+    structured JSON is unaffected either way, since that's a completely
+    separate, unmodified concern from this tool-level UI declaration).
+    """
+
+    @mcp.resource(
+        DIAGNOSE_CARD_RESOURCE_URI,
+        name="diagnose-error-card",
+        title="Diagnosis card",
+        description=(
+            "Visual card for a diagnose_error result: error code, appliance, meaning, "
+            "numbered repair steps, safety warnings, and citation."
+        ),
+        mime_type="text/html;profile=mcp-app",
+    )
+    def diagnose_error_card() -> str:
+        return DIAGNOSE_CARD_HTML
+
+    @mcp.tool(
+        name="diagnose_error",
+        description=DIAGNOSE_ERROR_DESCRIPTION,
+        meta={"ui": {"resourceUri": DIAGNOSE_CARD_RESOURCE_URI}},
+    )
     @log_tool_latency("diagnose_error")
     def diagnose_error(
         error_code: str,
