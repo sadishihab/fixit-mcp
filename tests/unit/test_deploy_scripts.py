@@ -380,3 +380,20 @@ def test_rendered_policies_fit_the_iam_size_limit_where_they_are_attached(
     size = len("".join((tmp_path / name).read_text().split()))
 
     assert size <= limit, f"{name} is {size} chars, over IAM's {limit} for where it's attached"
+
+
+def test_deployer_can_create_the_implicit_default_endpoint(tmp_path: Path) -> None:
+    """CreateAgentRuntime also creates the DEFAULT endpoint, authorized as
+    CreateAgentRuntimeEndpoint on the literal `runtime/*` -- a name-scoped
+    `runtime/fixit_mcp-*` grant doesn't match it (first real deploy, 4c)."""
+    render_iam.render_all(VALUES, output_dir=tmp_path)
+    policy = json.loads((tmp_path / "deployer-policy.json").read_text())
+
+    wildcard = next(s for s in policy["Statement"] if s["Sid"] == "AgentCoreRuntimeCreateAndList")
+    assert "bedrock-agentcore:CreateAgentRuntimeEndpoint" in wildcard["Action"]
+    assert wildcard["Resource"] == "*"
+    scoped = next(s for s in policy["Statement"] if s["Sid"] == "AgentCoreRuntimeManagement")
+    assert {
+        "bedrock-agentcore:UpdateAgentRuntimeEndpoint",
+        "bedrock-agentcore:DeleteAgentRuntimeEndpoint",
+    } <= set(scoped["Action"])

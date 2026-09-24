@@ -35,6 +35,8 @@
         "bedrock-agentcore:ListAgentRuntimeVersions",
         "bedrock-agentcore:GetAgentRuntimeEndpoint",
         "bedrock-agentcore:ListAgentRuntimeEndpoints",
+        "bedrock-agentcore:UpdateAgentRuntimeEndpoint",
+        "bedrock-agentcore:DeleteAgentRuntimeEndpoint",
         "bedrock-agentcore:InvokeAgentRuntime",
         "bedrock-agentcore:StopRuntimeSession"
       ],
@@ -46,7 +48,11 @@
     {
       "Sid": "AgentCoreRuntimeCreateAndList",
       "Effect": "Allow",
-      "Action": ["bedrock-agentcore:CreateAgentRuntime", "bedrock-agentcore:ListAgentRuntimes"],
+      "Action": [
+        "bedrock-agentcore:CreateAgentRuntime",
+        "bedrock-agentcore:CreateAgentRuntimeEndpoint",
+        "bedrock-agentcore:ListAgentRuntimes"
+      ],
       "Resource": "*"
     },
     {

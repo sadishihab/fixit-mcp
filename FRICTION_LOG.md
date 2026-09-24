@@ -1561,3 +1561,39 @@ Template for each entry:
 - **Actionable suggestion**: When handing out an IAM policy, state where
   it attaches (user inline, role inline, or managed) and check its
   non-whitespace size against that limit before handing it over.
+
+### 2026-09-24 — First real CreateAgentRuntime: AccessDenied on an action the call never names (CreateAgentRuntimeEndpoint)
+
+- **Tool/SDK**: `bedrock-agentcore-control:CreateAgentRuntime` (boto3
+  1.43.100), IAM, `scripts/deploy_runtime.py`.
+- **Task attempted**: First real deploy (`make deploy-runtime`) after
+  `make docker-push` succeeded. That push created ECR repo `fixit-mcp`;
+  the image digest `sha256:fc68db80…` equals the tested local image's id.
+- **Steps taken**: Ran the deploy with the `FixItRuntimeDeployer` managed
+  policy attached to `fixit-dev`.
+- **Expected**: `CreateAgentRuntime` authorized by the statement granting
+  `bedrock-agentcore:CreateAgentRuntime` on `*`.
+- **Actual**: `AccessDeniedException: User:
+  arn:aws:iam::<account>:user/fixit-dev is not authorized to perform:
+  bedrock-agentcore:CreateAgentRuntimeEndpoint on resource:
+  arn:aws:bedrock-agentcore:us-east-1:<account>:runtime/* because no
+  identity-based policy allows the bedrock-agentcore:CreateAgentRuntimeEndpoint
+  action`. `CreateAgentRuntime` implicitly creates the DEFAULT endpoint,
+  and IAM authorizes that as a **second action**, against the literal
+  wildcard ARN `runtime/*`, so a name-scoped `runtime/fixit_mcp-*` grant
+  can never match it. `ListAgentRuntimes` afterwards showed **no runtime
+  created**: the check fails before anything is provisioned.
+- **Severity**: Low (nothing half-created). Not documented on the
+  CreateAgentRuntime API page, nor in AWS's runtime-permissions page.
+- **Workaround**: Added `CreateAgentRuntimeEndpoint` to the `*` statement.
+  Also added `UpdateAgentRuntimeEndpoint` and `DeleteAgentRuntimeEndpoint`
+  to the runtime-scoped statement. Those two are **anticipated, not
+  observed**: update repoints DEFAULT at the new version, and delete
+  removes it, the same implicit-endpoint pattern. One policy revision
+  instead of three failed runs. Pinned by
+  `test_deployer_can_create_the_implicit_default_endpoint`.
+- **Actionable suggestion**: AWS should list implicitly authorized
+  sub-actions (like endpoint creation) on the CreateAgentRuntime API
+  reference page. Scoping a create to a resource-name pattern fails in a
+  confusing way when the service authorizes a sibling action against a
+  wildcard ARN.
