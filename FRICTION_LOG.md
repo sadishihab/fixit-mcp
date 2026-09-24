@@ -994,3 +994,169 @@ Template for each entry:
   than reality), and discovering it's wrong doesn't resolve the underlying
   decision, it just means the decision still needs to be made with correct
   information instead of skipped.
+
+### 2026-09-24 — AgentCore's recommended deploy path changed since step 1, and its "custom container" guide describes the wrong contract for MCP servers
+
+- **Tool/SDK**: Amazon Bedrock AgentCore Runtime docs
+  (docs.aws.amazon.com/bedrock-agentcore: `runtime-mcp.html`,
+  `runtime-mcp-protocol-contract.html`, `getting-started-custom.html`),
+  `aws/agentcore-cli` (`docs/container-builds.md`).
+- **Task attempted**: Before containerizing (step 4a), re-check the AgentCore
+  Runtime MCP container contract and the currently recommended deployment
+  method against what step 1 recorded (CLAUDE.md rules 5–6).
+- **Steps taken**: Read the MCP deploy guide, the MCP protocol contract, the
+  session and filesystem docs, the "get started without the CLI" guide, and
+  the AgentCore CLI's container-build doc.
+- **Expected**: Same contract as step 1. Deployment either through the
+  Python starter toolkit (`agentcore configure`/`launch`) or through
+  hand-written CDK.
+- **Actual**:
+  - **Contract: unchanged.** ARM64, `0.0.0.0:8000`, `POST /mcp`, and
+    `stateless_http=True` is still the recommended default. The platform
+    injects its own `Mcp-Session-Id`, which a stateless server must accept.
+    New since step 1: stateful MCP mode is now supported (Mar 2026) but not
+    needed here. Once clients move to MCP `2026-07-28`, elicitation and
+    sampling use MRTR and don't require stateful mode either.
+  - **Tooling: changed.** The AgentCore CLI is now an npm package
+    (`npm install -g @aws/agentcore`: `agentcore create`/`add agent
+    --protocol MCP`/`deploy`). `deploy` synthesizes **CDK** under the hood
+    (`agentcore/cdk/`, driven by `agentcore/agentcore.json`). The default
+    build is CodeZip (an S3 upload, no container). A `"build": "Container"`
+    agent can use a fully custom Dockerfile, built remotely by CodeBuild. The
+    CLI caps images at 1 GB for local packaging and 2 GB for CodeBuild. Its
+    generated images run as non-root UID 1000, which this repo's image
+    matches.
+  - The **"Get started without the AgentCore CLI"** page (the natural
+    starting point for bringing your own Dockerfile) documents only the
+    *HTTP*-protocol contract: `/invocations` + `/ping` on port **8080**.
+    Nothing on the page says this doesn't apply to MCP-protocol runtimes,
+    which use `/mcp` on **8000** and need no `/ping`. Following that page
+    for an MCP server would produce a container AgentCore can't talk to.
+- **Severity**: Medium. Nothing broke, but the "custom container" guide is
+  actively misleading for MCP, and "which deploy tool" now has a different
+  answer than step 1's research.
+- **Workaround**: Built against the MCP protocol contract page only.
+  `tests/unit/test_dockerfile.py` pins host/port/path to that contract.
+  Step 4b decides between the AgentCore CLI (Container build pointing at
+  this Dockerfile) and hand-written CDK.
+- **Actionable suggestion**: AWS should add a protocol note to
+  `getting-started-custom.html` ("this contract is for `--protocol HTTP`;
+  MCP runtimes serve `/mcp` on 8000, see the MCP protocol contract") and
+  link each protocol's contract from it.
+
+### 2026-09-24 — arm64 image under QEMU on an x86_64 host: silent emulation gap, then a 10x latency distortion
+
+- **Tool/SDK**: Docker Engine 29.7 (Linux, x86_64 host, no Docker Desktop
+  or Finch), buildx, `tonistiigi/binfmt`.
+- **Task attempted**: Build and run the `linux/arm64` image locally and
+  confirm it passes the same smoke checks as the dev server, including the
+  p95 latency budget.
+- **Steps taken**: `docker run --platform linux/arm64 alpine uname -m`
+  printed `exec format error`: plain Docker Engine on Linux ships no QEMU
+  handlers, unlike Docker Desktop. Registered them with
+  `docker run --privileged --rm tonistiigi/binfmt --install arm64`, then
+  built and ran the image. Ran `scripts/smoke_test.py` against it.
+- **Expected**: All checks pass, latency included. The handler itself is a
+  ~1ms in-memory lookup.
+- **Actual**: Every functional check passed, but `diagnose_error`'s p95
+  round trip was **656ms**, over the 500ms Alexa+ budget. The container's own
+  structlog line still said `latency_ms: 1.43`, so the time went to the
+  emulated SDK/ASGI/pydantic stack around the handler. Building the *same
+  Dockerfile* natively for `linux/amd64` gave **58.9ms**, matching the dev
+  server's **55.2ms**. That confirms the gap is QEMU, not the image. Cold
+  start under emulation was also ~30s.
+- **Severity**: Medium. This would have been a false alarm about the 500ms
+  budget, or worse, a "fix" to code that wasn't slow.
+- **Workaround**: `scripts/smoke_test.py --skip-latency`. `make
+  docker-smoke` passes it automatically when `DOCKER_PLATFORM` differs from
+  the host arch, and `tests/integration/test_container.py` skips the check
+  when the image arch differs from the host arch. Real latency is measured
+  natively (dev server, or an amd64 build) and must be re-measured on
+  Graviton after deployment (step 4b).
+- **Actionable suggestion**: When emulating the target arch, never read
+  latency numbers from the emulated run. Compare the handler's own logged
+  latency with the round trip first. A large gap means you're measuring the
+  emulator.
+
+### 2026-09-24 — data paths resolved via `Path(__file__).parents[N]` only work from an editable install
+
+- **Tool/SDK**: `uv sync` (0.12.18), uv_build, this repo's
+  `fixit_mcp.config` / `catalog.manifest` / `retrieval.codes`.
+- **Task attempted**: A minimal, dev-dependency-free runtime image.
+- **Steps taken**: Before writing the Dockerfile, grepped `src/` for how the
+  server finds `data/` at startup.
+- **Expected**: Data paths configurable, or package-relative.
+- **Actual**: Three modules locate `data/` as
+  `Path(__file__).resolve().parents[2 or 3]`, which is the repo root *only*
+  when the package runs from `src/`. The usual container idiom (`uv sync
+  --no-editable`, then copy just `.venv`) would point them at
+  `.venv/lib/python3.12/`. Missing index: `load_index()` raises, which is
+  loud and fine. Missing manifest: `load_manual_catalog()` **silently returns
+  an empty catalog**, so the container would start cleanly and then have
+  `add_appliance` report "no manual on file" for every model.
+- **Severity**: Medium. Invisible at startup, wrong at request time.
+- **Workaround**: Kept the default editable install and copied `src/`
+  alongside `.venv`, so `/app/src/fixit_mcp/...` resolves `data/` to
+  `/app/data`, with no code change. Guarded three ways:
+  `tests/unit/test_dockerfile.py` asserts every startup data file is COPYed
+  in and not `.dockerignore`d, and that `--no-editable` isn't used. The smoke
+  script's `add_appliance` check asserts `manual_linked is True`, which is
+  exactly what the silent failure would break.
+- **Actionable suggestion**: Worth a follow-up: an explicit
+  `FIXIT_DATA_DIR` setting, and making `load_manual_catalog()` fail loudly
+  at startup on a missing manifest (it's committed, so absence is always a
+  packaging bug). Not done here, to keep this step to "containerize without
+  changing server behavior."
+
+### 2026-09-24 — OPEN DECISION: the SQLite household store isn't durable, or even shared, on AgentCore Runtime
+
+- **Tool/SDK**: AgentCore Runtime sessions (`runtime-sessions.html`) and
+  filesystem configurations (`runtime-filesystem-configurations.html`),
+  `fixit_mcp.repository.sqlite`.
+- **Task attempted**: Work out what the step-3c SQLite store
+  (`data/state/appliances.db`) does inside the container, locally and on
+  AgentCore.
+- **Steps taken**: Locally, added an appliance, then (a) restarted the
+  container, (b) removed it and ran a fresh one from the image, and (c)
+  repeated (b) with a named volume at `/app/data/state`. Now pinned by
+  `tests/integration/test_container.py`. Read AgentCore's session and
+  filesystem docs.
+- **Expected**: Some durability gap on AgentCore across restarts.
+- **Actual**: Locally: (a) persisted, (b) **lost**, (c) persisted. On
+  AgentCore, *every new session* is case (b). Each runtime session gets its
+  own dedicated microVM, and local disk is ephemeral: gone after 15 min idle
+  (default), 8 h max lifetime, or on redeploy. The problem is worse than
+  "not durable across restarts". The store **isn't shared across sessions**
+  either, so an appliance a customer adds in one Alexa+ conversation is
+  invisible in the next one. Each fresh microVM also re-seeds the demo
+  households, which hides the problem in a demo that only uses seed data.
+  The storage options AgentCore now offers don't fix this as-is:
+  - *Managed session storage* (Preview, `/mnt/<name>`, no VPC) persists
+    across stop/resume but is **isolated per session** and **wiped on every
+    runtime version update**. That's the same sharing problem, and it
+    resets on each deploy.
+  - *EFS / S3 Files access points* are shared across sessions but need VPC
+    mode, NFS security groups, and mount targets. More importantly, SQLite
+    in **WAL mode (which this repo uses) is unsafe over NFS**: WAL relies on
+    shared memory on one host, and here multiple microVMs would write
+    concurrently.
+- **Severity**: High for real deployment. It breaks the "remembers which
+  appliances a household owns" feature outright. Harmless for local and
+  container testing.
+- **Workaround**: None applied. **This is an explicit decision for step 4b,
+  not something to patch silently.** Options, roughly in order of fit:
+  (1) implement the `ApplianceRepository` interface on **AgentCore Memory**,
+  already the stated production target in CLAUDE.md (check its read
+  latency against the 500ms budget first);
+  (2) DynamoDB behind the same interface (single-digit-ms reads,
+  serverless, no VPC);
+  (3) ship to AgentCore with the SQLite backend as a knowingly-ephemeral
+  demo store, which is acceptable only if the demo never relies on data
+  added in an earlier session.
+  `FIXIT_SQLITE_PATH` already lets the path move to a mount if (3) is chosen.
+- **Actionable suggestion**: For any MCP server bound for AgentCore
+  Runtime, treat local disk as per-conversation scratch space from day one,
+  since sessions map to microVMs. Anything that must outlive one
+  conversation belongs in an external store behind a repository interface.
+  The runtime docs could say "per-session" more prominently in the MCP
+  guide itself, not only in the sessions page.

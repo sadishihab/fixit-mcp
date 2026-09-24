@@ -239,6 +239,23 @@ Alexa+ MCP Toolkit and helps customers with home appliances:
   literal "per-call resourceUri, fully pre-rendered server-side, zero
   client-side JS" reading of the original request isn't what any current
   MCP Apps host looks for, and for the `tools/call` support finding above.
+- **Container image** (step 4a, `Dockerfile`, `make docker-build`/`docker-run`/
+  `docker-smoke`). linux/arm64, two-stage uv build, non-root UID 1000, prod
+  deps only. It serves the unmodified `Settings` defaults (`0.0.0.0:8000/mcp`,
+  stateless), which already match AgentCore's MCP container contract, so the
+  Dockerfile must never override host/port/path. The project install is
+  deliberately **editable** with `src/` copied next to `.venv`, because data
+  paths are resolved via `Path(__file__).parents[N]` and a non-editable install
+  would break them (`load_manual_catalog()` would silently go empty). Any new
+  data file loaded at startup must be added to the Dockerfile's COPY lines
+  (`tests/unit/test_dockerfile.py` enforces this for the current ones).
+  `scripts/smoke_test.py` is the end-to-end check for any running server URL
+  (container now, AgentCore in step 4b). Use `--skip-latency` under QEMU
+  emulation, because the latency it reports there is QEMU's, not the server's
+  (see `FRICTION_LOG.md`). **Open decision before step 4b:** on AgentCore
+  every session is a fresh microVM, so the SQLite store is neither durable
+  nor shared across conversations. See `FRICTION_LOG.md`'s step-4a "OPEN
+  DECISION" entry.
 
 ## Testing
 
@@ -266,8 +283,9 @@ persistent state the customer can add to and remove via `add_appliance`/
 `diagnose_error` has its first MCP Apps visual card (step 3d,
 `fixit_mcp.apps`) — but nothing beyond that yet: no embeddings, no
 fuzzy/semantic retrieval beyond `difflib` nearest-match suggestions, no
-Strands, no AWS deployment (the SQLite store is a dev/demo stand-in for
-AgentCore Memory, see the persistence bullet above), no auth/account
+Strands, no AWS deployment yet (the arm64 container image is built and
+verified locally, step 4a, but nothing is deployed; the SQLite store is a
+dev/demo stand-in for AgentCore Memory, see the persistence bullet above), no auth/account
 linking, no visual cards for any other tool, no web client, no
 parts-ordering or maintenance-scheduling tools. See
 `docs/alexa-plus-requirements.md` for the full done/todo/not-needed

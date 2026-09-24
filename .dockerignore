@@ -1,0 +1,23 @@
+# Keep the build context small and never ship local/derived/secret files.
+# The Dockerfile COPYs only what it needs; this just keeps them out of the
+# context entirely (and out of the builder's cache keys).
+.git/
+.venv/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.env
+.env.*
+!.env.example
+
+# Derived/local data -- only data/index/error_codes.json and
+# data/manuals/manifest.yaml are needed in the image.
+data/manuals/pdf/
+data/manuals/parsed/
+data/index/.extract_cache/
+data/state/
+
+tests/
+scripts/
+docs/

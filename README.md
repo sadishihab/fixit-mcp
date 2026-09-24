@@ -91,6 +91,37 @@ make tunnel
 This prints a temporary `https://*.trycloudflare.com` URL that proxies to
 your local server.
 
+### Running in Docker (AgentCore Runtime image)
+
+The `Dockerfile` builds the image Amazon Bedrock AgentCore Runtime will run:
+`linux/arm64`, non-root (UID 1000), prod dependencies only, serving
+`0.0.0.0:8000/mcp` in stateless mode, the same defaults as `make run`, so
+nothing is overridden. It's about 59 MB compressed and about 200 MB unpacked.
+
+```bash
+# x86_64 hosts only, once per boot: register QEMU so arm64 images can build/run.
+docker run --privileged --rm tonistiigi/binfmt --install arm64
+
+make docker-build   # docker buildx build --platform linux/arm64 -t fixit-mcp:latest --load .
+make docker-run     # serves http://localhost:8000/mcp; SQLite state in the `fixit-mcp-state` volume
+make docker-smoke   # in another terminal: end-to-end MCP checks against the running container
+```
+
+`make docker-smoke` runs `scripts/smoke_test.py`, which covers both protocol
+versions, every tool, the MCP Apps card, and a foreign `Mcp-Session-Id`
+header. On an x86_64 host it skips the latency check, because QEMU emulation
+makes each call about 10x slower than native. Set `DOCKER_PLATFORM=linux/amd64`
+for a native local build if you need real latency numbers. The container
+tests are opt-in: `FIXIT_DOCKER_TESTS=1 uv run pytest tests/integration/test_container.py`.
+
+> **State persistence caveat.** The SQLite household store lives at
+> `/app/data/state/appliances.db` inside the container. Locally,
+> `make docker-run` mounts a named volume there so data survives `docker rm`.
+> **AgentCore Runtime has no such volume by default.** Every new session
+> runs in a fresh microVM created from the image, so appliances added in one
+> Alexa+ conversation are gone in the next. This needs a decision before
+> deploying (step 4b). See `FRICTION_LOG.md` (step 4a) for the options.
+
 ## Running tests
 
 ```bash
@@ -107,6 +138,12 @@ Test suite:
   `2025-03-26` protocol version the Alexa+ client sends and confirms tool
   calls still work.
 - `tests/integration/test_latency.py` — 50 tool calls, asserts p95 < 100ms.
+- `tests/integration/test_smoke_script.py` — keeps `scripts/smoke_test.py`
+  (the container/deployment smoke checks) passing against the dev server.
+- `tests/unit/test_dockerfile.py` — guards the Dockerfile's contract
+  (startup data files copied in, editable install, non-root, port 8000).
+- `tests/integration/test_container.py` — opt-in (`FIXIT_DOCKER_TESTS=1`):
+  runs the real image and checks the smoke suite plus state persistence.
 
 ## AWS services used
 
