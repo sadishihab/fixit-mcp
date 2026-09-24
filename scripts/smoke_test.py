@@ -6,6 +6,11 @@ endpoint unchanged once one exists (step 4b). Drives the server with the
 official MCP client over real Streamable HTTP -- nothing is mocked.
 
     uv run python scripts/smoke_test.py [--url http://localhost:8000/mcp]
+    uv run python scripts/smoke_test.py --agent-arn arn:aws:bedrock-agentcore:...:runtime/...
+
+Against a deployed AgentCore Runtime, --agent-arn builds the runtime's
+HTTPS invocation URL and SigV4-signs every request (the runtime's default
+AWS_IAM inbound auth), with credentials from the standard boto3 chain.
 
 Pass --skip-latency when the server is an arm64 image running under QEMU
 on an x86_64 host (`make docker-smoke` does this automatically): emulation
@@ -23,12 +28,14 @@ import argparse
 import asyncio
 import sys
 import time
+import urllib.parse
 import uuid
 from collections.abc import Awaitable, Callable
 
 import httpx
 from mcp import ClientSession, types
 from mcp.client.streamable_http import streamable_http_client
+from mcp.shared._httpx_utils import create_mcp_http_client
 
 DEFAULT_URL = "http://localhost:8000/mcp"
 LATEST_PROTOCOL_VERSION = "2025-11-25"
@@ -49,13 +56,16 @@ def _check(condition: bool, message: str) -> None:
         raise SmokeCheckFailed(message)
 
 
-async def _with_session(url: str, body: Callable[[ClientSession], Awaitable[None]]) -> None:
-    async with streamable_http_client(url) as (read_stream, write_stream, _):
-        async with ClientSession(read_stream, write_stream) as session:
-            await body(session)
+async def _with_session(
+    url: str, body: Callable[[ClientSession], Awaitable[None]], auth: httpx.Auth | None = None
+) -> None:
+    async with create_mcp_http_client(auth=auth) as http_client:
+        async with streamable_http_client(url, http_client=http_client) as (read_stream, write_stream, _):
+            async with ClientSession(read_stream, write_stream) as session:
+                await body(session)
 
 
-async def check_latest_protocol(url: str) -> str:
+async def check_latest_protocol(url: str, auth: httpx.Auth | None = None) -> str:
     async def body(session: ClientSession) -> None:
         result = await session.initialize()
         _check(
@@ -63,11 +73,11 @@ async def check_latest_protocol(url: str) -> str:
             f"negotiated {result.protocolVersion!r}, expected {LATEST_PROTOCOL_VERSION!r}",
         )
 
-    await _with_session(url, body)
+    await _with_session(url, body, auth)
     return f"initialize negotiates {LATEST_PROTOCOL_VERSION}"
 
 
-async def check_legacy_protocol(url: str) -> str:
+async def check_legacy_protocol(url: str, auth: httpx.Auth | None = None) -> str:
     async def body(session: ClientSession) -> None:
         result = await session.send_request(
             types.ClientRequest(
@@ -89,11 +99,11 @@ async def check_legacy_protocol(url: str) -> str:
         listed = await session.call_tool("list_my_appliances", {"household_id": "house-002"})
         _check(listed.isError is False, f"list_my_appliances failed under legacy protocol: {listed}")
 
-    await _with_session(url, body)
+    await _with_session(url, body, auth)
     return f"initialize negotiates legacy {ALEXA_PLUS_PROTOCOL_VERSION} and tool calls still work"
 
 
-async def check_tools_listed(url: str) -> str:
+async def check_tools_listed(url: str, auth: httpx.Auth | None = None) -> str:
     async def body(session: ClientSession) -> None:
         await session.initialize()
         tools = {tool.name: tool for tool in (await session.list_tools()).tools}
@@ -104,11 +114,11 @@ async def check_tools_listed(url: str) -> str:
             f"diagnose_error ui meta wrong: {meta}",
         )
 
-    await _with_session(url, body)
+    await _with_session(url, body, auth)
     return f"tools/list returns {sorted(EXPECTED_TOOLS)}"
 
 
-async def check_list_my_appliances(url: str) -> str:
+async def check_list_my_appliances(url: str, auth: httpx.Auth | None = None) -> str:
     async def body(session: ClientSession) -> None:
         await session.initialize()
         result = await session.call_tool("list_my_appliances", {"household_id": "house-002"})
@@ -116,11 +126,11 @@ async def check_list_my_appliances(url: str) -> str:
         brands = {a["brand"] for a in result.structuredContent["appliances"]}
         _check(brands == {"GE", "LG"}, f"house-002 seed data wrong: {brands}")
 
-    await _with_session(url, body)
+    await _with_session(url, body, auth)
     return "list_my_appliances(house-002) returns the seeded GE + LG appliances"
 
 
-async def check_diagnose_error(url: str) -> str:
+async def check_diagnose_error(url: str, auth: httpx.Auth | None = None) -> str:
     async def body(session: ClientSession) -> None:
         await session.initialize()
         result = await session.call_tool("diagnose_error", {"error_code": "tE1", "household_id": "house-002"})
@@ -129,11 +139,11 @@ async def check_diagnose_error(url: str) -> str:
         _check(content["status"] == "found", f"expected found, got {content['status']!r}")
         _check(content["appliance"]["brand"] == "LG", f"wrong appliance: {content['appliance']}")
 
-    await _with_session(url, body)
+    await _with_session(url, body, auth)
     return "diagnose_error(tE1, house-002) finds the LG dryer code (error-code index loaded)"
 
 
-async def check_diagnose_card(url: str) -> str:
+async def check_diagnose_card(url: str, auth: httpx.Auth | None = None) -> str:
     async def body(session: ClientSession) -> None:
         await session.initialize()
         result = await session.read_resource(DIAGNOSE_CARD_URI)
@@ -143,11 +153,11 @@ async def check_diagnose_card(url: str) -> str:
             f"wrong card MIME type: {result.contents[0].mimeType!r}",
         )
 
-    await _with_session(url, body)
+    await _with_session(url, body, auth)
     return f"resources/read {DIAGNOSE_CARD_URI} returns the MCP Apps card"
 
 
-async def check_add_links_manual(url: str) -> str:
+async def check_add_links_manual(url: str, auth: httpx.Auth | None = None) -> str:
     """add_appliance links to a manual only if data/manuals/manifest.yaml
     was found at startup -- load_manual_catalog() silently returns an empty
     catalog when it isn't, so this is the check that catches a missing file."""
@@ -176,11 +186,11 @@ async def check_add_links_manual(url: str) -> str:
                 "remove_appliance", {"household_id": household_id, "appliance_id": appliance_id}
             )
 
-    await _with_session(url, body)
+    await _with_session(url, body, auth)
     return "add_appliance links a known model to its manual (manifest loaded), then cleans up"
 
 
-async def check_platform_session_id_accepted(url: str) -> str:
+async def check_platform_session_id_accepted(url: str, auth: httpx.Auth | None = None) -> str:
     """AgentCore injects its own Mcp-Session-Id on every request; a stateless
     server must not reject a session id it never issued (CLAUDE.md rule 5)."""
     headers = {
@@ -195,14 +205,14 @@ async def check_platform_session_id_accepted(url: str) -> str:
         "method": "tools/call",
         "params": {"name": "list_my_appliances", "arguments": {"household_id": "house-001"}},
     }
-    async with httpx.AsyncClient(timeout=10) as client:
+    async with httpx.AsyncClient(timeout=10, auth=auth) as client:
         response = await client.post(url, json=payload, headers=headers)
     _check(response.status_code == 200, f"foreign Mcp-Session-Id rejected: HTTP {response.status_code}")
     _check("result" in response.json(), f"no JSON-RPC result: {response.text[:200]}")
     return "a foreign, platform-style Mcp-Session-Id header is accepted, not rejected"
 
 
-async def check_latency(url: str) -> str:
+async def check_latency(url: str, auth: httpx.Auth | None = None) -> str:
     latencies_ms: list[float] = []
 
     async def body(session: ClientSession) -> None:
@@ -215,14 +225,57 @@ async def check_latency(url: str) -> str:
             latencies_ms.append((time.perf_counter() - start) * 1000)
             _check(result.isError is False, f"diagnose_error errored during latency run: {result}")
 
-    await _with_session(url, body)
+    await _with_session(url, body, auth)
     latencies_ms.sort()
     p95 = latencies_ms[int(len(latencies_ms) * 0.95) - 1]
     _check(p95 < P95_BUDGET_MS, f"diagnose_error p95 {p95:.1f}ms exceeds {P95_BUDGET_MS}ms")
     return f"diagnose_error p95 {p95:.1f}ms over {LATENCY_CALLS} calls (budget {P95_BUDGET_MS}ms)"
 
 
-CHECKS: list[Callable[[str], Awaitable[str]]] = [
+class SigV4Auth(httpx.Auth):
+    """Signs every request with AWS SigV4, the way AgentCore Runtime's
+    default (AWS_IAM) inbound auth requires. Credentials come from the
+    standard boto3 chain. The body is part of the signature, hence
+    requires_request_body."""
+
+    requires_request_body = True
+
+    def __init__(self, region: str, service: str = "bedrock-agentcore") -> None:
+        import boto3
+
+        credentials = boto3.Session().get_credentials()
+        if credentials is None:
+            raise SmokeCheckFailed("--sigv4 needs AWS credentials (none found in the standard chain)")
+        self._credentials = credentials
+        self._region = region
+        self._service = service
+
+    def auth_flow(self, request: httpx.Request):
+        from botocore.auth import SigV4Auth as BotocoreSigV4Auth
+        from botocore.awsrequest import AWSRequest
+
+        aws_request = AWSRequest(
+            method=request.method,
+            url=str(request.url),
+            data=request.content,
+            headers={k: v for k, v in request.headers.items() if k.lower() != "connection"},
+        )
+        BotocoreSigV4Auth(self._credentials.get_frozen_credentials(), self._service, self._region).add_auth(
+            aws_request
+        )
+        for name, value in aws_request.headers.items():
+            request.headers[name] = value
+        yield request
+
+
+def runtime_invocation_url(agent_runtime_arn: str, qualifier: str = "DEFAULT") -> str:
+    """The HTTPS MCP endpoint of an AgentCore Runtime (region taken from the ARN)."""
+    region = agent_runtime_arn.split(":")[3]
+    escaped = urllib.parse.quote(agent_runtime_arn, safe="")
+    return f"https://bedrock-agentcore.{region}.amazonaws.com/runtimes/{escaped}/invocations?qualifier={qualifier}"
+
+
+CHECKS: list[Callable[..., Awaitable[str]]] = [
     check_latest_protocol,
     check_legacy_protocol,
     check_tools_listed,
@@ -235,13 +288,13 @@ CHECKS: list[Callable[[str], Awaitable[str]]] = [
 ]
 
 
-def selected_checks(skip_latency: bool = False) -> list[Callable[[str], Awaitable[str]]]:
+def selected_checks(skip_latency: bool = False) -> list[Callable[..., Awaitable[str]]]:
     return [check for check in CHECKS if not (skip_latency and check is check_latency)]
 
 
-async def run_smoke_checks(url: str, skip_latency: bool = False) -> list[str]:
+async def run_smoke_checks(url: str, skip_latency: bool = False, auth: httpx.Auth | None = None) -> list[str]:
     """Run every check in order; raise SmokeCheckFailed on the first failure."""
-    return [await check(url) for check in selected_checks(skip_latency)]
+    return [await check(url, auth) for check in selected_checks(skip_latency)]
 
 
 async def _wait_until_up(url: str, timeout_s: float) -> None:
@@ -257,12 +310,12 @@ async def _wait_until_up(url: str, timeout_s: float) -> None:
                 await asyncio.sleep(0.5)
 
 
-async def _main(url: str, wait_s: float, skip_latency: bool) -> int:
+async def _main(url: str, wait_s: float, skip_latency: bool, auth: httpx.Auth | None) -> int:
     await _wait_until_up(url, wait_s)
     checks = selected_checks(skip_latency)
     for check in checks:
         try:
-            print(f"PASS  {await check(url)}")
+            print(f"PASS  {await check(url, auth)}")
         except SmokeCheckFailed as exc:
             print(f"FAIL  {check.__name__}: {exc}")
             return 1
@@ -282,5 +335,21 @@ if __name__ == "__main__":
         help="skip the p95 latency check -- for an arm64 image running under QEMU emulation on an "
         "x86_64 host, where round trips are ~10x slower than on real Graviton (FRICTION_LOG.md, step 4a)",
     )
+    parser.add_argument(
+        "--agent-arn",
+        help="an AgentCore Runtime ARN; the URL is derived from it (overrides --url) and --sigv4 is implied",
+    )
+    parser.add_argument(
+        "--sigv4", action="store_true", help="SigV4-sign requests (AgentCore AWS_IAM inbound auth)"
+    )
     args = parser.parse_args()
-    sys.exit(asyncio.run(_main(args.url, args.wait, args.skip_latency)))
+    url = runtime_invocation_url(args.agent_arn) if args.agent_arn else args.url
+    auth = None
+    if args.agent_arn or args.sigv4:
+        region = (
+            args.agent_arn.split(":")[3]
+            if args.agent_arn
+            else urllib.parse.urlparse(url).netloc.split(".")[1]
+        )
+        auth = SigV4Auth(region)
+    sys.exit(asyncio.run(_main(url, args.wait, args.skip_latency, auth)))

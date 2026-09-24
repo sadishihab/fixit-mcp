@@ -1399,3 +1399,81 @@ Template for each entry:
   target region before optimizing. The laptop numbers alone would have
   justified a caching layer that the real numbers show is unnecessary.
 
+
+### 2026-09-24 — Step 4c research: the AgentCore CLI can't deploy a prebuilt agent image, and requires an account-wide CDK bootstrap
+
+- **Tool/SDK**: `@aws/agentcore` CLI 0.30.0 (npm, released 2026-09-15;
+  repo `aws/agentcore-cli` at `805f342`), its `docs/container-builds.md`,
+  `docs/configuration.md`, `docs/commands.md`, `docs/PERMISSIONS.md`.
+- **Task attempted**: Re-check step 4a's recommendation (use the CLI:
+  `agentcore create` / `add agent --protocol MCP` / `deploy`) against a
+  hard requirement for 4c: deploy **exactly the image that was tested**
+  (the step-4a/4b container, built from this repo's Dockerfile), not a
+  different build.
+- **Steps taken**: Cloned the CLI repo and read its changelog, container,
+  configuration, command, and permissions docs. Searched the source for
+  any prebuilt-image or `containerUri` support.
+- **Expected**: `"build": "Container"` plus a way to point the agent at an
+  existing ECR image, or at least at our Dockerfile.
+- **Actual**:
+  - **Still clearly the maintained path.** Releases are frequent (0.27 →
+    0.30 in a month), each release bumps the vended CDK automatically, and
+    `protocol: "MCP"`, `envVars`, `executionRoleArn` (bring your own
+    role), `authorizerType`, and `lifecycleConfiguration` are all
+    first-class in `agentcore.json`.
+  - **No prebuilt image for agents.** Prebuilt images are supported only
+    for the separate "harness" primitive. An agent with
+    `build: "Container"` is **always rebuilt from its Dockerfile by
+    CodeBuild** on `agentcore deploy`. Our Dockerfile works there
+    (`buildContextPath: "."`), but the deployed digest is a CodeBuild
+    rebuild, not the image the 4a/4b tests ran against. Our base images
+    are tag-pinned (`python:3.12-slim-bookworm`, `uv:0.12.18`), not
+    digest-pinned, so a rebuild can legitimately differ.
+  - **Account-level setup.** `agentcore deploy` needs the region
+    CDK-bootstrapped: a `CDKToolkit` stack with an S3 assets bucket, an
+    ECR repo, and five IAM roles. By default the CloudFormation execution
+    role gets **`AdministratorAccess`**. The deploying user also needs a
+    broad policy (`cloudformation:*`, `iam:CreateRole` on `AgentCore-*`,
+    CodeBuild, ECR, S3, Cognito, Secrets Manager).
+- **Severity**: Medium. Not a bug, but it means "use the CLI" and "deploy
+  exactly what was tested" can't both be satisfied as written.
+- **Workaround**: Pending a decision (see 4c summary). The alternative is
+  the documented no-CLI path: push the locally tested image to ECR, then
+  `bedrock-agentcore-control:CreateAgentRuntime` with that exact
+  `containerUri`, a hand-made least-privilege execution role, and no CDK
+  bootstrap.
+- **Actionable suggestion**: The CLI could accept a prebuilt `imageUri`
+  for container agents, as it already does for harnesses. That's the
+  standard "build once, test, promote the same digest" workflow.
+
+### 2026-09-24 — AgentCore Runtime has no anonymous inbound auth: a deployed URL isn't reachable by Alexa+ until OAuth exists
+
+- **Tool/SDK**: AgentCore Runtime inbound auth (`runtime-oauth.html`,
+  CLI `authorizerType`).
+- **Task attempted**: Plan step 4c's "durable HTTPS URL" for Alexa+.
+- **Steps taken**: Read the Runtime inbound-auth docs and the CLI config
+  schema.
+- **Expected**: A public HTTPS endpoint Alexa+ can call, with auth
+  (account linking) added in a later step.
+- **Actual**: A Runtime accepts **either** IAM SigV4 (the default)
+  **or** JWT bearer tokens (`CUSTOM_JWT`): "not both simultaneously", and
+  there is no unauthenticated option. The CLI's runtime `authorizerType`
+  enum is just `AWS_IAM | CUSTOM_JWT`. Only Gateway has `NONE`, and a
+  `NONE` gateway in front of this server would expose every household's
+  data (and the write tools) to the internet. Alexa+ can't SigV4-sign, so
+  **the deployed URL is usable by our own tooling (SigV4) but not by
+  Alexa+** until inbound OAuth exists (CUSTOM_JWT against the IdP Alexa+
+  account linking uses). That's already listed as not-built in
+  `docs/alexa-plus-requirements.md`.
+- **Severity**: High for the Alexa+ milestone; nothing is broken today.
+  The invocation URL is derived from the runtime ARN, so it stays stable
+  when the authorizer is later switched to JWT (that's an
+  `UpdateAgentRuntime`, not a new URL).
+- **Workaround**: Planned: deploy with `AWS_IAM` for 4c and verify with
+  SigV4-signed smoke checks (`scripts/smoke_test.py --agent-arn …`, added
+  this step). Record the "remote HTTPS URL" requirement as "URL exists,
+  IAM-only", not "Alexa+-reachable". OAuth becomes its own step.
+- **Actionable suggestion**: AgentCore's MCP hosting guide should say up
+  front that a hosted MCP server is never anonymously reachable, and
+  point to the OAuth path for consumer MCP clients (Alexa+, Claude, etc.)
+  that can't sign SigV4.
