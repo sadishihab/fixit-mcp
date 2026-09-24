@@ -282,6 +282,26 @@ Alexa+ MCP Toolkit and helps customers with home appliances:
   (`tests/integration/test_agentcore_memory_live.py`) are opt-in via
   `FIXIT_AGENTCORE_TESTS=1` + `FIXIT_AGENTCORE_MEMORY_ID`.
 
+- **AgentCore Runtime deployment** (step 4c): the **direct path**, not the
+  AgentCore CLI (it always rebuilds container agents in CodeBuild and needs
+  an admin CDK bootstrap; see `FRICTION_LOG.md`). `scripts/push_image.py`
+  (`make docker-push`) pushes the already-tested local image unchanged and
+  reports source drift. `scripts/deploy_runtime.py` (`make deploy-runtime`)
+  idempotently creates or updates runtime `fixit_mcp`, **pinned to the
+  image digest**, with MCP protocol, PUBLIC network, **IAM SigV4 inbound
+  auth** (no authorizer; OAuth/JWT is a later step, so Alexa+ can't call
+  it yet), and the `agentcore` backend env vars. `make teardown-runtime`
+  stops all Runtime charges. IAM: `deploy/iam/*.json` templates
+  (placeholders only, never an account id), rendered by `make iam-policies`
+  into gitignored `build/iam/`. The deployer policy is a customer managed
+  policy (too big for a user inline policy), and it includes the implicit
+  `CreateAgentRuntimeEndpoint`/`CreateWorkloadIdentity` actions that
+  `CreateAgentRuntime` fans out into. `scripts/smoke_test.py --agent-arn`
+  SigV4-signs every request. `scripts/measure_runtime_latency.py` splits
+  latency into RTT, Runtime overhead, and handler time (from CloudWatch).
+  Measured: warm Runtime overhead ~125–155ms p50. Cold new sessions (1.3–8s
+  initialize, ~2s first call) are the open latency risk.
+
 ## Testing
 
 **Every change needs tests.** No exceptions for "small" changes.
@@ -309,9 +329,9 @@ an AgentCore Memory backend for deployment), and
 `diagnose_error` has its first MCP Apps visual card (step 3d,
 `fixit_mcp.apps`) — but nothing beyond that yet: no embeddings, no
 fuzzy/semantic retrieval beyond `difflib` nearest-match suggestions, no
-Strands, no AWS deployment yet (the arm64 container image is built and
-verified locally, step 4a, and household data can live in AgentCore
-Memory, step 4b, but nothing is deployed), no auth/account
+Strands, no Alexa+-reachable deployment yet (the server runs on AgentCore
+Runtime with IAM-only inbound auth, step 4c, and household data lives in
+AgentCore Memory, step 4b), no auth/account
 linking, no visual cards for any other tool, no web client, no
 parts-ordering or maintenance-scheduling tools. See
 `docs/alexa-plus-requirements.md` for the full done/todo/not-needed

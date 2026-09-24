@@ -1619,3 +1619,89 @@ Template for each entry:
   Building up from the API reference page means discovering the fan-out
   one AccessDenied at a time.
 
+
+### 2026-09-24 — First AgentCore Runtime deploy: what got created, and the measured latency (warm is fine; cold sessions are the real risk)
+
+- **Tool/SDK**: `bedrock-agentcore-control` (CreateAgentRuntime),
+  AgentCore Runtime data plane (SigV4), CloudWatch Logs,
+  `scripts/{push_image,deploy_runtime,measure_runtime_latency,smoke_test}.py`.
+- **Task attempted**: Deploy the tested image, verify it end to end, and
+  finally measure AgentCore Runtime's own overhead: the unverified
+  "~200ms warm p50" from step 4b.
+- **Steps taken**: `make docker-push`, then `make deploy-runtime` (third
+  attempt, after the two AccessDenied entries above). Inventoried the
+  result. Ran `measure_runtime_latency.py` **before** the smoke test, so
+  the very first sessions after creation were genuinely cold. Read the
+  container's CloudWatch log streams per session. Re-measured once the
+  warm pool existed. Ran `make runtime-smoke`. Re-ran `make deploy-runtime`
+  to check idempotency against the real API.
+- **What exists now (all us-east-1)**:
+  - ECR repo `fixit-mcp`, holding an OCI image index: linux/arm64 plus a
+    buildx provenance attestation. Its digest `sha256:fc68db80…` **equals
+    the tested local image id**, so it's byte-identical. AgentCore
+    accepted the index as-is.
+  - Runtime `fixit_mcp-<id>` v1, READY in ~10s. MCP, PUBLIC, no
+    authorizer (IAM SigV4), idle timeout 300s, role
+    `FixItAgentCoreRuntimeRole`, 4 env vars (agentcore backend).
+  - Endpoint `DEFAULT` → v1. Workload identity `fixit_mcp-<id>`
+    (automatic). Log group `/aws/bedrock-agentcore/runtimes/fixit_mcp-<id>-DEFAULT`.
+- **Expected**: Warm overhead of about 200ms. Cold start of a few
+  hundred ms, given the documented warm pool.
+- **Actual**:
+  - **Warm (same session), two runs of 30 and 60 calls:** client p50
+    532 / 516ms, p95 637 / 614ms. RTT (TCP connect) 308 / 321ms. Handler
+    p50 53 / 52ms, from our own `tool_call_completed` lines.
+    **Remainder: 171 / 143ms**, which includes ~17ms of our own stack
+    (entry above). **AgentCore Runtime overhead is roughly 125–155ms
+    p50**, better than the 200ms estimate. Implied in-region warm p50:
+    about 200–250ms. Well inside budget.
+  - **Cold, before the warm pool existed** (first traffic, 40s after
+    create): 5 new sessions. `initialize` took **6.3–8.4s**; the first
+    tool call another ~2s. CloudWatch shows our own process ready ~0.2s
+    after its first log line (warm-up Memory read 70–85ms), so the 6–8s
+    is microVM provisioning, image pull, and interpreter start: platform
+    time, not ours.
+  - **The warm pool appeared only *after* first use**: 10 extra microVMs
+    started 15:17:49–15:18:12, about 2 minutes after the runtime was
+    created (15:15:43) and after the first sessions. Each got one
+    platform ping and no traffic.
+  - **Cold, with the pool warm:** 8 new sessions. `initialize` took
+    **1.3–2.1s (p50 1.57s)**. Each opens a fresh TLS connection, about 3
+    RTTs (~1s) from this laptop. But the **first tool call in every new
+    session is ~2s regardless** (1.94–2.15s), versus ~0.5s warm. The
+    container logs show the platform holding that request about 1s
+    before forwarding it, with its own MCP ping arriving in between.
+    Cause unknown.
+  - **Platform health checks:** besides MCP `ping` every 2s on a separate
+    connection, the platform also probes **`GET /ping`, which returns
+    404** (FastMCP has no such route). Harmless so far: sessions work
+    and nothing restarts.
+  - **One intermittent `504 Gateway Time-out`** from the AgentCore front
+    door in one warm session: 1 of about 110 warm calls. The container
+    log shows the request **never arrived**; only healthy platform pings
+    continued. Not reproduced in the next 60-call run.
+  - **Smoke test:** 8/8 functional checks pass, SigV4-signed. The
+    latency check fails at 641.5ms p95, because RTT is ~320ms of that
+    from here.
+  - **Idempotency:** a second `make deploy-runtime` reports `unchanged
+    (version 1)`, so `config_matches` holds against the real
+    `GetAgentRuntime` shape.
+- **Severity**: **High, for cold sessions.** If Alexa+ opens a new MCP
+  session per conversation, the first call of every conversation costs
+  roughly 1.5s (initialize) + 2s (first tool call) from here, and seconds
+  even in-region: far over 500ms. Warm calls are fine. Low for the 504
+  and the `/ping` 404, but worth tracking.
+- **Workaround**: None yet, deliberately. The next measurements before
+  choosing a fix:
+  1. Rerun `measure_runtime_latency.py --cold 8` from CloudShell
+     (us-east-1), to separate the ~1s of laptop TLS setup from real
+     platform cold cost.
+  2. Find out whether Alexa+ reuses `Mcp-Session-Id` across turns or
+     conversations.
+  Candidate fixes to weigh later: a `/ping` route (cheap, needs a new
+  image), keeping sessions alive, and asking AWS about warm-pool sizing
+  and the first-call delay.
+- **Actionable suggestion**: AgentCore should document (a) that the
+  container warm pool fills only after first traffic, (b) the extra
+  first-request latency in a new session, and (c) that MCP-protocol
+  runtimes are also probed on `GET /ping`.
