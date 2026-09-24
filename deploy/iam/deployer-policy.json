@@ -51,9 +51,16 @@
       "Action": [
         "bedrock-agentcore:CreateAgentRuntime",
         "bedrock-agentcore:CreateAgentRuntimeEndpoint",
+        "bedrock-agentcore:CreateWorkloadIdentity",
         "bedrock-agentcore:ListAgentRuntimes"
       ],
       "Resource": "*"
+    },
+    {
+      "Sid": "DeleteRuntimeWorkloadIdentity",
+      "Effect": "Allow",
+      "Action": "bedrock-agentcore:DeleteWorkloadIdentity",
+      "Resource": "arn:aws:bedrock-agentcore:${AWS_REGION}:${AWS_ACCOUNT_ID}:workload-identity-directory/default/workload-identity/fixit_mcp-*"
     },
     {
       "Sid": "PassExecutionRoleToAgentCoreOnly",

@@ -1597,3 +1597,25 @@ Template for each entry:
   reference page. Scoping a create to a resource-name pattern fails in a
   confusing way when the service authorizes a sibling action against a
   wildcard ARN.
+- **Follow-up, second attempt (same day)**: With the endpoint action
+  granted, the create failed on the *next* implicit sub-action:
+  `AccessDeniedException: ... not authorized to perform:
+  bedrock-agentcore:CreateWorkloadIdentity on resource:
+  arn:aws:bedrock-agentcore:us-east-1:<account>:workload-identity-directory/default/workload-identity/*`
+  (request id `b20cfe3d-0a8c-4a93-ad57-ed9fc248b896`). Again, **no runtime
+  was created**. AWS's runtime docs do say a workload identity is created
+  automatically with every runtime, so this one was foreseeable. Rather
+  than find the rest one console round trip at a time, took the
+  **complete** runtime-lifecycle action set from the AgentCore CLI's own
+  shipped `docs/policies/iam-policy-user.json`: CreateAgentRuntime,
+  Update/Delete/ListAgentRuntimes, CreateAgentRuntimeEndpoint,
+  CreateWorkloadIdentity, DeleteWorkloadIdentity. Added
+  `CreateWorkloadIdentity` on `*`, and `DeleteWorkloadIdentity` scoped to
+  `workload-identity/fixit_mcp-*` (scoping is my inference; the CLI uses
+  `*`).
+- **Lesson**: For a service whose create call fans out into several
+  implicitly authorized sub-resources, start from the vendor tool's
+  shipped policy, which encodes that fan-out, and scope *down* from it.
+  Building up from the API reference page means discovering the fan-out
+  one AccessDenied at a time.
+

@@ -391,6 +391,8 @@ def test_deployer_can_create_the_implicit_default_endpoint(tmp_path: Path) -> No
 
     wildcard = next(s for s in policy["Statement"] if s["Sid"] == "AgentCoreRuntimeCreateAndList")
     assert "bedrock-agentcore:CreateAgentRuntimeEndpoint" in wildcard["Action"]
+    # ...and the runtime's workload identity, the same way (second real deploy attempt, 4c).
+    assert "bedrock-agentcore:CreateWorkloadIdentity" in wildcard["Action"]
     assert wildcard["Resource"] == "*"
     scoped = next(s for s in policy["Statement"] if s["Sid"] == "AgentCoreRuntimeManagement")
     assert {
