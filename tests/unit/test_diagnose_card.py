@@ -51,6 +51,28 @@ FOUND_RESULT = {
     "citation": {"brand": "LG", "model": "DLEX8000W", "page": 31, "section": "Error Codes"},
 }
 
+NOT_FOUND_RESULT = {
+    "status": "not_found",
+    "message": "No manual in our index documents an error code matching 'E24'.",
+    "error_code": "E24",
+    "code_normalized": "E24",
+    "nearest_matches": ["E9240", "TE2", "E6102"],
+}
+
+AMBIGUOUS_RESULT = {
+    "status": "ambiguous_appliance",
+    "message": "More than one of this household's appliances has a manual documenting E1 -- "
+    "which appliance is showing this code?",
+    "error_code": "E1",
+    "code_normalized": "E1",
+    "candidate_appliances": [
+        {"appliance_id": "app-1", "brand": "GE", "model": "GFE28GYNFS", "appliance_type": "refrigerator"},
+        {"appliance_id": "app-2", "brand": "Bosch", "model": "SHE53B75UC", "appliance_type": "dishwasher"},
+    ],
+}
+
+NO_CLICK_HANDLER_MARKERS = ("onclick", "<a ", "<button", 'addEventListener("click')
+
 
 # --- static template file -------------------------------------------------
 
@@ -137,15 +159,115 @@ def test_html_special_characters_in_content_are_escaped() -> None:
 
 
 @requires_node
-def test_not_found_result_renders_nothing() -> None:
-    assert _build_card_html({"status": "not_found"}) == ""
-
-
-@requires_node
-def test_ambiguous_appliance_result_renders_nothing() -> None:
-    assert _build_card_html({"status": "ambiguous_appliance"}) == ""
-
-
-@requires_node
 def test_none_result_renders_nothing() -> None:
     assert _build_card_html(None) == ""
+
+
+@requires_node
+def test_unrecognized_status_renders_nothing() -> None:
+    assert _build_card_html({"status": "something_else"}) == ""
+
+
+# --- not_found: muted, informational state -------------------------------------------------
+
+
+@requires_node
+def test_not_found_shows_the_queried_code() -> None:
+    html = _build_card_html(NOT_FOUND_RESULT)
+    assert "E24" in html
+
+
+@requires_node
+def test_not_found_shows_a_short_message() -> None:
+    html = _build_card_html(NOT_FOUND_RESULT)
+    assert "state-message" in html
+
+
+@requires_node
+def test_not_found_lists_nearest_matches() -> None:
+    html = _build_card_html(NOT_FOUND_RESULT)
+    for code in NOT_FOUND_RESULT["nearest_matches"]:
+        assert code in html
+
+
+@requires_node
+def test_not_found_with_no_nearest_matches_omits_the_list() -> None:
+    result = {**NOT_FOUND_RESULT, "nearest_matches": []}
+    html = _build_card_html(result)
+    assert "Closest known codes" not in html
+
+
+@requires_node
+def test_not_found_is_visually_distinct_from_the_found_card() -> None:
+    html = _build_card_html(NOT_FOUND_RESULT)
+    assert 'class="state-card state-not-found"' in html
+    assert 'class="card">' not in html
+
+
+@requires_node
+def test_not_found_uses_muted_styling_not_a_found_style_class() -> None:
+    html = _build_card_html(NOT_FOUND_RESULT)
+    # No difficulty/warning classes -- those are reserved for the found card
+    # and would visually read as "error" rather than "different state".
+    assert "difficulty" not in html
+    assert "safety-warnings" not in html
+
+
+@requires_node
+def test_not_found_has_no_click_handlers() -> None:
+    html = _build_card_html(NOT_FOUND_RESULT)
+    for marker in NO_CLICK_HANDLER_MARKERS:
+        assert marker not in html
+
+
+# --- ambiguous_appliance: muted, informational state -------------------------------------------------
+
+
+@requires_node
+def test_ambiguous_lists_candidate_appliances() -> None:
+    html = _build_card_html(AMBIGUOUS_RESULT)
+    assert "GE GFE28GYNFS" in html
+    assert "refrigerator" in html
+    assert "Bosch SHE53B75UC" in html
+    assert "dishwasher" in html
+
+
+@requires_node
+def test_ambiguous_shows_the_backend_message() -> None:
+    html = _build_card_html(AMBIGUOUS_RESULT)
+    assert "which appliance is showing this code" in html
+
+
+@requires_node
+def test_ambiguous_with_no_candidates_omits_the_list() -> None:
+    result = {**AMBIGUOUS_RESULT, "candidate_appliances": []}
+    html = _build_card_html(result)
+    assert "<ul" not in html
+
+
+@requires_node
+def test_ambiguous_is_visually_distinct_from_the_found_and_not_found_cards() -> None:
+    html = _build_card_html(AMBIGUOUS_RESULT)
+    assert 'class="state-card state-ambiguous"' in html
+    assert "state-not-found" not in html
+    assert 'class="card">' not in html
+
+
+@requires_node
+def test_ambiguous_has_no_click_handlers() -> None:
+    html = _build_card_html(AMBIGUOUS_RESULT)
+    for marker in NO_CLICK_HANDLER_MARKERS:
+        assert marker not in html
+
+
+@requires_node
+def test_ambiguous_candidate_html_is_escaped() -> None:
+    result = {
+        **AMBIGUOUS_RESULT,
+        "candidate_appliances": [
+            {"appliance_id": "app-1", "brand": "<b>Evil</b>", "model": "X", "appliance_type": "widget"}
+        ],
+    }
+    html = _build_card_html(result)
+    assert "<b>Evil</b>" not in html
+    assert "&lt;b&gt;" in html

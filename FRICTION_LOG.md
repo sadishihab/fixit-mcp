@@ -954,3 +954,43 @@ Template for each entry:
   reimplementing its logic a second time in Python to test in isolation --
   the reimplementation is the more common choice but is exactly the kind of
   thing that silently drifts from the real behavior over time.
+
+### 2026-09-24 — a user assumption about the spec ("cards can't invoke tools") turned out to be wrong, and confirming that reopened a scope question
+
+- **Tool/SDK**: `modelcontextprotocol/ext-apps` specification (same version
+  as the prior MCP Apps entry above).
+- **Task attempted**: Add non-blank, purely-informational visual states for
+  `not_found`/`ambiguous_appliance` to the `diagnose_error` card, per an
+  explicit instruction to first confirm whether a card can invoke a tool
+  call back through the host before assuming it can't, and to keep the new
+  states non-interactive only if that turned out to be unsupported.
+- **Steps taken**: Fetched the raw current spec and searched specifically
+  for the View -> Host message list, rather than assuming the premise ("MCP
+  Apps cards can't trigger tool calls") stated in the request was correct.
+- **Expected**: Uncertain going in -- this was the explicit point of
+  checking rather than building on the stated assumption.
+- **Actual**: The premise was wrong: `tools/call` is explicitly listed among
+  the standard MCP messages a view is allowed to send to the host ("Execute
+  a tool on the MCP server"), gated only by host discretion ("the Host...
+  MAY decide to block some messages or subject them to further user
+  approval"). This meant the original conditional instruction ("no click
+  handlers unless the spec supports it") no longer had a settled answer --
+  it *is* supported, which reopened whether to build it.
+- **Severity**: N/A -- not a bug, a case where confirming a stated
+  assumption before building surfaced that the assumption itself was false,
+  which changed what decision was actually being made.
+- **Workaround**: Rather than picking a side of a now-open scope question
+  unilaterally, reported the corrected fact and asked directly. User chose
+  to keep both new states purely informational. Reasoning offered for that
+  default (and accepted): no real host's approval-UX for view-initiated tool
+  calls has been verified against this server, view-initiated calls are a
+  first-of-its-kind pattern with no other precedent in this codebase, and
+  the step's own scope was "minimal, clearly-different states," not
+  reactive UI.
+- **Actionable suggestion**: When a task frames a build decision as
+  conditional on a fact ("do X unless the spec says Y"), verify the fact
+  independently before treating the condition as settled -- a user's
+  paraphrase of a spec can be wrong in either direction (stricter or looser
+  than reality), and discovering it's wrong doesn't resolve the underlying
+  decision, it just means the decision still needs to be made with correct
+  information instead of skipped.

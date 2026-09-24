@@ -15,6 +15,10 @@
     --warning-bg: #fff4e5;
     --warning-border: #f3a13b;
     --warning-fg: #7a4a00;
+    --state-bg: #f4f5f7;
+    --state-border: #cfd3d8;
+    --state-label-bg: #e4e6ea;
+    --state-label-fg: #55585e;
   }
   @media (prefers-color-scheme: dark) {
     :root {
@@ -26,6 +30,10 @@
       --warning-bg: #3a2c10;
       --warning-border: #b8791f;
       --warning-fg: #ffcf8a;
+      --state-bg: #2a2a2c;
+      --state-border: #48484a;
+      --state-label-bg: #3a3a3c;
+      --state-label-fg: #c7c9cd;
     }
   }
   * { box-sizing: border-box; }
@@ -106,6 +114,38 @@
     color: var(--muted);
     font-style: italic;
   }
+  /* not_found / ambiguous_appliance: deliberately muted (grey), never
+     red/amber, so it reads as "a different, non-diagnosis state" rather
+     than an error -- see FRICTION_LOG.md. */
+  .state-card {
+    border: 1px dashed var(--state-border);
+    background: var(--state-bg);
+    border-radius: 12px;
+    padding: 16px;
+    color: var(--muted);
+  }
+  .state-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+  .state-label {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--state-label-bg);
+    color: var(--state-label-fg);
+  }
+  .state-message {
+    margin: 0 0 8px;
+    color: var(--fg);
+  }
+  .suggestions { color: var(--muted); }
 </style>
 </head>
 <body>
@@ -123,12 +163,71 @@
     return (items || []).map(function (item) { return "<li>" + esc(item) + "</li>"; }).join("");
   }
 
+  // not_found: purely informational -- the queried code, a short fixed
+  // message (not the full backend `message`, which can include the
+  // add_appliance suggestion; that's still in the plain JSON/spoken
+  // response), and nearest_matches as a plain list. No click handlers: per
+  // the MCP Apps spec a view CAN send tools/call back through the host, but
+  // that's a deliberate scope decision left out of this card -- these are
+  // suggestions, not actions.
+  function buildNotFoundHtml(result) {
+    var codeHtml = result.error_code
+      ? '<span class="error-code">' + esc(result.error_code) + "</span>"
+      : "";
+    var nearest = result.nearest_matches || [];
+    var nearestHtml = nearest.length
+      ? '<h3>Closest known codes</h3><ul class="suggestions">' + listHtml(nearest) + "</ul>"
+      : "";
+    return (
+      '<div class="state-card state-not-found">' +
+        '<div class="state-header">' + codeHtml + '<span class="state-label">Not found</span></div>' +
+        '<p class="state-message">We don’t have this exact code in our index.</p>' +
+        nearestHtml +
+      "</div>"
+    );
+  }
+
+  // ambiguous_appliance: purely informational -- lists which of the
+  // household's appliances could match, so the customer/assistant can see
+  // the options. No click handlers -- same reasoning as buildNotFoundHtml.
+  function buildAmbiguousHtml(result) {
+    var candidates = result.candidate_appliances || [];
+    var candidatesHtml = candidates.length
+      ? '<ul class="suggestions">' +
+        candidates
+          .map(function (c) {
+            var label = esc(c.brand) + " " + esc(c.model);
+            return "<li>" + label + (c.appliance_type ? " (" + esc(c.appliance_type) + ")" : "") + "</li>";
+          })
+          .join("") +
+        "</ul>"
+      : "";
+    var message = result.message || "More than one appliance could match -- which one is it?";
+    return (
+      '<div class="state-card state-ambiguous">' +
+        '<div class="state-header"><span class="state-label">Which appliance?</span></div>' +
+        '<p class="state-message">' + esc(message) + "</p>" +
+        candidatesHtml +
+      "</div>"
+    );
+  }
+
   // Builds the card's inner HTML from a diagnose_error DiagnoseErrorResult.
-  // Returns "" when there is nothing to show (status != "found") -- the only
-  // gate on when a real visual appears, per CLAUDE.md rule 3 (no LLM, no
-  // guessing: this never renders content the tool result didn't provide).
+  // Returns "" only when there's truly nothing to show (no result yet, or an
+  // unrecognized status) -- found/not_found/ambiguous_appliance each get
+  // their own real, visually distinct rendering. Never guesses at content
+  // the tool result didn't provide, per CLAUDE.md rule 3.
   function buildCardHtml(result) {
-    if (!result || result.status !== "found") {
+    if (!result) {
+      return "";
+    }
+    if (result.status === "not_found") {
+      return buildNotFoundHtml(result);
+    }
+    if (result.status === "ambiguous_appliance") {
+      return buildAmbiguousHtml(result);
+    }
+    if (result.status !== "found") {
       return "";
     }
 

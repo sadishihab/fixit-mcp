@@ -214,21 +214,31 @@ Alexa+ MCP Toolkit and helps customers with home appliances:
   (a) implements the spec's postMessage handshake (`ui/initialize`, then
   listens for the host's `ui/notifications/tool-result`) -- no network
   fetching anywhere in it, all data arrives pushed from the host -- and (b)
-  a pure, DOM-free `buildCardHtml(result)` function that renders the error
-  code, appliance, meaning, numbered repair steps, a visually distinct
-  safety-warnings block, and citation. Because the resourceUri can't be
-  conditionally attached per call (it's static), "only show a real card on
-  `found`" is implemented *inside* `buildCardHtml`: it returns `""` for any
-  other `status`, same never-fabricate discipline as the JSON result itself
-  (an empty `meaning` stays empty, an empty `safety_warnings` list renders no
-  warning block). The plain `content`/`structuredContent` the tool already
-  returned is completely unmodified by any of this -- the card is a fully
-  separate, additive discovery path. `buildCardHtml` is unit-tested by
-  actually running it in Node (it's pure/DOM-free by design, so no jsdom or
-  browser needed), skipped rather than failed if `node` isn't on PATH. See
-  `FRICTION_LOG.md` for why a literal "per-call resourceUri, fully
-  pre-rendered server-side, zero client-side JS" reading of the request
-  isn't what any current MCP Apps host looks for.
+  a pure, DOM-free `buildCardHtml(result)` function that dispatches on
+  `result.status` to one of three distinct renderings: `found` shows the
+  error code, appliance, meaning, numbered repair steps, a visually distinct
+  (amber) safety-warnings block, and citation; `not_found` shows the queried
+  code, a short fixed message, and `nearest_matches` as a plain list;
+  `ambiguous_appliance` shows `candidate_appliances` as a plain list with the
+  backend's own message. `not_found`/`ambiguous_appliance` are deliberately
+  styled muted grey (`.state-card`, dashed border) rather than red/amber, so
+  they read as "a different, non-diagnosis state," not an error -- and
+  deliberately have **no click handlers**: the spec's View->Host message set
+  does include `tools/call` (a view can invoke a tool through the host,
+  subject to host-discretionary approval), confirmed by checking the spec
+  rather than assuming, but building on that was scoped out for now -- no
+  host's approval UX for it has been verified here, and it'd be a
+  first-of-its-kind interactive pattern in this server. Any other `status`
+  (including no result yet) returns `""` and the template's `render()` falls
+  back to a plain "waiting" placeholder. The plain `content`/
+  `structuredContent` the tool already returned is completely unmodified by
+  any of this -- the card is a fully separate, additive discovery path.
+  `buildCardHtml` is unit-tested by actually running it in Node (it's
+  pure/DOM-free by design, so no jsdom or browser needed), skipped rather
+  than failed if `node` isn't on PATH. See `FRICTION_LOG.md` for why a
+  literal "per-call resourceUri, fully pre-rendered server-side, zero
+  client-side JS" reading of the original request isn't what any current
+  MCP Apps host looks for, and for the `tools/call` support finding above.
 
 ## Testing
 
