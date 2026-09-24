@@ -187,7 +187,9 @@ auth**. Alexa+ can't call it until OAuth/JWT is added.
 > IAM role and policies. Delete those in the console if you want them gone.
 
 One-time IAM setup: `make iam-policies` renders `deploy/iam/*.json` with
-your account's values into `build/iam/` (gitignored). `deploy/iam/README.md`
+your account's values into `build/iam/` (gitignored). The deployer policy must be a
+**customer managed** policy, because it exceeds the 2,048-character limit for
+inline user policies. `deploy/iam/README.md`
 says which file attaches where.
 
 ```bash

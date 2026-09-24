@@ -1534,3 +1534,30 @@ Template for each entry:
 - **Actionable suggestion**: Log whole-request latency at the ASGI layer
   as well as per-tool latency, so server time can be split without
   assumptions. That's a candidate for the next image, not this deploy.
+
+### 2026-09-24 — The deployer policy is too big to be an inline IAM user policy
+
+- **Tool/SDK**: IAM console (inline user policies), `deploy/iam/deployer-policy.json`.
+- **Task attempted**: Attach the step-4c deployer permissions to `fixit-dev`
+  as an inline policy, following my own console steps.
+- **Steps taken**: The user pasted the rendered policy, then tried
+  minifying it.
+- **Expected**: The policy saves.
+- **Actual**: IAM caps inline policies on a **user** at **2,048
+  non-whitespace characters in total**, across all of that user's inline
+  policies, and `fixit-dev` already has the step-4b Memory policy. The
+  deployer policy alone is 2,296 characters. Minifying can't help,
+  because whitespace isn't counted. (Role inline policies allow 10,240,
+  so the execution-role policy at 1,577 was never at risk.)
+- **Severity**: Low. Caught at the console, before anything was created.
+  But it was my instruction that was wrong.
+- **Workaround**: Made the deployer policy a **customer managed policy**
+  (6,144-character limit) attached to `fixit-dev`. Dropped one redundant
+  `logs:DescribeLogGroups`, already covered by a `*` statement, bringing
+  it to 2,271. Added
+  `test_rendered_policies_fit_the_iam_size_limit_where_they_are_attached`,
+  which checks each rendered file against the limit for where it's
+  attached, so this can't recur silently.
+- **Actionable suggestion**: When handing out an IAM policy, state where
+  it attaches (user inline, role inline, or managed) and check its
+  non-whitespace size against that limit before handing it over.

@@ -362,3 +362,21 @@ def test_percentile() -> None:
     assert latency.percentile(samples, 50) == 50.0
     assert latency.percentile(samples, 95) == 95.0
     assert latency.percentile([7.0], 95) == 7.0
+
+
+# IAM counts non-whitespace characters against these limits.
+IAM_SIZE_LIMITS = {
+    "deployer-policy.json": 6144,  # customer managed policy (too big for a 2,048-char user inline policy)
+    "runtime-execution-policy.json": 10240,  # role inline policy
+    "runtime-execution-trust.json": 2048,  # role trust policy (default quota)
+}
+
+
+@pytest.mark.parametrize("name,limit", IAM_SIZE_LIMITS.items())
+def test_rendered_policies_fit_the_iam_size_limit_where_they_are_attached(
+    tmp_path: Path, name: str, limit: int
+) -> None:
+    render_iam.render_all(VALUES | {"AWS_ACCOUNT_ID": "999999999999"}, output_dir=tmp_path)
+    size = len("".join((tmp_path / name).read_text().split()))
+
+    assert size <= limit, f"{name} is {size} chars, over IAM's {limit} for where it's attached"

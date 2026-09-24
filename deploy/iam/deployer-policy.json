@@ -66,7 +66,7 @@
     {
       "Sid": "ReadRuntimeLogs",
       "Effect": "Allow",
-      "Action": ["logs:DescribeLogGroups", "logs:DescribeLogStreams", "logs:FilterLogEvents", "logs:GetLogEvents"],
+      "Action": ["logs:DescribeLogStreams", "logs:FilterLogEvents", "logs:GetLogEvents"],
       "Resource": [
         "arn:aws:logs:${AWS_REGION}:${AWS_ACCOUNT_ID}:log-group:/aws/bedrock-agentcore/runtimes/*",
         "arn:aws:logs:${AWS_REGION}:${AWS_ACCOUNT_ID}:log-group:/aws/bedrock-agentcore/runtimes/*:log-stream:*"
