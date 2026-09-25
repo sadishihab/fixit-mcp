@@ -1705,3 +1705,35 @@ Template for each entry:
   container warm pool fills only after first traffic, (b) the extra
   first-request latency in a new session, and (c) that MCP-protocol
   runtimes are also probed on `GET /ping`.
+
+### 2026-09-25 — I committed the real AWS account id in a test; caught before any push and scrubbed from local history
+
+- **Tool/SDK**: git, `tests/unit/test_deploy_scripts.py`.
+- **Task attempted**: Keep the account id out of the public repo (an
+  explicit requirement for step 4c), while testing the IAM policy size
+  limits with a realistic-length id.
+- **Steps taken**: Before the final step-4c commit, ran
+  `git grep` for the account id and runtime id over the staged tree.
+- **Expected**: Clean.
+- **Actual**: The real account id was hardcoded in
+  `test_rendered_policies_fit_the_iam_size_limit_where_they_are_attached`,
+  introduced in the "customer managed policy" commit. My command chained
+  the grep with `||` and `&&`, so **the commit still went through** despite
+  the grep finding it. `origin/main` was clean: all six step-4c commits
+  were still unpushed.
+- **Severity**: Medium. An account id isn't a credential, but the user
+  explicitly asked for it to stay out of the public repo, and a pushed
+  commit can't really be un-published.
+- **Workaround**: Created `backup/pre-account-id-scrub`. Replaced the id
+  with a same-length dummy (`999999999999`, so the size test measures the
+  same thing), then folded that into the offending commit with a
+  `fixup!` + `git rebase --autosquash origin/main`, rewriting local
+  unpushed commits only. Verified 0 occurrences in unpushed patches,
+  commit messages, and the tree. Added
+  `tests/unit/test_no_account_ids.py`, which scans every tracked file for
+  12-digit account ids in ARNs, ECR URIs, and `AWS_ACCOUNT_ID` /
+  `aws:SourceAccount` values, allowing only AWS's documentation examples
+  and the dummy. It would have caught this leak.
+- **Actionable suggestion**: A secret or identifier check has to *gate*
+  the commit (fail and stop), not just print before it. Better still, it
+  belongs in the test suite, where every commit already runs it.
