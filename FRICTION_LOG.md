@@ -2131,3 +2131,144 @@ full detail behind each number.
   already exists (Makefile targets, CI, Dockerfiles) and decide explicitly
   whether each one needs the new group, rather than assuming the default
   group covers it.
+
+### 2026-09-28 — Step 6b: SessionManager crashed on shutdown -- a session opened in one asyncio task can't be closed from another
+
+- **Tool/SDK**: `demo/mcp_session.py`'s `SessionManager`, anyio task
+  groups (used internally by `mcp.client.streamable_http.streamable_http_client`),
+  a real deployed AgentCore Runtime (SigV4-signed) via `make demo AGENT_ARN=...`.
+- **Task attempted**: Verify the demo backend end to end for real -- three
+  chat turns against a real deployed runtime, then a clean shutdown.
+- **Steps taken**: Started the demo, ran the three-turn conversation
+  (worked correctly), then sent SIGTERM for a normal shutdown.
+- **Expected**: Clean shutdown -- `SessionManager.aclose()` tears down
+  every open MCP session.
+- **Actual**: `RuntimeError: Attempted to exit cancel scope in a different
+  task than it was entered in`, crashing the shutdown with a full
+  traceback (`ERROR: Application shutdown failed. Exiting.`). Root cause:
+  the original `SessionManager.get()` entered the session's
+  `streamable_http_client`/`ClientSession` context via an `AsyncExitStack`
+  from inside whichever `/chat` request's own asyncio task called it
+  first. `aclose()` then ran from FastAPI's lifespan shutdown, which is a
+  *different* task. anyio's cancel scopes (used internally by
+  `streamable_http_client`'s task group) are tied to the task that entered
+  them, so exiting from another task fails. Actually calling the session's
+  own methods (`call_tool`, `read_resource`, ...) from other tasks was
+  never the problem -- all three real chat turns worked correctly across
+  three separate request tasks reusing the one session; only
+  entering/exiting its context is task-affine.
+- **Severity**: Medium. Didn't affect any real request/response during
+  actual use -- only shutdown -- but a demo backend that can't restart
+  cleanly (e.g. under `make demo` iteration, or a supervisor restart) is a
+  real reliability problem, and the traceback would have been alarming to
+  anyone running this for the first time.
+- **Workaround**: Rewrote `SessionManager` so each session's *entire*
+  `async with` lifetime (open through close) runs inside one dedicated
+  `asyncio.create_task` (`_SessionOwner`), coordinated with the request
+  tasks via `asyncio.Event`s rather than by sharing the context-manager
+  stack across tasks. Regression test added against the real local dev
+  server (`tests/integration/test_demo_mcp_session.py`) -- deliberately
+  *not* a fake, since a fake session object wouldn't exercise anyio's real
+  task-affine cancel scopes at all and would pass either way.
+- **Actionable suggestion**: Any async resource whose teardown must happen
+  in the same task that created it should say so loudly in its docs --
+  "AsyncExitStack-friendly" isn't a safe default assumption for something
+  built on anyio task groups. Caught here only because this step insisted
+  on actually starting, using, and cleanly stopping the real process
+  end to end, rather than trusting that passing unit tests (which never
+  opened a real session in one task and closed it in another) meant it
+  worked.
+
+### 2026-09-28 — Step 6b: live verification caught the model treating an empty safety_warnings list as "confirmed safe"
+
+- **Tool/SDK**: `demo/orchestrator.py`'s system prompt, Amazon Bedrock
+  Converse (`us.anthropic.claude-sonnet-4-5-20250929-v1:0`), a real
+  deployed AgentCore Runtime.
+- **Task attempted**: Three real chat turns against the deployed runtime
+  -- (a) "My dryer is showing tE1, what should I do?", (b) "Is that
+  dangerous?", (c) "What appliances do I have registered?" -- judged
+  strictly against the tool's actual data, per this step's explicit
+  instruction to flag anything said that wasn't in a tool result.
+- **Steps taken**: Ran the three turns twice: once against the original
+  step 6a system prompt, and again (after the fix below) against the
+  corrected one, both times with `session_setup_ms`/`turn_ms`/tool-call
+  logging added this step so the two runs could be compared precisely.
+- **Expected**: Turn (b) should say the manual lists no specific safety
+  warning for tE1 (the real record's `safety_warnings` is `[]`) and stop
+  there.
+- **Actual (before the fix)**: "No, there are no specific safety warnings
+  listed for this error code. The main concern is that the dryer won't
+  operate properly with a failed temperature sensor, which is why it
+  needs professional service. **It's safe to turn it off and wait for a
+  technician to repair it.**" The first sentence is correct. The rest is
+  not grounded in the tool result: "won't operate properly" is an invented
+  consequence the record never stated, and "it's safe" is an affirmative
+  safety judgment the record never made -- `safety_warnings: []` means no
+  warning was *extracted*, not that the code was confirmed safe. The
+  original system prompt only told the model not to invent a warning that
+  doesn't exist; it said nothing about not inventing an *absence* of
+  danger, or about not adding explanatory claims beyond what a tool
+  actually said. Turns (a) and (c) were faithful to their tool results in
+  every run.
+- **Severity**: High for what this demo exists to prove out -- an
+  appliance-repair assistant asserting something is safe, unprompted by
+  its own data, is exactly the class of mistake `CLAUDE.md` rule 3 (tools
+  never fabricate) is meant to prevent from reaching the customer, and the
+  LLM layer is precisely where that guarantee can quietly leak back in.
+- **Workaround**: Added two sentences to `SYSTEM_PROMPT_TEMPLATE`: one
+  forbidding any explanation/consequence/reasoning a tool result didn't
+  state, and one specifically on danger/safety questions -- answer only
+  from `safety_warnings`, and an empty list means "no warning found," not
+  "confirmed safe." Re-ran the identical three turns after the fix: turn
+  (b) became "The manual doesn't list a specific safety warning for this
+  code." and stopped there -- correct, and nothing else. Turns (a) and (c)
+  were unaffected. Added a regression test
+  (`test_system_prompt_forbids_treating_an_empty_warning_list_as_confirmed_safe`)
+  and left the fully-quoted before/after live responses in this entry
+  since they're the actual evidence, not a paraphrase.
+- **Actionable suggestion**: "Never invent an X" isn't the same instruction
+  as "never invent the *absence* of an X," and a tool schema using an
+  empty list/None to mean "nothing found" needs the system prompt to say
+  that explicitly -- an LLM will otherwise read silence as reassurance.
+  This class of bug is very unlikely to be caught by fake-based unit tests
+  (which supply exactly the tool result the test wrote, and never let a
+  real model free-associate around it) -- it only shows up by actually
+  running the real conversation and reading the real words, which is why
+  this step asked for that specifically instead of trusting the units.
+
+### 2026-09-28 — Step 6b: in a real conversation, Amazon Bedrock -- not the AgentCore cold start -- is where most of the wall-clock time goes
+
+- **Tool/SDK**: `demo/app.py`'s new per-turn timing log
+  (`session_setup_ms`/`tool_call_ms`/`turn_ms`), a real deployed AgentCore
+  Runtime, real Amazon Bedrock Converse calls, measured from Dhaka.
+- **Task attempted**: Break down each of the three verification turns'
+  wall-clock time into cold-session setup, the MCP tool call, and
+  everything else (Bedrock), per this step's explicit request.
+- **Steps taken**: Instrumented `SessionManager.is_open()` +
+  `/chat`'s handler to time session setup separately from `run_turn`, and
+  `run_turn` to sum `usage.inputTokens`/`outputTokens` across every
+  Converse call in a turn. Ran the three turns back to back (no idle gaps)
+  against the real deployed runtime and read the numbers straight from the
+  structured log lines, not estimated.
+- **Actual** (turn a / b / c; `session_was_cold` only on turn a):
+  cold session setup 2512.5 / 0 / 0 ms; MCP tool call 1746.9 / 0 / 1106.8
+  ms; everything else (Bedrock Converse calls, plus one `resources/read`
+  card fetch on turn a) 5982.3 / 1916.8 / 4835.5 ms; totals 10241.7 /
+  1916.9 / 5942.3 ms. Summed across all three turns: **70.3% of total
+  wall-clock time was Bedrock** (two Converse calls per tool-using turn,
+  one per plain-reply turn), 15.8% was the MCP tool call round trip, and
+  only 13.9% was the AgentCore cold session start that steps 4c-5e spent
+  so much effort measuring and mitigating.
+- **Severity**: Low as a "problem" (nothing is broken; the 500ms Alexa+
+  budget doesn't apply to this demo, which is deliberately not the real
+  Alexa+ integration path). Informational: it reframes where the next
+  latency-optimization effort would actually pay off in a real multi-turn
+  tool-use conversation like this one, as opposed to where step 4c-5e's
+  effort went.
+- **Workaround**: None -- not a bug, a measurement. Not investigated
+  further here (system-prompt length, `MAX_REPLY_TOKENS=1024`, and
+  growing conversation history are all plausible contributors, unverified).
+- **Actionable suggestion**: Before optimizing AgentCore cold starts
+  further for a conversational (not single-tool-call) workload, measure
+  where a real turn's time actually goes first -- it may not be where the
+  infrastructure-level investigation was looking.

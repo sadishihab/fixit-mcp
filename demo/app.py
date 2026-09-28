@@ -13,11 +13,13 @@ server-side: never returned to the caller or logged.
 
 from __future__ import annotations
 
+import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from typing import Any
 
 import boto3
+import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -93,12 +95,25 @@ def create_app(target: MCPTarget, settings: DemoSettings | None = None) -> FastA
 
     @app.post("/chat", response_model=ChatResponse)
     async def chat(request: ChatRequest) -> ChatResponse:
+        logger = structlog.get_logger()
+        total_start = time.perf_counter()
+
+        # A session_id not seen before means the next line pays for a
+        # brand-new MCP session -- against a deployed AgentCore Runtime,
+        # that's a cold session (FRICTION_LOG.md's cold-start entries).
+        # Timed and logged separately from the Bedrock/tool-use loop below
+        # so the two costs are never conflated when reading the logs.
+        session_was_cold = not sessions.is_open(request.session_id)
+        session_start = time.perf_counter()
         session = await sessions.get(request.session_id)
+        session_setup_ms = (time.perf_counter() - session_start) * 1000
+
         history = conversations.get(request.session_id)
 
         def converse(**kwargs: Any) -> dict[str, Any]:
             return bedrock.converse(**kwargs)
 
+        turn_start = time.perf_counter()
         result = await run_turn(
             converse=converse,
             model_id=settings.bedrock_model_id,
@@ -108,6 +123,20 @@ def create_app(target: MCPTarget, settings: DemoSettings | None = None) -> FastA
             session=session,
             user_message=request.message,
             max_rounds=settings.max_tool_rounds,
+        )
+        turn_ms = (time.perf_counter() - turn_start) * 1000
+
+        logger.info(
+            "demo_chat_turn",
+            session_id=request.session_id,
+            session_was_cold=session_was_cold,
+            session_setup_ms=round(session_setup_ms, 1),
+            turn_ms=round(turn_ms, 1),
+            tool_call_ms=round(sum(tc.latency_ms for tc in result.tool_calls), 1),
+            tool_call_count=len(result.tool_calls),
+            input_tokens=result.input_tokens,
+            output_tokens=result.output_tokens,
+            total_ms=round((time.perf_counter() - total_start) * 1000, 1),
         )
 
         return ChatResponse(

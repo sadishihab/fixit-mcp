@@ -42,15 +42,19 @@ class FakeConverse:
         return next(self._responses)
 
 
-def _text_response(text: str) -> dict[str, Any]:
+def _text_response(text: str, input_tokens: int = 10, output_tokens: int = 5) -> dict[str, Any]:
     return {
         "output": {"message": {"role": "assistant", "content": [{"text": text}]}},
         "stopReason": "end_turn",
+        "usage": {"inputTokens": input_tokens, "outputTokens": output_tokens},
     }
 
 
-def _tool_use_response(tool_use_id: str, name: str, input_: dict[str, Any]) -> dict[str, Any]:
+def _tool_use_response(
+    tool_use_id: str, name: str, input_: dict[str, Any], input_tokens: int = 20, output_tokens: int = 8
+) -> dict[str, Any]:
     return {
+        "usage": {"inputTokens": input_tokens, "outputTokens": output_tokens},
         "output": {
             "message": {
                 "role": "assistant",
@@ -144,6 +148,18 @@ def test_system_prompt_carries_household_id() -> None:
     assert "house-002" in build_system_prompt("house-002")
 
 
+def test_system_prompt_forbids_treating_an_empty_warning_list_as_confirmed_safe() -> None:
+    """Regression: step 6b's live verification caught the model saying 'it's
+    safe to turn it off' when safety_warnings was empty -- an empty list
+    means no warning was extracted, not that the tool confirmed safety.
+    See FRICTION_LOG.md."""
+    prompt = build_system_prompt("house-002")
+
+    assert "safety_warnings" in prompt
+    assert "not that it's confirmed safe" in prompt
+    assert "own explanation" in prompt  # also forbids adding unstated causes/consequences
+
+
 # --- run_turn: plain reply, no tool use -------------------------------------------------
 
 
@@ -204,6 +220,9 @@ async def test_one_tool_call_found_returns_card() -> None:
     assert result.card is not None
     assert result.card.resource_uri == "ui://fixit-mcp/diagnose-error-card"
     assert result.card.html == "<html>card</html>"
+    # summed across both Converse calls this turn made (default fakes: 20+10 in, 8+5 out).
+    assert result.input_tokens == 30
+    assert result.output_tokens == 13
     assert session.read_resource_calls == ["ui://fixit-mcp/diagnose-error-card"]
 
     # the toolResult sent back to Bedrock carries the tool's structured content.

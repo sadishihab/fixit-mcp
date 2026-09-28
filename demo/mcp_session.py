@@ -14,7 +14,7 @@ session (and a fresh cold start) per message.
 
 from __future__ import annotations
 
-from contextlib import AsyncExitStack
+import asyncio
 from dataclasses import dataclass
 from typing import Any
 
@@ -73,41 +73,92 @@ async def discover_tool_defs(target: MCPTarget) -> list[ToolDef]:
             return await list_tool_defs(session)
 
 
-class SessionManager:
-    """Owns one persistent MCP ClientSession per demo session_id.
+class _SessionOwner:
+    """Runs one MCP session's entire `async with` lifetime -- open through
+    close -- inside a single dedicated asyncio task, and exposes the live
+    ClientSession to whichever *other* task calls it.
 
-    Each session's streamable_http_client + ClientSession context is
-    entered via an AsyncExitStack (rather than an ordinary `async with`
-    block) specifically so it can stay open across independent /chat HTTP
-    requests -- which arrive as separate calls into this process over time,
-    not within one enclosing scope -- and be torn down explicitly
-    (SessionManager.aclose) on app shutdown.
+    Why a dedicated task, not an AsyncExitStack entered from whatever task
+    happens to call get() first: streamable_http_client's implementation
+    uses an anyio task group internally, and anyio's cancel scopes are
+    task-affine -- exiting one from a different task than the one that
+    entered it raises `RuntimeError: Attempted to exit cancel scope in a
+    different task than it was entered in` (hit for real: SessionManager
+    used to open a session inside the first /chat request's task, then
+    close it from the FastAPI lifespan's own task at shutdown -- crashed
+    every time. See FRICTION_LOG.md, step 6b). Calling the *session's own
+    methods* (call_tool, read_resource, ...) from other tasks is fine --
+    only entering/exiting its context is task-affine -- so ordinary use
+    from request handlers is unaffected by this.
     """
 
     def __init__(self, target: MCPTarget) -> None:
         self._target = target
-        self._sessions: dict[str, ClientSession] = {}
-        self._stacks: dict[str, AsyncExitStack] = {}
+        self.session: ClientSession | None = None
+        self._ready = asyncio.Event()
+        self._close_requested = asyncio.Event()
+        self._error: BaseException | None = None
+        self._task = asyncio.create_task(self._run())
 
-    async def get(self, session_id: str) -> ClientSession:
-        if session_id not in self._sessions:
-            stack = AsyncExitStack()
-            try:
-                http_client = await stack.enter_async_context(create_mcp_http_client(auth=self._target.auth))
-                read_stream, write_stream, _ = await stack.enter_async_context(
-                    streamable_http_client(self._target.url, http_client=http_client)
-                )
-                session = await stack.enter_async_context(ClientSession(read_stream, write_stream))
+    async def _run(self) -> None:
+        try:
+            async with (
+                create_mcp_http_client(auth=self._target.auth) as http_client,
+                streamable_http_client(self._target.url, http_client=http_client) as (
+                    read_stream,
+                    write_stream,
+                    _,
+                ),
+                ClientSession(read_stream, write_stream) as session,
+            ):
                 await session.initialize()
-            except BaseException:
-                await stack.aclose()
-                raise
-            self._stacks[session_id] = stack
-            self._sessions[session_id] = session
-        return self._sessions[session_id]
+                self.session = session
+                self._ready.set()
+                await self._close_requested.wait()
+        except BaseException as exc:  # noqa: BLE001 -- re-raised to the waiting get() below
+            self._error = exc
+            self._ready.set()
+
+    async def wait_ready(self) -> ClientSession:
+        await self._ready.wait()
+        if self._error is not None:
+            raise self._error
+        assert self.session is not None
+        return self.session
 
     async def aclose(self) -> None:
-        for stack in self._stacks.values():
-            await stack.aclose()
-        self._sessions.clear()
-        self._stacks.clear()
+        self._close_requested.set()
+        await self._task
+
+
+class SessionManager:
+    """Owns one persistent MCP ClientSession per demo session_id, reused
+    across every /chat turn in that conversation -- see AgentCore's own MCP
+    contract: a client "must capture the Mcp-Session-Id returned in the
+    response and include it in all subsequent requests to ensure session
+    affinity," warning that without it "each request may be routed to a new
+    microVM," i.e. a fresh cold start (FRICTION_LOG.md's cold-start
+    entries), rather than a fresh MCP session (and a fresh cold start) per
+    message.
+    """
+
+    def __init__(self, target: MCPTarget) -> None:
+        self._target = target
+        self._owners: dict[str, _SessionOwner] = {}
+
+    def is_open(self, session_id: str) -> bool:
+        """True if this session_id already has a live session -- so a
+        caller can tell, before calling get(), whether the next get() will
+        pay for a fresh MCP session (a cold AgentCore Runtime session, if
+        pointed at a deployed runtime) or reuse a warm one."""
+        return session_id in self._owners
+
+    async def get(self, session_id: str) -> ClientSession:
+        if session_id not in self._owners:
+            self._owners[session_id] = _SessionOwner(self._target)
+        return await self._owners[session_id].wait_ready()
+
+    async def aclose(self) -> None:
+        for owner in self._owners.values():
+            await owner.aclose()
+        self._owners.clear()

@@ -40,6 +40,14 @@ SYSTEM_PROMPT_TEMPLATE = (
     "Call a tool whenever you need real information about an error code or the "
     "household's appliances -- never invent a code's meaning, a cause, a repair "
     "step, a part, or a safety warning; only say what a tool actually returned. "
+    "Never add your own explanation, consequence, or reasoning that a tool result "
+    "didn't state -- if you want to say why something matters, only say what the "
+    "tool itself said. "
+    "If asked whether something is safe or dangerous, answer only from the tool "
+    "result's safety_warnings: if it has none, say the manual doesn't list a "
+    "specific safety warning for this code, and stop there -- an empty list means "
+    "no warning was found, not that it's confirmed safe, so never say 'it's safe' "
+    "or otherwise assert a safety judgment the tool didn't make. "
     "If a tool's result says the appliance is ambiguous, ask the customer which "
     "appliance they mean before guessing. If a tool finds nothing, say so "
     "plainly instead of making something up."
@@ -88,6 +96,12 @@ class TurnResult:
     reply_text: str
     tool_calls: list[ToolCallRecord] = field(default_factory=list)
     card: CardResult | None = None
+    # Summed across every Converse call this turn made (usually 1-2: the
+    # round that decides to call a tool, plus the round that answers using
+    # its result) -- for cost/usage reporting, not returned in the API
+    # response.
+    input_tokens: int = 0
+    output_tokens: int = 0
 
 
 class ConversationStore:
@@ -149,6 +163,8 @@ async def run_turn(
 
     tool_calls: list[ToolCallRecord] = []
     card: CardResult | None = None
+    input_tokens = 0
+    output_tokens = 0
 
     for _ in range(max_rounds):
         kwargs: dict[str, Any] = {
@@ -161,12 +177,21 @@ async def run_turn(
             kwargs["toolConfig"] = tool_config
 
         response = await asyncio.to_thread(converse, **kwargs)
+        usage = response.get("usage", {})
+        input_tokens += usage.get("inputTokens", 0)
+        output_tokens += usage.get("outputTokens", 0)
         output_message = response["output"]["message"]
         messages.append(output_message)
 
         if response.get("stopReason") != "tool_use":
             reply_text = "".join(block["text"] for block in output_message["content"] if "text" in block)
-            return TurnResult(reply_text=reply_text, tool_calls=tool_calls, card=card)
+            return TurnResult(
+                reply_text=reply_text,
+                tool_calls=tool_calls,
+                card=card,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+            )
 
         result_blocks: list[dict[str, Any]] = []
         for block in output_message["content"]:
@@ -198,4 +223,6 @@ async def run_turn(
         reply_text="Sorry, I'm having trouble with that one -- could you try asking again?",
         tool_calls=tool_calls,
         card=card,
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
     )
