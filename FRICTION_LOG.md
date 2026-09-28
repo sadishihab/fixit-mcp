@@ -1737,3 +1737,114 @@ Template for each entry:
 - **Actionable suggestion**: A secret or identifier check has to *gate*
   the commit (fail and stop), not just print before it. Better still, it
   belongs in the test suite, where every commit already runs it.
+
+### 2026-09-28 — Step 5a research: Alexa+'s MCP session model is undocumented where it matters most; our own deploy script silently opted out of the cold-start fix
+
+- **Tool/SDK**: Alexa+ MCP Toolkit docs (`mcp-toolkit-client-lifecycle.html`,
+  `mcp-toolkit-overview.html`, `mcp-toolkit-quickstart.html`), AWS AgentCore
+  Runtime docs (`runtime-lifecycle-settings.html`, `agent-runtime-versioning.html`,
+  the AGENTCOST06-BP03 / AGENTPERF02-BP03 Well-Architected agentic-ai-lens
+  pages), the "new AgentCore Runtime" GA blog post and what's-new post
+  (2026-09-18), `scripts/deploy_runtime.py`.
+- **Task attempted**: Research only (no code/AWS changes) — find out how
+  often a real Alexa+ conversation will hit a cold AgentCore Runtime
+  session, per the user's step-5a research request.
+- **Steps taken**: Read all three Alexa+ MCP Toolkit doc pages and the
+  AWS AgentCore Runtime lifecycle/versioning docs and two Well-Architected
+  agentic-ai-lens best-practice pages. Cross-checked `deploy_runtime.py`'s
+  `create_agent_runtime`/`update_agent_runtime` call against what the docs
+  say controls cold-start latency.
+- **Expected**: Alexa+ docs would state whether `Mcp-Session-Id` is reused
+  across conversation turns/conversations, and whether `initialize` runs
+  once at deploy time or on every customer turn — the fact that determines
+  whether cold start is a rare edge case or a per-turn tax.
+- **Actual**:
+  - **Undocumented, load-bearing gap**: `mcp-toolkit-client-lifecycle.html`
+    says only "the session is based on the customer's previous conversations
+    with Alexa+ rather than an explicit identifier for a session with your
+    MCP App" — it never says whether that maps to one `Mcp-Session-Id` per
+    conversation, one per turn, or something else, and never states whether
+    `initialize`/`tools/list` run once at add-on deployment (the overview
+    page's registration language implies this) or are replayed per
+    session. Nothing in any of the three pages mentions timeouts or retries
+    for a slow/cold tool call beyond the flat 500ms latency requirement.
+  - **Unexpected, concrete finding**: AgentCore Runtime shipped a new
+    execution platform (`platformVersion: "V2"`, GA 2026-09-18, us-east-1
+    included) that replaces the boot-and-initialize cold path with a
+    snapshot-restore, giving a documented P75 cold start of ~2s regardless
+    of image size, versus **5.4–30s on V1** — squarely explaining our
+    measured 1.3–8.4s cold `initialize` times. `platformVersion` defaults
+    to `V1` when omitted on `CreateAgentRuntime`/`UpdateAgentRuntime`, and
+    `deploy_runtime.py`'s `desired` payload (around line 90) never sets it
+    — so step 4c's runtime has been on the slow platform the whole time,
+    not because V2 didn't exist, but because it launched *nine days before*
+    our step-4c deploy and nothing here checked for it.
+  - Also confirmed (documented, not inferred): the observed "10 microVMs
+    appeared ~2 minutes after first traffic" behavior in the step-4c entry
+    matches AWS's stated container warm-pool size (10 pre-warmed VMs; the
+    11th+ concurrent new session pays full cold cost). Idle timeout
+    (`deploy_runtime.py`'s 300s) resets on every invocation to the same
+    `runtimeSessionId` and is independent of `maxLifetime` (8h default) —
+    so a conversation with >5 minutes between turns will cold-start its
+    *own* session even if the runtime overall stays warm for other traffic.
+- **Severity**: High. Two compounding unknowns — how Alexa+ maps
+  conversations to sessions (undocumented) and which Runtime platform we
+  deployed on (documented, but silently wrong in our own script) — made the
+  cold-start risk look worse and less actionable than it actually is.
+- **Workaround**: None yet — this is the research step; the report handed
+  to the user ranks `platformVersion: "V2"` as the first thing to try,
+  since it's a config change to an existing script, not a new mitigation to
+  build, and costs no new code path.
+- **Actionable suggestion**: Alexa+'s MCP Toolkit docs should state the
+  `Mcp-Session-Id` reuse policy explicitly — it's the one fact that decides
+  whether a builder needs to care about cold starts at all. Separately,
+  `deploy_runtime.py` should assert or default `platformVersion` explicitly
+  rather than silently inheriting whatever AWS's API default is, so a
+  future platform-default change can't silently change our latency profile
+  again.
+
+### 2026-09-28 — Step 5b: `platformVersion` is a free-text field with no documented default value in the API reference itself
+
+- **Tool/SDK**: boto3 1.43.100 (`bedrock-agentcore-control` service model),
+  the `CreateAgentRuntime`/`UpdateAgentRuntime`/`GetAgentRuntime` API
+  reference pages, `scripts/deploy_runtime.py`.
+- **Task attempted**: Make `platformVersion` explicit in
+  `deploy_runtime.py` (default `"V2"`, overridable via
+  `--platform-version`/`FIXIT_AGENTCORE_PLATFORM_VERSION`), per step 5a's
+  finding that the script was silently deploying on the slower V1
+  platform.
+- **Steps taken**: Inspected the installed boto3 service model directly
+  (`client.meta.service_model.operation_model(...)`) before changing any
+  code, rather than trusting the step-5a research secondhand. Confirmed
+  `platformVersion` is a real input member on both `CreateAgentRuntime` and
+  `UpdateAgentRuntime`, and an output member on `GetAgentRuntime`, in the
+  installed SDK (uploaded 2026-09-22, four days after V2 GA'd). Then read
+  the three API reference pages directly (not secondhand from search
+  results) for the field's documented behavior.
+- **Expected**: The API reference would state a default (e.g. "V1 if
+  omitted") the way the marketing blog post and secondary sources
+  (forkast.news, unite.ai) claimed.
+- **Actual**: `platformVersion` is modeled as a **plain string** (pattern
+  `[^\s]+`, 1-128 chars, **no enum constraint** in the SDK) on all three
+  operations. Its prose description is one line ("The version of the
+  runtime platform...") with no stated default and no enum of valid values
+  anywhere in the API reference itself -- "V1 is the default" is real (per
+  the GA announcement and secondary coverage) but isn't asserted by the
+  `CreateAgentRuntime`/`GetAgentRuntime` reference pages a caller would
+  actually consult. Whether a runtime created before this field existed
+  reports back `"V1"` explicitly or omits the key from `GetAgentRuntime`
+  is therefore still unconfirmed against a real runtime.
+- **Severity**: Low. `config_matches()` (`deploy_runtime.py`) already
+  compares every `desired` key against `current.get(key)` generically --
+  `current.get("platformVersion")` being `"V1"` or `None` both fail to
+  equal our desired `"V2"`, so the idempotency check triggers an update
+  either way without needing to know which case is real. Confirmed with a
+  fake-runtime test (`test_a_v1_runtime_is_detected_as_needing_an_update`)
+  using an explicit `"V1"` current value, since that's the only case a
+  fake can assert without live AWS.
+- **Workaround**: None needed -- the existing generic comparison already
+  handles both possibilities correctly.
+- **Actionable suggestion**: The `CreateAgentRuntime`/`GetAgentRuntime` API
+  reference should state `platformVersion`'s default and valid values
+  (`V1`/`V2`) directly, not require cross-referencing a blog post and a
+  service model with no enum to find them.

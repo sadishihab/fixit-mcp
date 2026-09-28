@@ -124,6 +124,8 @@ def test_desired_config_is_the_agreed_deployed_configuration() -> None:
     assert config["environmentVariables"]["FIXIT_AGENTCORE_MEMORY_ID"] == "FixItH-abcdefghij"
     # IAM (SigV4) inbound auth == no authorizerConfiguration at all.
     assert "authorizerConfiguration" not in config
+    # step 5b: never silently inherit AWS's CreateAgentRuntime platformVersion default.
+    assert config["platformVersion"] == "V2"
 
 
 def test_image_is_pinned_by_digest_not_tag() -> None:
@@ -175,6 +177,43 @@ def test_redeploying_the_same_config_is_a_no_op() -> None:
     assert action == "unchanged"
     assert "update" not in control.calls and "create" not in control.calls
     assert runtime["agentRuntimeVersion"] == "1"
+
+
+def test_platform_version_is_sent_on_both_create_and_update() -> None:
+    control = FakeControl()
+
+    _, created = deploy_runtime.deploy(control, desired(), sleep=no_sleep)
+    assert created["platformVersion"] == "V2"
+
+    new_image = f"{TARGET.repository_uri}@sha256:{'c' * 64}"
+    _, updated = deploy_runtime.deploy(control, desired(new_image), sleep=no_sleep)
+    assert updated["platformVersion"] == "V2"
+
+
+def test_an_already_v2_runtime_is_a_no_op() -> None:
+    control = FakeControl()
+    deploy_runtime.deploy(control, desired(), sleep=no_sleep)
+    control.calls.clear()
+
+    action, runtime = deploy_runtime.deploy(control, desired(), sleep=no_sleep)
+
+    assert action == "unchanged"
+    assert "update" not in control.calls
+    assert runtime["platformVersion"] == "V2"
+
+
+def test_a_v1_runtime_is_detected_as_needing_an_update() -> None:
+    control = FakeControl()
+    v1_config = {**desired(), "platformVersion": "V1"}
+    control.create_agent_runtime(agentRuntimeName="fixit_mcp", **v1_config)
+    deploy_runtime.wait_for_status(control, next(iter(control.runtimes)), sleep=no_sleep)
+    control.calls.clear()
+
+    action, runtime = deploy_runtime.deploy(control, desired(), sleep=no_sleep)
+
+    assert action == "updated"
+    assert "update" in control.calls
+    assert runtime["platformVersion"] == "V2"
 
 
 def test_a_new_image_digest_updates_the_existing_runtime() -> None:

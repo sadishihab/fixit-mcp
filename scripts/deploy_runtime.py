@@ -19,6 +19,12 @@ not a menu:
     authorizerConfiguration => SigV4; OAuth/JWT is a later step)
   - FIXIT_REPOSITORY_BACKEND=agentcore + FIXIT_AGENTCORE_MEMORY_ID, since
     SQLite doesn't survive AgentCore's per-session microVMs (step 4a)
+  - platformVersion V2 (step 5b, see FRICTION_LOG.md): the execution
+    platform, not our own config version. Overridable with
+    --platform-version / FIXIT_AGENTCORE_PLATFORM_VERSION so we never again
+    silently inherit whatever AWS's CreateAgentRuntime default is (step 5a
+    found we'd been doing exactly that -- V1, with its 5.4-30s documented
+    cold starts vs V2's ~2s).
 Only the memory id is taken from the environment (FIXIT_AGENTCORE_MEMORY_ID).
 """
 
@@ -38,6 +44,11 @@ REPOSITORY_NAME = "fixit-mcp"
 EXECUTION_ROLE_NAME = "FixItAgentCoreRuntimeRole"
 DEFAULT_REGION = "us-east-1"
 DEFAULT_IMAGE_TAG = "latest"
+# AgentCore Runtime's execution platform (V1 | V2), not a config version of
+# ours. V2 (GA 2026-09-18) replaces V1's boot-and-initialize cold path with
+# a snapshot-restore: documented P75 cold start ~2s regardless of image
+# size, vs 5.4-30s on V1 -- see FRICTION_LOG.md, step 5a/5b.
+DEFAULT_PLATFORM_VERSION = "V2"
 # 5 minutes idle before a session's microVM is stopped (the default is 15).
 # Household state lives in AgentCore Memory, so a stopped session loses
 # nothing -- the next call just pays a cold start.
@@ -57,6 +68,7 @@ class DeployTarget:
     region: str
     memory_id: str
     image_tag: str = DEFAULT_IMAGE_TAG
+    platform_version: str = DEFAULT_PLATFORM_VERSION
 
     @property
     def repository_uri(self) -> str:
@@ -88,6 +100,7 @@ def desired_config(target: DeployTarget, container_uri: str) -> dict[str, Any]:
         "roleArn": target.role_arn,
         "networkConfiguration": {"networkMode": "PUBLIC"},
         "protocolConfiguration": {"serverProtocol": "MCP"},
+        "platformVersion": target.platform_version,
         "lifecycleConfiguration": {
             "idleRuntimeSessionTimeout": IDLE_TIMEOUT_S,
             "maxLifetime": MAX_LIFETIME_S,
@@ -200,6 +213,11 @@ def main() -> int:
     parser.add_argument("--region", default=os.environ.get("FIXIT_AGENTCORE_REGION", DEFAULT_REGION))
     parser.add_argument("--image-tag", default=DEFAULT_IMAGE_TAG)
     parser.add_argument(
+        "--platform-version",
+        default=os.environ.get("FIXIT_AGENTCORE_PLATFORM_VERSION", DEFAULT_PLATFORM_VERSION),
+        help="AgentCore Runtime execution platform, V1 or V2 (default V2; see FRICTION_LOG.md step 5b)",
+    )
+    parser.add_argument(
         "--delete", action="store_true", help="delete the runtime (stops all Runtime charges)"
     )
     parser.add_argument(
@@ -225,7 +243,11 @@ def main() -> int:
         return 2
     account_id = session.client("sts").get_caller_identity()["Account"]
     target = DeployTarget(
-        account_id=account_id, region=args.region, memory_id=memory_id, image_tag=args.image_tag
+        account_id=account_id,
+        region=args.region,
+        memory_id=memory_id,
+        image_tag=args.image_tag,
+        platform_version=args.platform_version,
     )
 
     container_uri = resolve_image_digest_uri(ecr, target)
