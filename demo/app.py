@@ -22,11 +22,13 @@ import boto3
 import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from demo.config import DemoSettings
 from demo.mcp_session import MCPTarget, SessionManager, ToolDef, discover_tool_defs
 from demo.orchestrator import ConversationStore, build_system_prompt, run_turn
+from demo.web import INDEX_HTML
 
 # Any localhost origin, any port -- this demo has no web UI of its own yet
 # (step 6a), but a future one served from a dev server on some local port
@@ -89,9 +91,11 @@ def create_app(target: MCPTarget, settings: DemoSettings | None = None) -> FastA
         allow_headers=["*"],
     )
 
-    @app.get("/")
-    async def root() -> dict[str, str]:
-        return {"service": "fixit-demo", "note": "simulated Alexa+ -- not the real Alexa+ client"}
+    @app.get("/", response_class=HTMLResponse)
+    async def root() -> str:
+        # The single-page simulated-Alexa+ UI (demo/static/index.html),
+        # loaded once at import time -- see demo/web.py.
+        return INDEX_HTML
 
     @app.post("/chat", response_model=ChatResponse)
     async def chat(request: ChatRequest) -> ChatResponse:

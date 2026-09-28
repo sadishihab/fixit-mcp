@@ -4,8 +4,9 @@
 that plays the same role Alexa+ eventually will: a real MCP client over
 Streamable HTTP, driving a tool-use LLM loop against the FixIt MCP server,
 so the tool-calling and MCP Apps card behavior can be exercised and
-demoed before a real Alexa+ integration exists (step 6a). There's no web
-UI yet -- this is the backend only, driven with `curl` or any HTTP client.
+demoed before a real Alexa+ integration exists (step 6a). A single-page
+web UI (step 6c, `GET /`) drives it in a browser; the API can still be
+driven directly with `curl` or any HTTP client.
 
 Every API response says so explicitly (`"simulated_alexa_plus": true`).
 
@@ -17,7 +18,66 @@ make demo AGENT_ARN=arn:aws:bedrock-agentcore:...   # against a deployed AgentCo
 ```
 
 Binds to `127.0.0.1` only. It is never meant to be exposed beyond your own
-machine.
+machine. Open `http://127.0.0.1:8090/` in a browser for the web UI.
+
+## Web UI
+
+`GET /` serves a single self-contained page (`demo/static/index.html`,
+loaded once at import time by `demo/web.py` -- same no-file-I/O-per-request
+convention as `fixit_mcp/apps/resources.py`): inline CSS/JS, no build
+step, no CDN dependencies, so it works offline. It talks only to this
+backend's own `/chat` endpoint (same origin) -- no AWS credentials ever
+reach the page.
+
+A dark, Echo-Show-style conversation view: a persistent "Simulated
+Alexa+" label, a text input, and a mic button (hidden quietly if the
+browser has no `SpeechRecognition`; the typed path always works).
+Replies are optionally spoken with `speechSynthesis` (a mute toggle,
+hidden if unsupported). Each turn shows one chip per tool call (name, key
+arguments, `latency_ms`), and a hidden-by-default "Details" disclosure
+with the turn's raw `tool_calls` JSON -- the actual MCP data behind the
+answer. A "New conversation" button starts a fresh `session_id`
+(`crypto.randomUUID()`, reused for every turn of one conversation so the
+AgentCore session stays warm).
+
+**This page is the demo's MCP Apps host.** When a turn's response
+includes a `card` (see below), the page renders it in a directly
+sandboxed iframe (`sandbox="allow-scripts"`, srcdoc, **never**
+`allow-same-origin` combined with `allow-scripts`) and answers the
+card's own postMessage handshake: it responds to the card's
+`ui/initialize` request, then immediately pushes
+`ui/notifications/tool-input` and `ui/notifications/tool-result` with
+that turn's `diagnose_error` arguments/result.
+
+Two things confirmed by reading `src/fixit_mcp/apps/diagnose_card.html`'s
+actual script and the MCP Apps spec
+(`modelcontextprotocol/ext-apps`, `specification/2026-01-26/apps.mdx`)
+directly, not assumed:
+
+- **The card never sends `ui/notifications/initialized`.** The spec's
+  lifecycle diagram shows the View sending that notification after the
+  host answers `ui/initialize`, before the host pushes tool data. This
+  card doesn't send it, so the host pushes `tool-input`/`tool-result`
+  right after answering `ui/initialize` instead of waiting for a
+  notification that will never arrive.
+- **Deliberate spec deviation -- single sandboxed iframe, not the
+  double-iframe Sandbox Proxy.** The spec requires web hosts to wrap the
+  View in an intermediate Sandbox Proxy iframe on a different origin from
+  the host. This demo renders the card directly in one sandboxed iframe
+  instead (the spec's simpler "Desktop/Native hosts" path). Without
+  `allow-same-origin`, a `srcdoc` iframe still gets a unique opaque
+  origin distinct from this page, so the isolation goal -- the untrusted
+  card can never reach this page's DOM -- holds without the second origin
+  hop. Acceptable for a local single-user demo; a production web host
+  should implement the full Sandbox Proxy.
+- **Sizing**: the card's template has no SDK and never reports its own
+  size. Rather than modify the file the MCP server actually serves via
+  `resources/read`, the page appends a small inline script to the HTML
+  *it* hands the iframe as `srcdoc` (a `ResizeObserver`-based
+  `ui/notifications/size-changed` reporter) so the iframe grows to fit
+  its content instead of showing a scrollbar or a blank area. The
+  resource the server ships and `tests/unit/test_diagnose_card.py` tests
+  is untouched.
 
 ## API
 
@@ -41,9 +101,13 @@ machine.
 
 `card` is only populated when a called tool declared an MCP Apps
 `resourceUri` (via its own `_meta.ui.resourceUri`, exactly as `diagnose_error`
-does -- see `CLAUDE.md`) *and* that call's result has `status == "found"`.
-Every other tool result -- `not_found`, `ambiguous_appliance`, or a plain
-tool with no card at all -- leaves `card` as `null`.
+does -- see `CLAUDE.md`) *and* that call's result has a `status` of
+`found`, `not_found`, or `ambiguous_appliance` -- the three states
+`diagnose_card.html` itself knows how to render (a full card, or one of
+its two muted informational states). This rule is generic over any tool
+with a `resourceUri`, not hardcoded to `diagnose_error` by name. A tool
+with no `resourceUri` at all, or a result whose `status` is none of those
+three, leaves `card` as `null`.
 
 Conversation history and household_id association are per `session_id`.
 Send the same `session_id` for every turn of one conversation.
@@ -113,9 +177,16 @@ make test    # includes demo/'s own tests (fakes only -- no AWS)
 - `tests/unit/test_demo_mcp_session.py` -- tool discovery from a fake MCP
   session.
 - `tests/unit/test_demo_orchestrator.py` -- the Converse tool-use loop
-  against a fake Bedrock client: a plain reply, one tool call, an
-  `ambiguous_appliance` follow-up, a tool error, a runaway-loop cap, and
-  the MCP Apps card being returned only for a `found` result.
+  against a fake Bedrock client: a plain reply, one tool call, a tool
+  error, a runaway-loop cap, and the MCP Apps card being returned for
+  `found`, `not_found`, and `ambiguous_appliance` results but not for an
+  unrecognized status or a tool with no `resourceUri`.
+- `tests/unit/test_demo_app.py` -- `GET /` serves the web UI page (fakes
+  only, no AWS/MCP network), and `/chat`'s route is unchanged.
+- `tests/unit/test_demo_web_ui.py` -- the web page's pure/DOM-free JS
+  (card-ownership decision, handshake message builders, chip formatting)
+  executed directly in Node, same rationale as
+  `tests/unit/test_diagnose_card.py`. Skipped if `node` isn't on PATH.
 - `tests/integration/test_demo_live.py` -- **opt-in**, real AWS (real
   Amazon Bedrock, and a real deployed AgentCore Runtime): runs one real
   conversation ("my dryer shows tE1") end to end and checks the LG dryer

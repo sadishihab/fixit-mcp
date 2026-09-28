@@ -2272,3 +2272,89 @@ full detail behind each number.
   further for a conversational (not single-tool-call) workload, measure
   where a real turn's time actually goes first -- it may not be where the
   infrastructure-level investigation was looking.
+
+### 2026-09-28 — Step 6c: the deployed MCP Apps card doesn't implement the spec's own View-side lifecycle notification
+
+- **Tool/SDK**: MCP Apps spec (`modelcontextprotocol/ext-apps`,
+  `specification/2026-01-26/apps.mdx`, fetched directly via `gh api` for
+  this step, not assumed), `src/fixit_mcp/apps/diagnose_card.html`'s
+  actual `<script>`.
+- **Task attempted**: Build `demo/static/index.html` as an MCP Apps host
+  for the existing `diagnose_error` card, per this step's explicit
+  instruction to confirm the host-side handshake from the spec and from
+  what the card's own JS expects, not guess.
+- **Steps taken**: Read the spec's Lifecycle section (`UI Initialization`
+  sequence diagram) and Sandbox Proxy section, then read
+  `diagnose_card.html`'s handshake IIFE line by line.
+- **Expected** (per the spec's own sequence diagram, which applies to both
+  the Desktop/Native and Web host branches): after the Host responds to
+  the View's `ui/initialize` request, the View sends a
+  `ui/notifications/initialized` notification, and only after *that* does
+  the Host send `ui/notifications/tool-input`/`tool-result`.
+  `apps.mdx`'s Sandbox Proxy section states this explicitly as a hard
+  requirement for that path ("The Host MUST NOT send any request or
+  notification to the View before it receives an `initialized`
+  notification").
+- **Actual**: `diagnose_card.html`'s handshake code sends the
+  `ui/initialize` request and, in its `.catch()`, only handles the host
+  not supporting MCP Apps at all. There's no `.then()` that sends
+  `ui/notifications/initialized`, and no code path that ever sends it.
+  Waiting for it before pushing `tool-input`/`tool-result` would leave the
+  card permanently blank.
+- **Severity**: Medium -- not a bug in the card (it was written and
+  tested, step 3d, before this SEP's `initialized` notification existed in
+  its current form, or simply predates strict adherence to it), but a real
+  trap for anyone implementing a host from the spec text alone: the spec
+  reads as if waiting for `initialized` is universal lifecycle behavior,
+  not merely the Sandbox-Proxy-specific requirement its exact wording is
+  scoped to.
+- **Workaround**: The host (`demo/static/index.html`) responds to
+  `ui/initialize` and immediately pushes `ui/notifications/tool-input`
+  then `ui/notifications/tool-result`, without waiting for
+  `initialized`. Verified against a real `tE1` turn (found state renders)
+  and a real `not_found`/`ambiguous_appliance` turn (muted states render)
+  through `make run` + `make demo`.
+- **Actionable suggestion**: When building an MCP Apps host against a
+  real, already-shipped card/View, verify the View's actual handshake
+  behavior by reading its code before trusting the spec's lifecycle
+  diagram to describe it exactly -- an SEP evolving after a View was
+  written is exactly the kind of drift that silently breaks a
+  spec-literal host implementation.
+
+### 2026-09-28 — Step 6c: a sandboxed card iframe with no `allow-same-origin` can't be measured from the host, so it can't just self-report either (it has no SDK)
+
+- **Tool/SDK**: Browser iframe sandboxing (`sandbox="allow-scripts"`,
+  deliberately without `allow-same-origin` per this step's own security
+  requirement), `demo/static/index.html`.
+- **Task attempted**: Size the card iframe to its content so it never
+  shows a scrollbar or a large blank area, per this step's two suggested
+  options: have the card send a size notification, or have the host
+  measure it directly.
+- **Steps taken**: Checked whether the host could read
+  `iframe.contentDocument`/`scrollHeight` directly for a "measure it"
+  approach.
+- **Expected**: One of the two suggested options would apply cleanly:
+  either the card already reports its size, or the host can just read it.
+- **Actual**: Neither applies as-is. `diagnose_card.html` has no SDK and
+  never sends `ui/notifications/size-changed` (see the spec's own note
+  that auto-resize is a behavior of the View's *SDK*, which this
+  hand-written card doesn't use). And a `sandbox="allow-scripts"` iframe
+  with no `allow-same-origin` gets a unique opaque origin distinct from
+  the host, so `iframe.contentDocument`/`contentWindow.document` throw a
+  cross-origin `SecurityError` -- the host genuinely cannot measure it
+  directly without granting `allow-same-origin`, which this step's own
+  security requirement forbids pairing with `allow-scripts`.
+- **Severity**: Low -- resolvable without weakening the sandbox.
+- **Workaround**: A third option between the two offered: the host
+  appends a small inline `ResizeObserver`-based reporter script to the
+  HTML string *it* assigns to `iframe.srcdoc` (`withSizeReporter()` in
+  `demo/static/index.html`), making the card behave, for sizing purposes
+  only, as if its own SDK reported size -- without editing the file the
+  MCP server actually serves via `resources/read`
+  (`src/fixit_mcp/apps/diagnose_card.html` on disk, and what
+  `tests/unit/test_diagnose_card.py` tests, are both untouched).
+- **Actionable suggestion**: "Have the host measure a sandboxed
+  cross-origin iframe" isn't achievable at all without `allow-same-origin`
+  -- for a card with no self-reporting SDK, a host-side srcdoc-injected
+  reporter is the option actually available; worth stating explicitly next
+  time this class of requirement comes up in this project's docs.

@@ -104,6 +104,22 @@ def _ambiguous_result() -> types.CallToolResult:
     )
 
 
+def _not_found_result() -> types.CallToolResult:
+    return types.CallToolResult(
+        content=[types.TextContent(type="text", text="not found")],
+        structuredContent={"status": "not_found", "nearest_matches": ["tE2"]},
+        isError=False,
+    )
+
+
+def _unknown_status_result() -> types.CallToolResult:
+    return types.CallToolResult(
+        content=[types.TextContent(type="text", text="?")],
+        structuredContent={"status": "something_else"},
+        isError=False,
+    )
+
+
 def _card_resource() -> types.ReadResourceResult:
     return types.ReadResourceResult(
         contents=[
@@ -234,17 +250,21 @@ async def test_one_tool_call_found_returns_card() -> None:
     ]
 
 
-# --- run_turn: ambiguous_appliance -> no card -------------------------------------------------
+# --- run_turn: ambiguous_appliance and not_found also get a card ------------------------------
 
 
-async def test_ambiguous_appliance_follow_up_has_no_card() -> None:
+async def test_ambiguous_appliance_follow_up_has_a_card_too() -> None:
+    """A card is shown for ambiguous_appliance too, not just found -- the
+    card's own template already renders a muted 'which appliance?' state
+    for it (see diagnose_card.html), so there's no reason to withhold the
+    card just because the status isn't found."""
     converse = FakeConverse(
         [
             _tool_use_response("t1", "diagnose_error", {"error_code": "tE1", "household_id": "house-002"}),
             _text_response("Which appliance is showing that code -- the dryer or the fridge?"),
         ]
     )
-    session = FakeSession(call_tool_result=_ambiguous_result())
+    session = FakeSession(call_tool_result=_ambiguous_result(), resource=_card_resource())
 
     result = await run_turn(
         converse=converse,
@@ -259,6 +279,86 @@ async def test_ambiguous_appliance_follow_up_has_no_card() -> None:
     assert result.reply_text == "Which appliance is showing that code -- the dryer or the fridge?"
     assert len(result.tool_calls) == 1
     assert result.tool_calls[0].result["status"] == "ambiguous_appliance"
+    assert result.card is not None
+    assert result.card.resource_uri == "ui://fixit-mcp/diagnose-error-card"
+    assert session.read_resource_calls == ["ui://fixit-mcp/diagnose-error-card"]
+
+
+async def test_not_found_has_a_card_too() -> None:
+    """Same reasoning as ambiguous_appliance above -- not_found gets its own
+    muted card state from the template too."""
+    converse = FakeConverse(
+        [
+            _tool_use_response("t1", "diagnose_error", {"error_code": "E24", "household_id": "house-002"}),
+            _text_response("I don't have that exact code in our index."),
+        ]
+    )
+    session = FakeSession(call_tool_result=_not_found_result(), resource=_card_resource())
+
+    result = await run_turn(
+        converse=converse,
+        model_id="test-model",
+        system_prompt="be helpful",
+        messages=[],
+        tool_defs=[DIAGNOSE_TOOL],
+        session=session,
+        user_message="E24 on my appliance",
+    )
+
+    assert result.tool_calls[0].result["status"] == "not_found"
+    assert result.card is not None
+    assert session.read_resource_calls == ["ui://fixit-mcp/diagnose-error-card"]
+
+
+async def test_unknown_status_has_no_card() -> None:
+    """A status outside the found/not_found/ambiguous_appliance convention
+    is not assumed to have a matching card state -- no card is fetched."""
+    converse = FakeConverse(
+        [
+            _tool_use_response("t1", "diagnose_error", {"error_code": "tE1"}),
+            _text_response("..."),
+        ]
+    )
+    session = FakeSession(call_tool_result=_unknown_status_result(), resource=_card_resource())
+
+    result = await run_turn(
+        converse=converse,
+        model_id="test-model",
+        system_prompt="be helpful",
+        messages=[],
+        tool_defs=[DIAGNOSE_TOOL],
+        session=session,
+        user_message="tE1",
+    )
+
+    assert result.card is None
+    assert session.read_resource_calls == []
+
+
+async def test_tool_without_resource_uri_has_no_card_even_when_found() -> None:
+    """A tool with no _meta.ui.resourceUri never gets a card, regardless of
+    its result's status -- the rule is generic over any tool, not
+    hardcoded to diagnose_error, but a tool that never declared a UI
+    resource has nothing to fetch."""
+    converse = FakeConverse(
+        [
+            _tool_use_response("t1", "list_my_appliances", {"household_id": "house-002"}),
+            _text_response("You have a dryer and a fridge."),
+        ]
+    )
+    session = FakeSession(call_tool_result=_found_result(), resource=_card_resource())
+
+    result = await run_turn(
+        converse=converse,
+        model_id="test-model",
+        system_prompt="be helpful",
+        messages=[],
+        tool_defs=[LIST_TOOL],
+        session=session,
+        user_message="what appliances do I have",
+    )
+
+    assert result.tool_calls[0].result["status"] == "found"
     assert result.card is None
     assert session.read_resource_calls == []
 

@@ -1,0 +1,633 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>FixIt -- Simulated Alexa+</title>
+<style>
+  :root {
+    --bg: #050506;
+    --panel-bg: #101014;
+    --fg: #f5f5f7;
+    --muted: #9a9aa2;
+    --accent: #4d8dff;
+    --user-bubble-bg: #23324a;
+    --assistant-bubble-bg: #17171d;
+    --border: #2a2a30;
+    --chip-bg: #1c1c22;
+    --chip-fg: #b9c3d6;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    margin: 0;
+  }
+  body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  #app {
+    width: 100%;
+    max-width: 760px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  header {
+    flex: 0 0 auto;
+    padding: 16px 20px 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .badge-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .badge {
+    display: inline-block;
+    background: var(--accent);
+    color: #04101f;
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 0.02em;
+    padding: 3px 10px;
+    border-radius: 999px;
+  }
+  .badge-note {
+    color: var(--muted);
+    font-size: 12px;
+  }
+  .header-controls {
+    margin-top: 10px;
+    display: flex;
+    gap: 8px;
+  }
+  button {
+    font-family: inherit;
+    cursor: pointer;
+  }
+  .ctrl-btn {
+    background: var(--panel-bg);
+    color: var(--fg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+  .ctrl-btn:hover { border-color: var(--accent); }
+
+  #conversation {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 16px 20px 8px;
+  }
+  .turn {
+    margin-bottom: 22px;
+  }
+  .msg {
+    max-width: 88%;
+    padding: 10px 14px;
+    border-radius: 14px;
+    line-height: 1.45;
+    font-size: 16px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+  }
+  .msg.user {
+    background: var(--user-bubble-bg);
+    margin-left: auto;
+    border-bottom-right-radius: 4px;
+  }
+  .msg.assistant {
+    background: var(--assistant-bubble-bg);
+    border: 1px solid var(--border);
+    margin-right: auto;
+    border-bottom-left-radius: 4px;
+  }
+  .msg.assistant.error {
+    border-color: #7a2b2b;
+    color: #ffb3b3;
+  }
+  .thinking-dots {
+    display: inline-flex;
+    gap: 4px;
+    align-items: center;
+  }
+  .thinking-dots span {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--muted);
+    animation: pulse 1.1s infinite ease-in-out;
+  }
+  .thinking-dots span:nth-child(2) { animation-delay: 0.15s; }
+  .thinking-dots span:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes pulse {
+    0%, 80%, 100% { opacity: 0.25; transform: scale(0.85); }
+    40% { opacity: 1; transform: scale(1); }
+  }
+
+  .chips {
+    margin-top: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .chip {
+    background: var(--chip-bg);
+    color: var(--chip-fg);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 3px 10px;
+    font-size: 11px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  .card-wrap {
+    margin-top: 10px;
+  }
+  iframe.card-frame {
+    display: block;
+    width: 100%;
+    min-height: 24px;
+    height: 24px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    background: #fff;
+    transition: height 0.15s ease;
+    /* content-box, not the page-wide border-box default: the height we
+       set from the card's own reported content size must land exactly on
+       the iframe's *interior* viewport, or the 1px border eats into it
+       and the card's own content overflows by that sliver, showing a
+       spurious scrollbar right at the fit boundary -- see FRICTION_LOG.md. */
+    box-sizing: content-box;
+  }
+
+  details.turn-details {
+    margin-top: 8px;
+  }
+  details.turn-details summary {
+    cursor: pointer;
+    color: var(--muted);
+    font-size: 12px;
+    user-select: none;
+  }
+  details.turn-details pre {
+    margin: 6px 0 0;
+    padding: 10px;
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 11px;
+    color: var(--chip-fg);
+    overflow-x: auto;
+    max-height: 240px;
+    overflow-y: auto;
+  }
+
+  footer {
+    flex: 0 0 auto;
+    padding: 10px 20px 18px;
+    border-top: 1px solid var(--border);
+  }
+  .input-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+  #textInput {
+    flex: 1 1 auto;
+    background: var(--panel-bg);
+    color: var(--fg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 16px;
+  }
+  #textInput:focus { outline: none; border-color: var(--accent); }
+  .round-btn {
+    flex: 0 0 auto;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    background: var(--panel-bg);
+    color: var(--fg);
+    font-size: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .round-btn:hover { border-color: var(--accent); }
+  #micBtn.listening {
+    background: var(--accent);
+    color: #04101f;
+    animation: mic-pulse 1s infinite;
+  }
+  @keyframes mic-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(77, 141, 255, 0.55); }
+    50% { box-shadow: 0 0 0 8px rgba(77, 141, 255, 0); }
+  }
+  #sendBtn {
+    background: var(--accent);
+    color: #04101f;
+    border: none;
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div class="badge-row">
+      <span class="badge">Simulated Alexa+</span>
+      <span class="badge-note">Not the real Alexa+ client -- a local stand-in for demoing FixIt.</span>
+    </div>
+    <div class="header-controls">
+      <button type="button" class="ctrl-btn" id="newConvoBtn">New conversation</button>
+      <button type="button" class="ctrl-btn" id="muteBtn">Mute replies</button>
+    </div>
+  </header>
+
+  <div id="conversation"></div>
+
+  <footer>
+    <div class="input-row">
+      <input id="textInput" type="text" placeholder="Ask about an appliance error code..." autocomplete="off" />
+      <button type="button" class="round-btn" id="micBtn" title="Speak">&#127908;</button>
+      <button type="button" class="round-btn" id="sendBtn" title="Send">&#10148;</button>
+    </div>
+  </footer>
+</div>
+
+<script>
+  // This page is the demo's MCP Apps HOST: it renders diagnose_error's
+  // card in a sandboxed iframe and answers the card's own postMessage
+  // handshake, matching modelcontextprotocol/ext-apps
+  // specification/2026-01-26/apps.mdx AND what src/fixit_mcp/apps/
+  // diagnose_card.html's actual script does (confirmed by reading it, not
+  // guessed): it sends one `ui/initialize` request and never sends
+  // `ui/notifications/initialized`, so this host answers `ui/initialize`
+  // and then immediately pushes `ui/notifications/tool-input` and
+  // `ui/notifications/tool-result` -- it does not wait for an
+  // `initialized` notification the card will never send.
+  //
+  // Deliberate spec deviation: the spec requires web hosts to wrap the
+  // View in a double-iframe Sandbox Proxy (host and sandbox on different
+  // origins). This demo instead renders the card in a single directly
+  // sandboxed iframe (`sandbox="allow-scripts"`, never combined with
+  // `allow-same-origin`) -- the spec's simpler "Desktop/Native hosts"
+  // path. Without `allow-same-origin` the iframe still gets a unique
+  // opaque origin distinct from this page, so the isolation goal (the
+  // card can't reach this page's DOM) holds without the second origin
+  // hop. See demo/README.md.
+  //
+  // The functions above the "DOM wiring" marker are pure/DOM-free by
+  // design, the same way diagnose_card.html's buildCardHtml is, so they
+  // can be exercised directly in Node -- see
+  // tests/unit/test_demo_web_ui.py.
+
+  var CARD_STATUSES = ["found", "not_found", "ambiguous_appliance"];
+
+  function formatArgs(args) {
+    var keys = Object.keys(args || {});
+    return keys.map(function (k) { return k + "=" + args[k]; }).join(", ");
+  }
+
+  function formatChipText(toolCall) {
+    var argsText = formatArgs(toolCall.arguments);
+    var latency = Math.round(toolCall.latency_ms);
+    return toolCall.name + (argsText ? "(" + argsText + ")" : "()") + " · " + latency + "ms";
+  }
+
+  // Decides which tool_call a turn's card (if any) belongs to, so the
+  // host knows which arguments/result to push through the handshake.
+  // Pure: takes the parsed /chat response, returns a plain object or
+  // null, touches no DOM.
+  function pickCardForTurn(response) {
+    if (!response || !response.card) {
+      return null;
+    }
+    var calls = response.tool_calls || [];
+    var owner = null;
+    for (var i = 0; i < calls.length; i++) {
+      var call = calls[i];
+      if (call.result && CARD_STATUSES.indexOf(call.result.status) !== -1) {
+        owner = call;
+        break;
+      }
+    }
+    if (!owner) {
+      owner = calls[0] || null;
+    }
+    return {
+      html: response.card.html,
+      structuredContent: owner ? owner.result : null,
+      arguments: owner ? owner.arguments : {},
+    };
+  }
+
+  function buildInitResult(id) {
+    return {
+      jsonrpc: "2.0",
+      id: id,
+      result: {
+        protocolVersion: "2026-01-26",
+        hostCapabilities: {},
+        hostInfo: { name: "fixit-demo-web", version: "0.1.0" },
+        hostContext: { theme: "dark", displayMode: "inline" },
+      },
+    };
+  }
+
+  function buildToolInputNotification(args) {
+    return {
+      jsonrpc: "2.0",
+      method: "ui/notifications/tool-input",
+      params: { arguments: args || {} },
+    };
+  }
+
+  function buildToolResultNotification(structuredContent) {
+    return {
+      jsonrpc: "2.0",
+      method: "ui/notifications/tool-result",
+      params: {
+        content: [{ type: "text", text: JSON.stringify(structuredContent) }],
+        structuredContent: structuredContent,
+      },
+    };
+  }
+
+  // The card's own template has no SDK and never reports its size (no
+  // ResizeObserver-based size-changed notification). This host can't
+  // measure a sandboxed cross-origin iframe's content directly (that
+  // would require allow-same-origin, which requirement #4 forbids
+  // pairing with allow-scripts), so instead of touching the server's
+  // committed diagnose_card.html, this appends a small inline script to
+  // the HTML *this page* hands the iframe as srcdoc -- the file served by
+  // the MCP server via resources/read is never modified. That script
+  // reports document size the same way the spec says a View's SDK would.
+  function withSizeReporter(html) {
+    var reporter =
+      "<" + "script>(function(){" +
+      "function report(){" +
+      "var d=document.documentElement;" +
+      "window.parent.postMessage({jsonrpc:'2.0',method:'ui/notifications/size-changed'," +
+      "params:{width:d.scrollWidth,height:d.scrollHeight}},'*');" +
+      "}" +
+      "if(window.ResizeObserver){new ResizeObserver(report).observe(document.documentElement);}" +
+      "window.addEventListener('load',report);" +
+      "setTimeout(report,50);" +
+      "setTimeout(report,300);" +
+      "})();</" + "script>";
+    return html + reporter;
+  }
+
+  // ---- DOM wiring below (impure, not covered by the Node pure-function tests) ----
+
+  (function () {
+    var conversation = document.getElementById("conversation");
+    var textInput = document.getElementById("textInput");
+    var sendBtn = document.getElementById("sendBtn");
+    var micBtn = document.getElementById("micBtn");
+    var muteBtn = document.getElementById("muteBtn");
+    var newConvoBtn = document.getElementById("newConvoBtn");
+
+    function newSessionId() {
+      if (window.crypto && typeof window.crypto.randomUUID === "function") {
+        return window.crypto.randomUUID();
+      }
+      return "session-" + Date.now() + "-" + Math.random().toString(16).slice(2);
+    }
+
+    var sessionId = newSessionId();
+    var muted = false;
+    var recognizing = false;
+    var cardsByWindow = new WeakMap();
+
+    function clearConversation() {
+      while (conversation.firstChild) {
+        conversation.removeChild(conversation.firstChild);
+      }
+    }
+
+    function scrollToBottom() {
+      conversation.scrollTop = conversation.scrollHeight;
+    }
+
+    function addUserBubble(text) {
+      var turn = document.createElement("div");
+      turn.className = "turn";
+      var bubble = document.createElement("div");
+      bubble.className = "msg user";
+      bubble.textContent = text;
+      turn.appendChild(bubble);
+      conversation.appendChild(turn);
+      scrollToBottom();
+      return turn;
+    }
+
+    function addThinkingBubble(turn) {
+      var bubble = document.createElement("div");
+      bubble.className = "msg assistant";
+      bubble.style.marginTop = "8px";
+      var dots = document.createElement("span");
+      dots.className = "thinking-dots";
+      for (var i = 0; i < 3; i++) {
+        var dot = document.createElement("span");
+        dots.appendChild(dot);
+      }
+      bubble.appendChild(dots);
+      turn.appendChild(bubble);
+      scrollToBottom();
+      return bubble;
+    }
+
+    function renderCard(container, cardData) {
+      var iframe = document.createElement("iframe");
+      iframe.setAttribute("sandbox", "allow-scripts");
+      iframe.className = "card-frame";
+      container.appendChild(iframe);
+      iframe.srcdoc = withSizeReporter(cardData.html);
+      cardsByWindow.set(iframe.contentWindow, {
+        el: iframe,
+        structuredContent: cardData.structuredContent,
+        arguments: cardData.arguments,
+      });
+    }
+
+    window.addEventListener("message", function (event) {
+      var entry = cardsByWindow.get(event.source);
+      if (!entry) {
+        return;
+      }
+      var data = event.data;
+      if (!data || typeof data !== "object") {
+        return;
+      }
+      if (data.method === "ui/initialize" && data.id !== undefined) {
+        event.source.postMessage(buildInitResult(data.id), "*");
+        event.source.postMessage(buildToolInputNotification(entry.arguments), "*");
+        event.source.postMessage(buildToolResultNotification(entry.structuredContent), "*");
+        return;
+      }
+      if (data.method === "ui/notifications/size-changed" && data.params) {
+        var height = data.params.height;
+        if (typeof height === "number" && height > 0) {
+          // +2px: a small safety margin against sub-pixel rounding
+          // differences between the reported scrollHeight and the actual
+          // layout box, so content never overflows its own iframe by a
+          // sliver and shows a spurious scrollbar right at the fit
+          // boundary (see FRICTION_LOG.md).
+          entry.el.style.height = Math.min(height + 2, 900) + "px";
+        }
+      }
+    });
+
+    function renderChips(container, toolCalls) {
+      if (!toolCalls || !toolCalls.length) {
+        return;
+      }
+      var chips = document.createElement("div");
+      chips.className = "chips";
+      for (var i = 0; i < toolCalls.length; i++) {
+        var chip = document.createElement("span");
+        chip.className = "chip";
+        chip.textContent = formatChipText(toolCalls[i]);
+        chips.appendChild(chip);
+      }
+      container.appendChild(chips);
+    }
+
+    function renderDetails(container, toolCalls) {
+      if (!toolCalls || !toolCalls.length) {
+        return;
+      }
+      var details = document.createElement("details");
+      details.className = "turn-details";
+      var summary = document.createElement("summary");
+      summary.textContent = "Details (raw MCP tool calls)";
+      var pre = document.createElement("pre");
+      pre.textContent = JSON.stringify(toolCalls, null, 2);
+      details.appendChild(summary);
+      details.appendChild(pre);
+      container.appendChild(details);
+    }
+
+    function speak(text) {
+      if (muted || !("speechSynthesis" in window) || !text) {
+        return;
+      }
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+    }
+
+    function sendMessage(text) {
+      var trimmed = (text || "").trim();
+      if (!trimmed) {
+        return;
+      }
+      textInput.value = "";
+      var turn = addUserBubble(trimmed);
+      var thinking = addThinkingBubble(turn);
+
+      fetch("/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: trimmed, session_id: sessionId }),
+      })
+        .then(function (response) {
+          if (!response.ok) {
+            throw new Error("HTTP " + response.status);
+          }
+          return response.json();
+        })
+        .then(function (data) {
+          thinking.className = "msg assistant";
+          thinking.textContent = data.reply_text || "(no reply text)";
+          renderChips(turn, data.tool_calls);
+          var cardData = pickCardForTurn(data);
+          if (cardData) {
+            var cardWrap = document.createElement("div");
+            cardWrap.className = "card-wrap";
+            turn.appendChild(cardWrap);
+            renderCard(cardWrap, cardData);
+          }
+          renderDetails(turn, data.tool_calls);
+          scrollToBottom();
+          speak(data.reply_text);
+        })
+        .catch(function () {
+          thinking.className = "msg assistant error";
+          thinking.textContent = "Sorry, something went wrong reaching FixIt. Please try again.";
+          scrollToBottom();
+        });
+    }
+
+    sendBtn.addEventListener("click", function () {
+      sendMessage(textInput.value);
+    });
+    textInput.addEventListener("keydown", function (event) {
+      if (event.key === "Enter") {
+        sendMessage(textInput.value);
+      }
+    });
+
+    newConvoBtn.addEventListener("click", function () {
+      sessionId = newSessionId();
+      clearConversation();
+    });
+
+    var speechSupported = "speechSynthesis" in window;
+    if (!speechSupported) {
+      muteBtn.style.display = "none";
+    } else {
+      muteBtn.addEventListener("click", function () {
+        muted = !muted;
+        muteBtn.textContent = muted ? "Unmute replies" : "Mute replies";
+        if (muted) {
+          window.speechSynthesis.cancel();
+        }
+      });
+    }
+
+    var SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognitionCtor) {
+      micBtn.style.display = "none";
+    } else {
+      micBtn.addEventListener("click", function () {
+        if (recognizing) {
+          return;
+        }
+        var recognizer = new SpeechRecognitionCtor();
+        recognizer.lang = "en-US";
+        recognizer.continuous = false;
+        recognizer.interimResults = false;
+        recognizing = true;
+        micBtn.classList.add("listening");
+        recognizer.onresult = function (event) {
+          var transcript = event.results[0][0].transcript;
+          sendMessage(transcript);
+        };
+        recognizer.onerror = function () {
+          recognizing = false;
+          micBtn.classList.remove("listening");
+        };
+        recognizer.onend = function () {
+          recognizing = false;
+          micBtn.classList.remove("listening");
+        };
+        recognizer.start();
+      });
+    }
+  })();
+</script>
+</body>
+</html>

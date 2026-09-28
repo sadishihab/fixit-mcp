@@ -21,12 +21,13 @@ from mcp import ClientSession
 
 from demo.mcp_session import ToolDef
 
-# A tool result counts as the "found" case worth fetching a card for when
-# its structuredContent has this shape -- generalized rather than
-# hardcoded to diagnose_error by name, so any future tool with a ui card
-# and the same found/not_found/ambiguous convention gets the same behavior
-# for free.
-_FOUND_STATUS = "found"
+# A tool result is worth fetching a card for when its structuredContent's
+# status is one of these -- generalized rather than hardcoded to
+# diagnose_error by name, so any future tool with a ui card and the same
+# found/not_found/ambiguous_appliance convention gets the same behavior for
+# free. Any other status (or a tool with no resourceUri at all) gets no
+# card -- see demo/README.md.
+_CARD_STATUSES = frozenset({"found", "not_found", "ambiguous_appliance"})
 
 MAX_REPLY_TOKENS = 1024
 DEFAULT_TEMPERATURE = 0.3
@@ -209,7 +210,7 @@ async def run_turn(
                 card is None
                 and not is_error
                 and record.result is not None
-                and record.result.get("status") == _FOUND_STATUS
+                and record.result.get("status") in _CARD_STATUSES
                 and resource_uri_by_name.get(name)
             ):
                 resource_uri = resource_uri_by_name[name]
