@@ -12,6 +12,7 @@ ALLOWED = {
     "111122223333",  # AWS documentation example
     "123456789012",  # AWS documentation example
     "999999999999",  # our test dummy (same length as a real id)
+    "424242424242",  # this file's own scanner-catches-a-leak sample, below
 }
 PATTERNS = [
     re.compile(r"arn:aws[a-z-]*:[a-z0-9-]+:[a-z0-9-]*:(\d{12}):"),
