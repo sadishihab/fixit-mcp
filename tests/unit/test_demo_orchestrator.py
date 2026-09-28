@@ -176,6 +176,42 @@ def test_system_prompt_forbids_treating_an_empty_warning_list_as_confirmed_safe(
     assert "own explanation" in prompt  # also forbids adding unstated causes/consequences
 
 
+def test_system_prompt_forbids_repeating_meaning_and_likely_causes() -> None:
+    """Regression: step 6e's live verification caught a tE1 reply saying
+    'which means temperature sensor failure. The likely cause is
+    temperature sensor failure' -- meaning and likely_causes said the same
+    thing twice in one reply. See FRICTION_LOG.md."""
+    prompt = build_system_prompt("house-002")
+
+    assert "meaning" in prompt
+    assert "likely_causes" in prompt
+    assert "state it once, not both" in prompt
+
+
+def test_system_prompt_restricts_not_found_replies_to_what_the_result_supports() -> None:
+    """Regression: step 6e's live verification caught a not_found reply
+    saying 'it's not documented for your LG dryer' and suggesting the
+    customer contact LG support -- not_found means the whole index was
+    searched, not one appliance, and the tool never suggested contacting
+    anyone. Only nearest_matches and a suggest_add_appliance-based
+    suggestion are tool-grounded content for this status. See
+    FRICTION_LOG.md."""
+    prompt = build_system_prompt("house-002")
+
+    assert "not_found" in prompt
+    assert "never name a brand or appliance" in prompt
+    assert "nearest_matches" in prompt
+    assert "adding the appliance" in prompt
+    assert "never suggest contacting support" in prompt
+
+
+def test_system_prompt_caps_replies_to_two_sentences_unless_steps_are_asked_for() -> None:
+    prompt = build_system_prompt("house-002")
+
+    assert "at most two sentences" in prompt
+    assert "full repair steps" in prompt
+
+
 # --- run_turn: plain reply, no tool use -------------------------------------------------
 
 

@@ -2358,3 +2358,66 @@ full detail behind each number.
   -- for a card with no self-reporting SDK, a host-side srcdoc-injected
   reporter is the option actually available; worth stating explicitly next
   time this class of requirement comes up in this project's docs.
+
+### 2026-09-28 — Step 6e: two more unstated-content leaks, caught only by reading a real conversation
+
+- **Tool/SDK**: `demo/orchestrator.py`'s `SYSTEM_PROMPT_TEMPLATE`, a real
+  deployed local FixIt MCP server, real Amazon Bedrock Converse calls
+  (`demo/static/index.html`'s `/chat` path), driven manually.
+- **Task attempted**: Exercise a live multi-turn conversation (tE1, a
+  safety follow-up, then a not_found code) and read the actual model
+  output, the same verification method step 6b's safety-prompt fix used.
+- **Steps taken**: Ran the same three-turn conversation twice against the
+  identical live server/tool data, once with the pre-6e system prompt and
+  once with the 6e prompt, and compared the real replies word for word.
+- **Expected**: A `found` reply states each fact once; a `not_found`
+  reply states only what the tool result actually supports (the code
+  isn't in the index, `nearest_matches` if any, a suggestion to add the
+  appliance if the result says to) and nothing else.
+- **Actual (before)**:
+  - tE1: *"The tE1 code on your LG dryer means temperature sensor
+    failure. The likely cause is temperature sensor failure. To fix this,
+    turn off the dryer and call for service. This is a call for service
+    repair, so you'll need a technician to handle it."* -- `meaning` and
+    the sole `likely_causes` entry are the same fact, stated twice, plus
+    a fourth sentence restating `difficulty` as unstated advice ("you'll
+    need a technician").
+  - ZZ99 (`not_found`, `nearest_matches: []`, `suggest_add_appliance:
+    false`): *"I don't have any manual in my index that documents an
+    error code matching ZZ99. You might want to check your fridge's user
+    manual directly or contact the manufacturer for help with that
+    code."* -- the second sentence is pure invention; nothing in a
+    `not_found` result suggests contacting a manufacturer, and the reply
+    named an appliance ("your fridge") the search never actually
+    confirmed (the code wasn't found anywhere in the index, not
+    specifically ruled out for one appliance).
+  - The safety follow-up ("Is that dangerous?") was already correct
+    before this step, unaffected either way: *"The manual doesn't list a
+    specific safety warning for this code."*
+- **Actual (after)**: tE1: *"Code tE1 on your LG dryer means temperature
+  sensor failure, and the manual says to turn off the dryer and call for
+  service."* -- one sentence, each fact once. ZZ99: *"Code ZZ99 isn't in
+  the manuals we have."* -- states only what the result supports, and
+  correctly says nothing else since `nearest_matches` was empty and
+  `suggest_add_appliance` was false on this real record. Safety follow-up
+  unchanged.
+- **Severity**: Medium -- same class as step 6b's finding (rule 3's
+  "tools never fabricate" guarantee leaking back in at the LLM layer),
+  caught the same way: fake-based unit tests supply exactly the tool
+  result the test wrote and never let a real model free-associate a
+  restatement or an invented next step around it.
+- **Workaround**: Added three instructions to `SYSTEM_PROMPT_TEMPLATE`: a
+  two-sentence-unless-asked-for-steps length cap, a "don't restate the
+  same fact twice" rule (`meaning` vs `likely_causes` specifically), and
+  a `not_found`-specific rule naming exactly what that status supports
+  (no brand/appliance name, `nearest_matches` if non-empty, a
+  suggest_add_appliance-based suggestion if true, nothing else).
+  Regression tests assert each new instruction's presence in the prompt,
+  same style as the existing safety-prompt test.
+- **Actionable suggestion**: A `not_found` result's blank fields
+  (`appliance: null`, no brand anywhere in the JSON) are easy for a model
+  to read as "search this specific appliance and came up empty" rather
+  than "searched the whole index and never narrowed to an appliance at
+  all" -- when a schema's absence of a field is meant to convey a scope
+  boundary, not just missing data, the system prompt needs to say so
+  explicitly, the same lesson as step 6b's empty-`safety_warnings` case.
