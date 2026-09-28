@@ -1919,3 +1919,70 @@ Template for each entry:
   a V1-specific bug as the cause and makes it the single highest-value
   remaining mystery in the cold-start budget. AWS should document what
   that hold is.
+
+### 2026-09-28 — Step 5d: tested and ruled out the `GET /ping` hypothesis for the ~1s first-tool-call hold
+
+- **Tool/SDK**: AgentCore Runtime docs (`runtime-service-contract.md`,
+  `runtime-http-protocol-contract.md`, `runtime-mcp-protocol-contract.md`,
+  `runtime-troubleshooting.md`), CloudWatch Logs on the live `fixit_mcp`
+  runtime (`GetLogEvents`, container access-log stream).
+- **Task attempted**: Test the hypothesis that the platform waits on a
+  `GET /ping` health check (which 404s on our server -- FastMCP has no
+  such route) before forwarding the first real request in a new session,
+  and that wait is the ~1s hold noted in step 4c and reproduced identically
+  under V2 in step 5b. Investigate only; no code change unless the
+  evidence supported it.
+- **Steps taken**:
+  1. Read the AgentCore Runtime service-contract docs directly (not
+     secondhand). Finding: `GET /ping` is documented **only** under the
+     HTTP protocol contract (port 8080, alongside `/invocations`) as a
+     liveness/idle-timeout signal ("Verifies that your agent is
+     operational and ready to handle requests" / drives the 15-minute
+     idle-session timeout via `Healthy`/`HealthyBusy`). The **MCP protocol
+     contract**'s "Path requirements" section lists exactly one path --
+     `POST /mcp` -- and never mentions `/ping` at all. Nothing in any of
+     the four contract pages describes `/ping` as gating or delaying
+     forwarding of a session's first request; every documented use is
+     liveness/idle-timeout, not readiness-gating.
+  2. Generated one fresh cold session
+     (`measure_runtime_latency.py --agent-arn ... --cold 1 --warm 0`) and
+     pulled the exact CloudWatch container log lines for that session
+     immediately after (`GetLogEvents` on the current `runtime-logs-*`
+     stream, millisecond timestamps from our own uvicorn access log --
+     `127.0.0.1` addresses, so no network/TLS time is mixed in).
+- **Expected**: A `GET /ping` (or the periodic MCP `PingRequest` keepalive)
+  landing inside the gap between the client's `initialize` completing and
+  the server starting to process the first tool call.
+- **Actual**: The real timeline for that session:
+  ```
+  13:18:58.898  POST /mcp  200 OK        <- initialize response
+  13:18:59.384  POST /mcp  202 Accepted  <- notifications/initialized
+                ---- 1037ms gap, nothing logged ----
+  13:19:00.421  "Processing request of type CallToolRequest"  <- diagnose_error begins
+  13:19:00.540  tool_call_completed (118ms handler)
+  13:19:00.557  POST /mcp  200 OK        <- tool call response
+  13:19:00.821  GET /ping  404 Not Found <- the only GET /ping in the window,
+                                             ~400ms AFTER the tool call already finished
+  ```
+  The periodic MCP `PingRequest` keepalive (separate connection, steady
+  ~2005ms cadence: `13:18:58.819`, `13:19:00.824`, `13:19:02.829`, ...)
+  doesn't land inside the 1037ms gap either -- the nearest one is *after*
+  the gap closes. **Neither `GET /ping` nor an MCP `PingRequest` occurs
+  anywhere in the hold.** This also refines step 4c's original qualitative
+  note ("the platform holding that request... with its own MCP ping
+  arriving in between") -- with precise timestamps, the ping doesn't
+  actually arrive inside the gap; that was an imprecise read of noisier
+  logs at the time.
+- **Severity**: N/A -- this is a negative result, which is the point of
+  testing a hypothesis before building on it.
+- **Workaround**: None -- per instructions, stopped here and did not add a
+  `/ping` route or touch any code. The ~1s hold is confirmed real (all
+  timestamps are internal, not RTT) and confirmed platform-version-
+  independent (step 5b), but its cause is still unknown. `/ping` and the
+  MCP keepalive are both ruled out.
+- **Actionable suggestion**: Unchanged from step 4c/5b -- AWS should
+  document what happens internally between a session's `initialize`
+  completing and its first tool call being dispatched. The docs gap here
+  isn't that `/ping`'s role for MCP is unclear (it's fairly clear: HTTP-
+  protocol-only, liveness/idle-timeout) -- it's that nothing documents
+  *this specific* internal gap at all.
