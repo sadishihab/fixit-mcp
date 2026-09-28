@@ -50,7 +50,10 @@ deploy to Amazon Bedrock AgentCore Runtime.
   — matching both the Alexa+ Toolkit's requirements and Amazon Bedrock
   AgentCore Runtime's container contract for a future deployment.
 - **Latency**: no LLM calls in any tool handler; `tests/integration/test_latency.py`
-  asserts p95 < 100ms locally over 50 calls (well under the 500ms Alexa+ budget).
+  asserts p95 < 100ms locally over 50 calls. On the deployed AgentCore Runtime,
+  **warm calls fit the 500ms Alexa+ budget** (~200-250ms p50 in-region); **cold
+  sessions are a known limitation** (a brand-new session can cost ~5s end to
+  end) — see `FRICTION_LOG.md`'s "Cold-start latency: known limitation" entry.
 - Full requirement-by-requirement checklist: [`docs/alexa-plus-requirements.md`](docs/alexa-plus-requirements.md).
 
 ## Quickstart

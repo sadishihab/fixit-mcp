@@ -1986,3 +1986,75 @@ Template for each entry:
   isn't that `/ping`'s role for MCP is unclear (it's fairly clear: HTTP-
   protocol-only, liveness/idle-timeout) -- it's that nothing documents
   *this specific* internal gap at all.
+
+### Cold-start latency: known limitation
+
+Consolidates steps 4c, 5a, 5b, and 5d. This is the closing summary for the
+cold-start investigation, not a new finding -- see those entries for the
+full detail behind each number.
+
+- **Measured numbers** (all from Dhaka, ~320ms RTT to us-east-1;
+  `scripts/measure_runtime_latency.py`):
+  - **V1** (`platformVersion` unset, step 4c): cold `initialize`
+    6.3-8.4s before the runtime's warm pool existed, 1.3-2.1s (p50 1.57s)
+    once it did.
+  - **V2** (`platformVersion: "V2"`, step 5b): cold `initialize`
+    2.8-3.1s (p50 2.88s), measured immediately after the platform
+    update, before any V2-specific warm pool had a chance to fill --
+    the fair comparison is V1's unwarmed number, against which V2 is
+    2-3x faster; against V1's warm-pool number, V2's raw figure is
+    higher (though ~1s of that gap is Dhaka's TLS RTT that AWS's own
+    EC2-to-EC2 P75 benchmark wouldn't pay).
+  - **First tool call in a new session: ~2s on both platform versions**
+    (V1 1.94-2.15s, V2 2.04-2.34s) -- statistically the same, including a
+    **~1.0s internal platform hold** between `initialize` completing and
+    the server starting to process the first tool call. Step 5d confirmed
+    with real CloudWatch timestamps that neither `GET /ping` nor the
+    periodic MCP `PingRequest` keepalive occurs inside that hold, so
+    neither explains it. Cause still unknown.
+  - **Total cold session cost (init + first tool call): ~5s**, on both
+    platform versions, from here.
+  - **Warm path**: fits the 500ms budget once RTT is discounted to an
+    in-region customer (~200-250ms p50 estimated in-region, vs. the
+    ~572-645ms client-side measured from Dhaka).
+- **Documented vs. inferred**:
+  - **Undocumented**: whether Alexa+'s `Mcp-Session-Id` maps to one
+    session per conversation, one per turn, or something else (step 5a --
+    the single fact that would tell us how often a real Alexa+
+    conversation pays the cold-start cost above). Also undocumented: what
+    happens internally between a session's `initialize` completing and
+    its first tool call being dispatched (the ~1.0s hold, step 5d).
+  - **Documented**: AgentCore's 10-VM warm pool and per-session microVM
+    model (step 4c); `platformVersion` V1 vs. V2 and V2's ~2s P75 cold
+    start claim (step 5a/5b); `/ping`'s role as an HTTP-protocol-only
+    liveness/idle-timeout signal, not part of the MCP contract and not
+    documented as gating traffic (step 5d).
+- **What we did**: set `platformVersion: "V2"` explicitly instead of
+  silently inheriting AWS's V1 default (step 5b) -- a real, low-cost,
+  low-risk win for the unwarmed-pool case, already deployed.
+- **What we did not do**: any application-level mitigation. Specifically
+  not attempted: keep-alive pings to hold a session's own microVM warm
+  between customer turns (per-session isolation means this only helps if
+  Alexa+ actually reuses the same `Mcp-Session-Id`, which is unknown);
+  measuring from AWS CloudShell in-region to separate real platform cold
+  cost from Dhaka's RTT cleanly; provisioned/reserved capacity (Instances
+  compute type, `capacityProviderConfiguration`) to eliminate microVM
+  cold starts entirely, unevaluated for cost or fit against our stateless,
+  bursty workload.
+- **The bottom line**: warm calls comfortably fit the 500ms Alexa+ budget.
+  Cold sessions do not, by roughly an order of magnitude, on either
+  platform version, and that is a known, currently unmitigated limitation
+  of this deployment -- not a solved problem. Whether that limitation
+  matters in practice for a real Alexa+ conversation depends entirely on
+  the undocumented `Mcp-Session-Id` reuse policy above, which can only be
+  learned by testing against a real Alexa+ client, not by further
+  measurement of our own runtime.
+- **Suggestions for AWS/Amazon**:
+  1. Document whether/how Alexa+'s MCP client reuses `Mcp-Session-Id`
+     across conversation turns and across separate conversations --
+     `mcp-toolkit-client-lifecycle.html` currently says only that "the
+     session is based on the customer's previous conversations," which
+     doesn't answer this.
+  2. Document what happens internally between a session's `initialize`
+     completing and its first tool call being dispatched, and why it
+     costs ~1s independent of platform version or warm-pool state.
