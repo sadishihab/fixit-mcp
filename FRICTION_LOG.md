@@ -1848,3 +1848,74 @@ Template for each entry:
   reference should state `platformVersion`'s default and valid values
   (`V1`/`V2`) directly, not require cross-referencing a blog post and a
   service model with no enum to find them.
+
+### 2026-09-28 — Step 5b live measurement: V2 beats V1's cold-start-from-scratch case, but the ~2s first-tool-call tax survives the platform switch unchanged
+
+- **Tool/SDK**: The live `fixit_mcp` AgentCore Runtime, `scripts/deploy_runtime.py`,
+  `scripts/smoke_test.py`, `scripts/measure_runtime_latency.py`.
+- **Task attempted**: Deploy `platformVersion: "V2"` to the real runtime
+  (step 5b), confirm it took effect and functional checks still pass, and
+  measure cold/warm latency against step 4c's V1 numbers.
+- **Steps taken**: `make deploy-runtime` with `FIXIT_AGENTCORE_MEMORY_ID`
+  set. Confirmed via `GetAgentRuntime` on both versions:
+  `agentRuntimeVersion` 1 reports `platformVersion: "V1"` explicitly (not
+  omitted -- resolves the "unconfirmed" question in the entry above) and
+  version 2 reports `"V2"`. Same `agentRuntimeId`/ARN throughout -- an
+  in-place `UpdateAgentRuntime` (not a recreate), and it wasn't denied.
+  `make runtime-smoke`: 8/8 functional checks pass; the pre-existing
+  latency check still fails from here (as in step 4c -- RTT-dominated, not
+  a regression). `measure_runtime_latency.py --agent-arn ...` (defaults:
+  5 cold sessions, 30 warm calls), run from Dhaka: TCP-connect RTT p50
+  316.6ms / p95 327.1ms, essentially identical to step 4c's laptop numbers,
+  so the two runs are comparable.
+- **Expected**: Cold `initialize` around AWS's documented ~2s P75 for V2,
+  and some improvement to the first-tool-call cost too.
+- **Actual**:
+  - **Cold `initialize`** (n=5): 2880.2, 3093.5, 2866.7, 2931.9, 2780.3ms
+    -- p50 2880.2ms, p95 3093.5ms, min 2780.3ms, max 3093.5ms.
+  - **Cold first `diagnose_error` in the new session** (n=5): 2254.9,
+    2187.3, 2337.6, 2113.9, 2040.9ms -- p50 2187.3ms, p95 2337.6ms.
+  - **Warm `diagnose_error`** (n=30, same session): p50 571.8ms, p95
+    645.2ms, min 505.8ms, max 835.0ms. Server-side handler (CloudWatch):
+    p50 53.5ms, p95 105.2ms. Client p50 − RTT p50 − handler p50 = 201.7ms.
+  - **These 5 cold samples were taken right after the update**, before any
+    V2-specific warm pool had a chance to exist (step 4c found AWS's
+    10-VM pool fills only ~2 minutes *after* first traffic on a version).
+    So the fair V1 comparison is the *"before the warm pool existed"* row
+    (6.3-8.4s), not the *"with pool warm"* row (1.3-2.1s, p50 1.57s) -- and
+    against that, V2 is clearly faster (2.78-3.09s, roughly 2-3x). Against
+    the warm-pool V1 row, though, V2's raw numbers are **higher**, not
+    lower. Subtracting the ~1s of TLS-handshake RTT (3 round trips from
+    here, per step 4c) that AWS's own EC2-to-EC2 benchmark environment
+    wouldn't have paid gives a platform-side estimate of roughly 1.8-2.1s
+    -- in the neighborhood of the documented ~2s P75, but that's an
+    inference from subtraction, not a direct platform-only measurement, so
+    **I'm not calling this a confirmed hit on the P75 claim, just
+    plausible.**
+  - **The first-tool-call tax is unchanged.** Step 4c (V1): first tool
+    call in a new session was ~1.94-2.15s *regardless of warm-pool state*,
+    with "the platform holding that request about 1s before forwarding
+    it, with its own MCP ping arriving in between. Cause unknown." This
+    run (V2): 2.04-2.34s -- statistically the same. Switching platform
+    version did nothing to this component, whatever it is.
+  - **The warm path got slightly worse, not better, in this one run**: p50
+    571.8ms vs V1's 516-532ms, and the derived Runtime-overhead figure
+    rose to ~202ms vs V1's ~125-155ms p50. One run of 30 calls; step 4c
+    ran two independent rounds (30 and 60 calls) before trusting its V1
+    number, so this isn't yet distinguishable from noise.
+- **Severity**: Medium. Real improvement over an unwarmed pool, but not a
+  clean "problem solved": total cold-session cost (init + first tool call)
+  is still roughly 5s from here, still far over the 500ms budget for a
+  conversation's first turn, and the one component step 4c couldn't
+  explain (the ~2s first-tool-call hold) is now confirmed to be
+  independent of platform version.
+- **Workaround**: None decided yet. Worth remeasuring cold numbers again
+  once natural traffic (or a deliberate second cold burst) has had time to
+  fill a V2 warm pool, the way step 4c did for V1, before concluding V2's
+  warm-pool cold-start number is actually worse than V1's -- this run
+  never got that chance.
+- **Actionable suggestion**: The first-request-in-new-session ~1s hold is
+  now reproduced identically across two platform versions, which rules out
+  a V1-specific bug as the cause and makes it the single highest-value
+  remaining mystery in the cold-start budget. AWS should document what
+  that hold is.
