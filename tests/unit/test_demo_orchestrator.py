@@ -1,0 +1,312 @@
+"""demo.orchestrator: the Bedrock Converse tool-use loop, against a fake
+Bedrock client and a fake MCP session -- no AWS, no real server."""
+
+from __future__ import annotations
+
+from typing import Any
+
+from mcp import types
+
+from demo.mcp_session import ToolDef
+from demo.orchestrator import ConversationStore, build_system_prompt, build_tool_config, run_turn
+
+DIAGNOSE_TOOL = ToolDef(
+    name="diagnose_error",
+    description="Look up an error code.",
+    input_schema={"type": "object", "properties": {"error_code": {"type": "string"}}},
+    resource_uri="ui://fixit-mcp/diagnose-error-card",
+)
+LIST_TOOL = ToolDef(
+    name="list_my_appliances",
+    description="List appliances.",
+    input_schema={"type": "object"},
+    resource_uri=None,
+)
+
+
+class FakeConverse:
+    """Returns each of `responses` in order, one per call; records every
+    call's kwargs so tests can assert on what was sent to Bedrock.
+
+    `messages` is snapshotted (shallow-copied) at call time: run_turn
+    mutates the same list object across rounds, so storing the raw
+    reference would make every recorded call show the loop's *final*
+    message list instead of what that particular call actually saw."""
+
+    def __init__(self, responses: list[dict[str, Any]]) -> None:
+        self._responses = iter(responses)
+        self.calls: list[dict[str, Any]] = []
+
+    def __call__(self, **kwargs: Any) -> dict[str, Any]:
+        self.calls.append({**kwargs, "messages": list(kwargs["messages"])})
+        return next(self._responses)
+
+
+def _text_response(text: str) -> dict[str, Any]:
+    return {
+        "output": {"message": {"role": "assistant", "content": [{"text": text}]}},
+        "stopReason": "end_turn",
+    }
+
+
+def _tool_use_response(tool_use_id: str, name: str, input_: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "output": {
+            "message": {
+                "role": "assistant",
+                "content": [{"toolUse": {"toolUseId": tool_use_id, "name": name, "input": input_}}],
+            }
+        },
+        "stopReason": "tool_use",
+    }
+
+
+class FakeSession:
+    """Stands in for mcp.ClientSession's call_tool/read_resource."""
+
+    def __init__(
+        self,
+        call_tool_result: types.CallToolResult,
+        resource: types.ReadResourceResult | None = None,
+    ) -> None:
+        self._result = call_tool_result
+        self._resource = resource
+        self.calls: list[tuple[str, dict[str, Any]]] = []
+        self.read_resource_calls: list[str] = []
+
+    async def call_tool(self, name: str, arguments: dict[str, Any]) -> types.CallToolResult:
+        self.calls.append((name, arguments))
+        return self._result
+
+    async def read_resource(self, uri: str) -> types.ReadResourceResult:
+        self.read_resource_calls.append(uri)
+        assert self._resource is not None
+        return self._resource
+
+
+def _found_result(household_id: str = "house-002") -> types.CallToolResult:
+    return types.CallToolResult(
+        content=[types.TextContent(type="text", text="found")],
+        structuredContent={"status": "found", "appliance": {"brand": "LG"}, "meaning": "temperature sensor"},
+        isError=False,
+    )
+
+
+def _ambiguous_result() -> types.CallToolResult:
+    return types.CallToolResult(
+        content=[types.TextContent(type="text", text="ambiguous")],
+        structuredContent={"status": "ambiguous_appliance", "candidate_appliances": [{"brand": "LG"}]},
+        isError=False,
+    )
+
+
+def _card_resource() -> types.ReadResourceResult:
+    return types.ReadResourceResult(
+        contents=[
+            types.TextResourceContents(uri="ui://fixit-mcp/diagnose-error-card", text="<html>card</html>")
+        ]
+    )
+
+
+# --- build_tool_config / build_system_prompt -------------------------------------------------
+
+
+def test_build_tool_config_reflects_advertised_tools_not_a_hardcoded_list() -> None:
+    config = build_tool_config([DIAGNOSE_TOOL, LIST_TOOL])
+
+    assert config == {
+        "tools": [
+            {
+                "toolSpec": {
+                    "name": "diagnose_error",
+                    "description": "Look up an error code.",
+                    "inputSchema": {
+                        "json": {"type": "object", "properties": {"error_code": {"type": "string"}}}
+                    },
+                }
+            },
+            {
+                "toolSpec": {
+                    "name": "list_my_appliances",
+                    "description": "List appliances.",
+                    "inputSchema": {"json": {"type": "object"}},
+                }
+            },
+        ]
+    }
+
+
+def test_build_tool_config_empty_when_no_tools() -> None:
+    assert build_tool_config([]) is None
+
+
+def test_system_prompt_carries_household_id() -> None:
+    assert "house-002" in build_system_prompt("house-002")
+
+
+# --- run_turn: plain reply, no tool use -------------------------------------------------
+
+
+async def test_plain_reply_makes_no_tool_calls() -> None:
+    converse = FakeConverse([_text_response("Sure, what's the error code?")])
+    session = FakeSession(call_tool_result=_found_result())
+    history: list[dict[str, Any]] = []
+
+    result = await run_turn(
+        converse=converse,
+        model_id="test-model",
+        system_prompt="be helpful",
+        messages=history,
+        tool_defs=[DIAGNOSE_TOOL],
+        session=session,
+        user_message="my dryer is broken",
+    )
+
+    assert result.reply_text == "Sure, what's the error code?"
+    assert result.tool_calls == []
+    assert result.card is None
+    assert session.calls == []
+    # history now has the user turn and the assistant's reply.
+    assert len(history) == 2
+    assert history[0] == {"role": "user", "content": [{"text": "my dryer is broken"}]}
+
+
+# --- run_turn: one tool call, found -> card fetched -------------------------------------------------
+
+
+async def test_one_tool_call_found_returns_card() -> None:
+    converse = FakeConverse(
+        [
+            _tool_use_response("t1", "diagnose_error", {"error_code": "tE1", "household_id": "house-002"}),
+            _text_response("Your dryer's tE1 means a temperature sensor issue."),
+        ]
+    )
+    session = FakeSession(call_tool_result=_found_result(), resource=_card_resource())
+
+    result = await run_turn(
+        converse=converse,
+        model_id="test-model",
+        system_prompt="be helpful",
+        messages=[],
+        tool_defs=[DIAGNOSE_TOOL],
+        session=session,
+        user_message="my dryer shows tE1",
+    )
+
+    assert result.reply_text == "Your dryer's tE1 means a temperature sensor issue."
+    assert len(result.tool_calls) == 1
+    call = result.tool_calls[0]
+    assert call.name == "diagnose_error"
+    assert call.arguments == {"error_code": "tE1", "household_id": "house-002"}
+    assert call.result == {"status": "found", "appliance": {"brand": "LG"}, "meaning": "temperature sensor"}
+    assert call.latency_ms >= 0
+    assert session.calls == [("diagnose_error", {"error_code": "tE1", "household_id": "house-002"})]
+    assert result.card is not None
+    assert result.card.resource_uri == "ui://fixit-mcp/diagnose-error-card"
+    assert result.card.html == "<html>card</html>"
+    assert session.read_resource_calls == ["ui://fixit-mcp/diagnose-error-card"]
+
+    # the toolResult sent back to Bedrock carries the tool's structured content.
+    second_call_messages = converse.calls[1]["messages"]
+    tool_result_message = second_call_messages[-1]
+    assert tool_result_message["content"][0]["toolResult"]["toolUseId"] == "t1"
+    assert tool_result_message["content"][0]["toolResult"]["content"] == [
+        {"json": {"status": "found", "appliance": {"brand": "LG"}, "meaning": "temperature sensor"}}
+    ]
+
+
+# --- run_turn: ambiguous_appliance -> no card -------------------------------------------------
+
+
+async def test_ambiguous_appliance_follow_up_has_no_card() -> None:
+    converse = FakeConverse(
+        [
+            _tool_use_response("t1", "diagnose_error", {"error_code": "tE1", "household_id": "house-002"}),
+            _text_response("Which appliance is showing that code -- the dryer or the fridge?"),
+        ]
+    )
+    session = FakeSession(call_tool_result=_ambiguous_result())
+
+    result = await run_turn(
+        converse=converse,
+        model_id="test-model",
+        system_prompt="be helpful",
+        messages=[],
+        tool_defs=[DIAGNOSE_TOOL],
+        session=session,
+        user_message="tE1 on my appliance",
+    )
+
+    assert result.reply_text == "Which appliance is showing that code -- the dryer or the fridge?"
+    assert len(result.tool_calls) == 1
+    assert result.tool_calls[0].result["status"] == "ambiguous_appliance"
+    assert result.card is None
+    assert session.read_resource_calls == []
+
+
+# --- run_turn: tool error -------------------------------------------------
+
+
+async def test_tool_error_is_reported_to_bedrock_as_an_error_result() -> None:
+    error_result = types.CallToolResult(
+        content=[types.TextContent(type="text", text="boom")], structuredContent=None, isError=True
+    )
+    converse = FakeConverse(
+        [
+            _tool_use_response("t1", "diagnose_error", {"error_code": "tE1"}),
+            _text_response("Sorry, something went wrong looking that up."),
+        ]
+    )
+    session = FakeSession(call_tool_result=error_result)
+
+    result = await run_turn(
+        converse=converse,
+        model_id="test-model",
+        system_prompt="be helpful",
+        messages=[],
+        tool_defs=[DIAGNOSE_TOOL],
+        session=session,
+        user_message="tE1",
+    )
+
+    assert result.card is None
+    tool_result_message = converse.calls[1]["messages"][-1]
+    assert tool_result_message["content"][0]["toolResult"]["status"] == "error"
+
+
+# --- run_turn: max_rounds caps a runaway loop -------------------------------------------------
+
+
+async def test_max_rounds_caps_a_runaway_tool_use_loop() -> None:
+    converse = FakeConverse(
+        [_tool_use_response(f"t{i}", "diagnose_error", {"error_code": "tE1"}) for i in range(10)]
+    )
+    session = FakeSession(call_tool_result=_found_result(), resource=_card_resource())
+
+    result = await run_turn(
+        converse=converse,
+        model_id="test-model",
+        system_prompt="be helpful",
+        messages=[],
+        tool_defs=[DIAGNOSE_TOOL],
+        session=session,
+        user_message="tE1",
+        max_rounds=3,
+    )
+
+    assert len(result.tool_calls) == 3
+    assert len(converse.calls) == 3
+    assert result.reply_text  # a fallback message, not an exception or a hang
+
+
+# --- ConversationStore -------------------------------------------------
+
+
+def test_conversation_store_keeps_history_per_session_id() -> None:
+    store = ConversationStore()
+
+    a = store.get("session-a")
+    a.append({"role": "user", "content": [{"text": "hi"}]})
+
+    assert store.get("session-a") == [{"role": "user", "content": [{"text": "hi"}]}]
+    assert store.get("session-b") == []

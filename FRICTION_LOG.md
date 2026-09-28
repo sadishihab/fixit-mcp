@@ -2058,3 +2058,76 @@ full detail behind each number.
   2. Document what happens internally between a session's `initialize`
      completing and its first tool call being dispatched, and why it
      costs ~1s independent of platform version or warm-pool state.
+
+### 2026-09-28 — Step 6a: a fake that captures a mutable list by reference showed every recorded Bedrock call the loop's *final* message history, not what that call actually saw
+
+- **Tool/SDK**: `tests/unit/test_demo_orchestrator.py`'s `FakeConverse`,
+  Python's mutable-default-argument-adjacent footgun (a shared mutable
+  object captured by reference, not value).
+- **Task attempted**: Assert that the `toolResult` sent back to Bedrock on
+  the *second* Converse call (after a tool call) carries the tool's
+  structured content and the right `toolUseId`.
+- **Steps taken**: `run_turn` (`demo/orchestrator.py`) mutates one shared
+  `messages` list in place across every round of its loop (appending the
+  assistant's response, then the tool result, then looping). `FakeConverse`
+  recorded `kwargs` -- including `kwargs["messages"]` -- as-is in a list of
+  calls, then the test inspected `converse.calls[1]["messages"][-1]` after
+  `run_turn` had already returned.
+- **Expected**: `calls[1]["messages"]` frozen at 3 items (user, assistant
+  tool-use, user tool-result) -- the state at the moment of the *second*
+  `converse()` call.
+- **Actual**: `KeyError: 'toolResult'` -- `calls[1]["messages"][-1]` was
+  actually the assistant's *final* text message (4th item), because
+  `calls[0]["messages"]` and `calls[1]["messages"]` were never two lists;
+  they were two dict entries both pointing at the same list object, which
+  kept growing after each was "recorded." Inspecting either one after the
+  loop finished showed the loop's ending state, not either call's.
+- **Severity**: Low -- caught immediately by the test itself failing, never
+  reached committed code; the bug was in the test double, not in
+  `run_turn`, which was correct throughout.
+- **Workaround**: `FakeConverse.__call__` now stores
+  `{**kwargs, "messages": list(kwargs["messages"])}` -- a shallow copy at
+  call time -- so each recorded call is a snapshot, not a live view into a
+  list the code under test keeps mutating.
+- **Actionable suggestion**: Any fake that records `**kwargs` verbatim from
+  a caller that's known to mutate a passed-in list/dict afterward needs an
+  explicit snapshot, not just `kwargs.copy()`/`{**kwargs}` -- a shallow
+  copy of the outer dict still shares the same inner mutable list.
+
+### 2026-09-28 — Step 6a: a new uv dependency group needs `make test` updated too, or its tests silently never run
+
+- **Tool/SDK**: `uv` dependency groups (PEP 735), `pyproject.toml`,
+  Makefile.
+- **Task attempted**: Add FastAPI (and transitively uvicorn) for `demo/`
+  without adding them to the image the Dockerfile builds -- the demo is a
+  separate client application, never deployed, and `CLAUDE.md`/step 4a's
+  `uv sync --frozen --no-dev` in the Dockerfile already excludes every
+  non-default group.
+- **Steps taken**: `uv add --group demo fastapi`, which created a new
+  `[dependency-groups] demo = [...]` section, separate from `dev`. Ran
+  `make test` (`uv run pytest -v`, unchanged) to check the new demo tests
+  collected.
+- **Expected**: The new `tests/integration/test_demo_live.py` (which
+  imports `demo.app`, and therefore `fastapi`) either runs or is skipped
+  by its own `FIXIT_DEMO_TESTS` gate.
+- **Actual**: `uv run pytest` only installs the default group (`dev`) plus
+  the project itself -- a non-default group like `demo` is never installed
+  unless explicitly requested with `--group demo`. Without it, collecting
+  `test_demo_live.py` would fail at import time with `ModuleNotFoundError:
+  fastapi` for anyone who hasn't manually run `uv sync --group demo`
+  first -- not a skip, a collection error that would have broken `make
+  test` for every contributor except whoever happened to have the group
+  already installed locally.
+- **Severity**: Medium -- would have silently broken the single command
+  (`make test`) this project's own testing conventions say to run before
+  considering work done, for anyone starting from a clean checkout.
+- **Workaround**: Changed the Makefile's `test` target to
+  `uv run --group demo pytest -v` (this also installs the default `dev`
+  group, per uv's semantics -- `--group` adds to the defaults, it doesn't
+  replace them). The Dockerfile's `uv sync --frozen --no-dev` is
+  unaffected either way, since it never passes `--group demo`.
+- **Actionable suggestion**: Adding a new named dependency group is only
+  half the change -- grep for every place a plain `uv run`/`uv sync`
+  already exists (Makefile targets, CI, Dockerfiles) and decide explicitly
+  whether each one needs the new group, rather than assuming the default
+  group covers it.

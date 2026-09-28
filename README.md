@@ -212,6 +212,21 @@ make runtime-latency RUNTIME_ARN=<arn>   # cold vs warm latency, with the Runtim
 > Alexa+ conversation are gone in the next. Deploy with the `agentcore`
 > backend (below) instead, which keeps household data outside the container.
 
+## Simulated Alexa+ demo
+
+There's no real Alexa+ integration yet (see the OAuth row in
+[`docs/alexa-plus-requirements.md`](docs/alexa-plus-requirements.md)). In
+the meantime, [`demo/`](demo/README.md) is a local FastAPI backend that
+plays Alexa+'s role -- a real MCP client driving a tool-use LLM loop
+against this server, including the MCP Apps card -- so the tool-calling
+behavior can be exercised and demoed. Backend only, no web UI yet, always
+clearly labeled `"simulated_alexa_plus": true`.
+
+```bash
+make demo                                          # against the local dev server
+make demo AGENT_ARN=<deployed runtime ARN>          # against a deployed AgentCore Runtime
+```
+
 ## Running tests
 
 ```bash

@@ -1,12 +1,16 @@
 .PHONY: run test lint format inspector tunnel fetch-manuals parse-manuals extract-codes \
 	docker-build docker-run docker-smoke docker-run-agentcore seed-agentcore \
-	iam-policies docker-push deploy-runtime runtime-smoke runtime-latency teardown-runtime teardown-runtime-all
+	iam-policies docker-push deploy-runtime runtime-smoke runtime-latency teardown-runtime teardown-runtime-all \
+	demo
 
 run:
 	uv run python -m fixit_mcp
 
+# --group demo so demo/'s own tests (which import fastapi) collect --
+# demo/ is its own uv dependency group, never installed in the deployed
+# image (Dockerfile's `uv sync --no-dev` never requests it either).
 test:
-	uv run pytest -v
+	uv run --group demo pytest -v
 
 lint:
 	uv run ruff check .
@@ -24,6 +28,12 @@ inspector:
 # which is what Alexa+'s MCP Toolkit needs since it requires a remote HTTPS endpoint.
 tunnel:
 	cloudflared tunnel --url http://localhost:8000
+
+# Simulated-Alexa+ demo backend (demo/, see demo/README.md) -- NOT the real
+# Alexa+ client. Talks to the local dev FixIt server by default; pass
+# AGENT_ARN to point it at a deployed AgentCore Runtime instead (SigV4-signed).
+demo:
+	uv run --group demo python -m demo $(if $(AGENT_ARN),--agent-arn $(AGENT_ARN),)
 
 # Downloads manuals listed in data/manuals/manifest.yaml to data/manuals/pdf/.
 # Pass FORCE=1 to re-download files that already exist.
