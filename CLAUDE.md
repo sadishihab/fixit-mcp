@@ -331,6 +331,27 @@ Alexa+ MCP Toolkit and helps customers with home appliances:
   forward into the model's own reply, the same class of leak
   `FRICTION_LOG.md`'s step 6b/6e entries caught for other tools.
 
+- **Add-a-manual path** (step 11a, `scripts/add_manual.py`, `make add-manual`,
+  `CONTRIBUTING.md`). One command: validate args (duplicate id or brand+model
+  refused; an id already present with identical brand/model/type/url is treated
+  as a re-run, not a duplicate) -> download via `fetch_manuals.download_pdf`
+  (shared with `make fetch-manuals`) -> content check (model number, or its
+  series stem like `GFE28`, plus a troubleshooting/error-code keyword; runs on
+  `extract_lines` output so the encoding repair applies; `--force` overrides)
+  -> `--dry-run` stops here, touching nothing (download goes to a temp dir) ->
+  append to the manifest as text (comments preserved; a non-empty `--note` is
+  required, terms-of-use reminder printed) -> parse -> extract -> merge into
+  `error_codes.json`, replacing only that manual's records (others stay as raw
+  dicts). Bedrock extraction prints chunk count, token and cost estimates first
+  and needs `yes`/`--yes`; the stub refuses to overwrite fully extracted records
+  unless `--allow-downgrade`. `make validate-manifest`
+  (`scripts/validate_manifest.py`) checks required fields, unique ids and
+  brand+model, notes, seeded appliances' `manual_id`, and that every index
+  record has a manifest entry; `tests/unit/test_manifest_validation.py` runs it
+  on the real manifest, so `make test` covers it. A new manual only reaches the
+  deployed server after an image rebuild and runtime update, because the index
+  is baked into the image.
+
 ## Testing
 
 **Every change needs tests.** No exceptions for "small" changes.

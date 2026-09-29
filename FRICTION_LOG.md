@@ -2496,3 +2496,32 @@ full detail behind each number.
   MCP, log the failure path from day one, not just the success path -- the
   single biggest reason this incident couldn't be root-caused after the
   fact was that nothing recorded it happened at all.
+
+### 2026-09-30 — the "PDF must contain the model number" check failed 2 of our 5 real manuals
+
+- **Tool/SDK**: `scripts/add_manual.py` content check (step 11a).
+- **Task attempted**: Add the automated version of the Bosch spec-sheet lesson:
+  require the model number in the PDF text.
+- **Steps taken**: Before trusting the rule, ran it read-only over the five
+  already-downloaded, known-good manuals.
+- **Expected**: All five pass.
+- **Actual**: The GE fridge (`GFE28GYNFS`) and GE washer (`GTW680BSJWS`) failed:
+  they are series manuals that only print `GFE28` / `GTW680`, never the full
+  model. Both fine, real manuals.
+- **Severity**: Medium: a strict rule would have made `add-manual` reject the
+  very manuals the corpus is made of.
+- **Workaround**: Fall back to the series stem (model minus its trailing letter
+  run, at least 4 chars including a digit) and report it as "series", not
+  "exact". `--force` remains for anything else.
+- **Actionable suggestion**: Validate any new automated gate against the
+  existing known-good corpus before shipping it.
+
+### 2026-09-30 — PyMuPDF stamps a random file id, so the "idempotent re-run" test flapped
+
+- **Tool/SDK**: PyMuPDF `Document.tobytes()` (synthetic test PDFs).
+- **Actual**: Two builds of the "same" synthetic PDF differ byte for byte, so a
+  hash-snapshot idempotence test failed on the re-downloaded PDF, not on any
+  pipeline output.
+- **Severity**: Low. **Workaround**: build the synthetic PDF once
+  (`functools.cache`) so every mocked download serves identical bytes.
+

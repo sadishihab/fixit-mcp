@@ -1,4 +1,5 @@
 .PHONY: run test lint format inspector tunnel fetch-manuals parse-manuals extract-codes \
+	add-manual validate-manifest \
 	docker-build docker-run docker-smoke docker-run-agentcore seed-agentcore \
 	iam-policies docker-push deploy-runtime runtime-smoke runtime-latency teardown-runtime teardown-runtime-all \
 	demo
@@ -52,6 +53,21 @@ parse-manuals:
 # per-chunk cache.
 extract-codes:
 	uv run python scripts/extract_codes.py $(if $(MANUAL),--manual $(MANUAL),) $(if $(FORCE),--force,)
+
+# One command to extend the knowledge base: manifest entry + download + content
+# check + parse + extract + merge into data/index/error_codes.json. See
+# CONTRIBUTING.md. Required: ID BRAND MODEL TYPE URL NOTE. Optional: DRY_RUN=1
+# (check only, change nothing), FORCE=1 (override the content check), YES=1
+# (skip the Bedrock cost prompt). Avoid double quotes inside NOTE.
+add-manual:
+	uv run python scripts/add_manual.py --id "$(ID)" --brand "$(BRAND)" --model "$(MODEL)" \
+		--type "$(TYPE)" --url "$(URL)" --note "$(NOTE)" \
+		$(if $(DRY_RUN),--dry-run,) $(if $(FORCE),--force,) $(if $(YES),--yes,)
+
+# Checks every manifest entry (fields, unique ids, notes, seeded appliances'
+# manual_id). Also runs as part of `make test`.
+validate-manifest:
+	uv run python scripts/validate_manifest.py
 
 # --- Container (AgentCore Runtime target: linux/arm64) -----------------------
 # See README's "Running in Docker" section. On an x86_64 host, arm64 builds and

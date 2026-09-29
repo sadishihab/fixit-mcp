@@ -48,22 +48,18 @@ def _page_count(path: Path) -> int:
     return len(PdfReader(path).pages)
 
 
-def fetch_one(entry: dict, force: bool) -> FetchResult:
-    manual_id = entry["id"]
-    url = entry["source_url"]
-    dest = PDF_DIR / f"{manual_id}.pdf"
-
-    if dest.exists() and not force:
-        try:
-            return FetchResult(
-                manual_id, True, "already downloaded (skipped)", dest.stat().st_size, _page_count(dest)
-            )
-        except PdfReadError:
-            pass  # cached file is corrupt; fall through and re-download
-
+def download_pdf(
+    manual_id: str, url: str, dest: Path, *, transport: httpx.BaseTransport | None = None
+) -> FetchResult:
+    """GET `url`, keep it at `dest` only if it is a real, parseable PDF
+    (magic bytes + page count). Shared with scripts/add_manual.py so both use
+    exactly the same checks. `transport` exists so tests can mock all HTTP."""
     try:
         with httpx.Client(
-            follow_redirects=True, timeout=TIMEOUT_SECONDS, headers={"User-Agent": USER_AGENT}
+            follow_redirects=True,
+            timeout=TIMEOUT_SECONDS,
+            headers={"User-Agent": USER_AGENT},
+            transport=transport,
         ) as client:
             response = client.get(url)
             response.raise_for_status()
@@ -75,7 +71,7 @@ def fetch_one(entry: dict, force: bool) -> FetchResult:
         content_type = response.headers.get("content-type", "unknown")
         return FetchResult(manual_id, False, f"not a PDF (content-type={content_type!r})")
 
-    PDF_DIR.mkdir(parents=True, exist_ok=True)
+    dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_bytes(body)
 
     try:
@@ -85,6 +81,21 @@ def fetch_one(entry: dict, force: bool) -> FetchResult:
         return FetchResult(manual_id, False, f"downloaded but failed to parse as PDF: {exc}")
 
     return FetchResult(manual_id, True, "downloaded", len(body), pages)
+
+
+def fetch_one(entry: dict, force: bool) -> FetchResult:
+    manual_id = entry["id"]
+    dest = PDF_DIR / f"{manual_id}.pdf"
+
+    if dest.exists() and not force:
+        try:
+            return FetchResult(
+                manual_id, True, "already downloaded (skipped)", dest.stat().st_size, _page_count(dest)
+            )
+        except PdfReadError:
+            pass  # cached file is corrupt; fall through and re-download
+
+    return download_pdf(manual_id, entry["source_url"], dest)
 
 
 def print_results(results: list[FetchResult]) -> None:

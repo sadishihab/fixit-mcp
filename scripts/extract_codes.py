@@ -78,8 +78,15 @@ def chunk_cache_key(chunk: ManualChunk, tag: str) -> str:
     return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:16]
 
 
-def load_chunks(manual_id: str) -> list[ManualChunk]:
-    path = PARSED_DIR / f"{manual_id}.json"
+def cost_usd(input_tokens: int, output_tokens: int) -> float:
+    return (
+        input_tokens / 1000 * ESTIMATED_INPUT_COST_PER_1K
+        + output_tokens / 1000 * ESTIMATED_OUTPUT_COST_PER_1K
+    )
+
+
+def load_chunks(manual_id: str, parsed_dir: Path = PARSED_DIR) -> list[ManualChunk]:
+    path = parsed_dir / f"{manual_id}.json"
     data = json.loads(path.read_text())
     return [ManualChunk.model_validate(item) for item in data]
 
@@ -94,8 +101,16 @@ def write_cached_records(cache_path: Path, records: list[ErrorCodeRecord]) -> No
     cache_path.write_text(json.dumps([r.model_dump() for r in records], indent=2))
 
 
-def process_manual(manual_id: str, extractor, tag: str, force: bool) -> tuple[list[ErrorCodeRecord], dict]:
-    chunks = load_chunks(manual_id)
+def process_manual(
+    manual_id: str,
+    extractor,
+    tag: str,
+    force: bool,
+    *,
+    parsed_dir: Path = PARSED_DIR,
+    cache_dir: Path = CACHE_DIR,
+) -> tuple[list[ErrorCodeRecord], dict]:
+    chunks = load_chunks(manual_id, parsed_dir)
     candidates = [c for c in chunks if is_worth_extracting_from(c)]
 
     records: list[ErrorCodeRecord] = []
@@ -105,7 +120,7 @@ def process_manual(manual_id: str, extractor, tag: str, force: bool) -> tuple[li
     output_tokens = 0
 
     for chunk in candidates:
-        cache_path = CACHE_DIR / f"{chunk_cache_key(chunk, tag)}.json"
+        cache_path = cache_dir / f"{chunk_cache_key(chunk, tag)}.json"
         cached = None if force else load_cached_records(cache_path)
         if cached is not None:
             records.extend(cached)
@@ -187,10 +202,7 @@ def main() -> int:
     final_records = kept + [r.model_dump() for r in new_records]
     OUTPUT_PATH.write_text(json.dumps(final_records, indent=2))
 
-    est_cost = (
-        total_input_tokens / 1000 * ESTIMATED_INPUT_COST_PER_1K
-        + total_output_tokens / 1000 * ESTIMATED_OUTPUT_COST_PER_1K
-    )
+    est_cost = cost_usd(total_input_tokens, total_output_tokens)
     print(f"Total codes in {OUTPUT_PATH.relative_to(REPO_ROOT)}: {len(final_records)}")
     if total_input_tokens or total_output_tokens:
         print(f"This run's estimated tokens: {total_input_tokens} in / {total_output_tokens} out")

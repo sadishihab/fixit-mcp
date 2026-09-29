@@ -237,6 +237,22 @@ make demo                                          # against the local dev serve
 make demo AGENT_ARN=<deployed runtime ARN>          # against a deployed AgentCore Runtime
 ```
 
+## Add a manual
+
+One command takes a manufacturer manual from a URL to validated, cited records in
+`data/index/error_codes.json`:
+
+```bash
+make add-manual ID=acme-x100-oven BRAND=Acme MODEL=X100 TYPE=oven \
+  URL=https://example.com/x100.pdf NOTE="Public support page, free download, no login"
+make add-manual ... DRY_RUN=1   # verify the PDF and its content, change nothing
+make validate-manifest          # check the manifest is consistent
+```
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for what makes a good source and the
+terms-of-use rule. A new manual only reaches the deployed server after an image
+rebuild and runtime update.
+
 ## Running tests
 
 ```bash
@@ -256,6 +272,10 @@ Test suite:
 - `tests/unit/test_warranty_tool.py` / `tests/integration/test_check_warranty.py` —
   `check_warranty`'s date resolution (active/expired/unknown/ambiguous/not_found,
   the ends-today boundary, appliance_id precedence) and its real Streamable HTTP wiring.
+- `tests/unit/test_add_manual.py` / `tests/unit/test_manifest_validation.py` —
+  the add-a-manual script (duplicates, wrong-content PDFs, dry run, idempotent
+  merge; synthetic PDFs, mocked HTTP) and the manifest validator, which also
+  checks the real manifest.
 - `tests/integration/test_smoke_script.py` — keeps `scripts/smoke_test.py`
   (the container/deployment smoke checks) passing against the dev server.
 - `tests/unit/test_dockerfile.py` — guards the Dockerfile's contract
