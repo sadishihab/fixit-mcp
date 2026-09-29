@@ -10,12 +10,22 @@ customers with home appliances: diagnosing error codes from real appliance
 manuals, remembering which appliances a household owns, guiding repairs with
 visual cards, ordering replacement parts, and scheduling maintenance.
 
-This repository is currently at the **scaffolding milestone**: a minimal,
-tested MCP server running locally with one tool. RAG/ingestion, auth, AWS
-deployment, MCP Apps UI, and a web client are not built yet — see
+This repository is a tested MCP server running locally with five tools (see
+below). RAG/ingestion, an Alexa+-reachable deployment with OAuth, parts
+ordering, and maintenance scheduling are not built yet — see
 [`docs/alexa-plus-requirements.md`](docs/alexa-plus-requirements.md) for the
 full requirements checklist and [`CLAUDE.md`](CLAUDE.md) for the target
 architecture.
+
+## Tools
+
+| Tool | What it does |
+|---|---|
+| `list_my_appliances` | Lists a household's registered appliances. |
+| `add_appliance` | Registers a new appliance for a household, linking it to a manual on file when one matches. |
+| `remove_appliance` | Removes an appliance from a household's registry. |
+| `diagnose_error` | Looks up an appliance error code's meaning, causes, repair steps, parts, and safety warnings, cited to the source manual; has an MCP Apps visual card. |
+| `check_warranty` | Reports whether a registered appliance's recorded warranty is active or expired, from a deterministic server-side date comparison — never a coverage claim. |
 
 ## Demo video
 
@@ -242,7 +252,10 @@ Test suite:
 - `tests/integration/test_server_legacy_protocol.py` — negotiates the
   `2025-03-26` protocol version the Alexa+ client sends and confirms tool
   calls still work.
-- `tests/integration/test_latency.py` — 50 tool calls, asserts p95 < 100ms.
+- `tests/integration/test_latency.py` — 50 tool calls per tool, asserts p95 < 100ms.
+- `tests/unit/test_warranty_tool.py` / `tests/integration/test_check_warranty.py` —
+  `check_warranty`'s date resolution (active/expired/unknown/ambiguous/not_found,
+  the ends-today boundary, appliance_id precedence) and its real Streamable HTTP wiring.
 - `tests/integration/test_smoke_script.py` — keeps `scripts/smoke_test.py`
   (the container/deployment smoke checks) passing against the dev server.
 - `tests/unit/test_dockerfile.py` — guards the Dockerfile's contract

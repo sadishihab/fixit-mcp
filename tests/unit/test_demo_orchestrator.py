@@ -212,6 +212,18 @@ def test_system_prompt_caps_replies_to_two_sentences_unless_steps_are_asked_for(
     assert "full repair steps" in prompt
 
 
+def test_system_prompt_restricts_warranty_replies_to_the_recorded_date_fact() -> None:
+    """Step 8a: check_warranty only ever reports a date comparison -- the
+    system prompt must forbid the model from turning that into a coverage
+    claim or an unstated suggestion, the same class of leak step 6b/6e
+    caught for other tools."""
+    prompt = build_system_prompt("house-002")
+
+    assert "check_warranty" in prompt
+    assert "never say whether a repair would be covered" in prompt
+    assert "never suggest contacting anyone the tool result didn't mention" in prompt
+
+
 # --- run_turn: plain reply, no tool use -------------------------------------------------
 
 

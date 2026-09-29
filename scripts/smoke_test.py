@@ -41,7 +41,13 @@ DEFAULT_URL = "http://localhost:8000/mcp"
 LATEST_PROTOCOL_VERSION = "2025-11-25"
 # What the Alexa+ MCP Toolkit docs show its client sending (CLAUDE.md rule 2).
 ALEXA_PLUS_PROTOCOL_VERSION = "2025-03-26"
-EXPECTED_TOOLS = {"list_my_appliances", "add_appliance", "remove_appliance", "diagnose_error"}
+EXPECTED_TOOLS = {
+    "list_my_appliances",
+    "add_appliance",
+    "remove_appliance",
+    "diagnose_error",
+    "check_warranty",
+}
 DIAGNOSE_CARD_URI = "ui://fixit-mcp/diagnose-error-card"
 LATENCY_CALLS = 20
 P95_BUDGET_MS = 500  # The Alexa+ round-trip requirement itself, not the tighter local test budget.
@@ -141,6 +147,22 @@ async def check_diagnose_error(url: str, auth: httpx.Auth | None = None) -> str:
 
     await _with_session(url, body, auth)
     return "diagnose_error(tE1, house-002) finds the LG dryer code (error-code index loaded)"
+
+
+async def check_warranty(url: str, auth: httpx.Auth | None = None) -> str:
+    async def body(session: ClientSession) -> None:
+        await session.initialize()
+        result = await session.call_tool(
+            "check_warranty", {"household_id": "house-002", "appliance_type": "dryer"}
+        )
+        _check(result.isError is False, f"check_warranty errored: {result}")
+        content = result.structuredContent
+        _check(content["status"] == "expired", f"expected expired, got {content['status']!r}")
+        _check(content["appliance"]["brand"] == "LG", f"wrong appliance: {content['appliance']}")
+        _check("recorded" in content["message"], f"message doesn't say 'recorded': {content['message']!r}")
+
+    await _with_session(url, body, auth)
+    return "check_warranty(house-002, dryer) reports the seeded LG dryer's expired warranty"
 
 
 async def check_diagnose_card(url: str, auth: httpx.Auth | None = None) -> str:
@@ -281,6 +303,7 @@ CHECKS: list[Callable[..., Awaitable[str]]] = [
     check_tools_listed,
     check_list_my_appliances,
     check_diagnose_error,
+    check_warranty,
     check_diagnose_card,
     check_add_links_manual,
     check_platform_session_id_accepted,

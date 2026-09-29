@@ -13,6 +13,7 @@ from fixit_mcp.repository.sqlite import SqliteApplianceRepository
 from fixit_mcp.retrieval.codes import ErrorCodeIndex, load_index
 from fixit_mcp.tools.appliances import register_appliance_tools
 from fixit_mcp.tools.diagnose import register_diagnose_tool
+from fixit_mcp.tools.warranty import register_warranty_tool
 
 SERVER_INSTRUCTIONS = (
     "FixIt helps customers diagnose appliance error codes, remembers which "
@@ -61,6 +62,7 @@ def create_server(
 
     register_appliance_tools(mcp, repository, manual_catalog)
     register_diagnose_tool(mcp, repository, error_code_index)
+    register_warranty_tool(mcp, repository)
 
     return mcp
 

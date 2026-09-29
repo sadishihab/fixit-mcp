@@ -55,6 +55,24 @@ async def test_add_appliance_p95_latency_under_budget_with_sqlite_backend(server
             assert p95_ms < P95_BUDGET_MS, f"p95 latency {p95_ms:.2f}ms exceeded {P95_BUDGET_MS}ms budget"
 
 
+async def test_check_warranty_p95_latency_under_budget(server_url: str) -> None:
+    async with streamable_http_client(server_url) as (read_stream, write_stream, _):
+        async with ClientSession(read_stream, write_stream) as session:
+            await session.initialize()
+
+            latencies_ms: list[float] = []
+            for _ in range(CALL_COUNT):
+                start = time.perf_counter()
+                result = await session.call_tool(
+                    "check_warranty", {"household_id": "house-002", "appliance_type": "dryer"}
+                )
+                latencies_ms.append((time.perf_counter() - start) * 1000)
+                assert result.isError is False
+
+            p95_ms = _p95(latencies_ms)
+            assert p95_ms < P95_BUDGET_MS, f"p95 latency {p95_ms:.2f}ms exceeded {P95_BUDGET_MS}ms budget"
+
+
 async def test_diagnose_error_p95_latency_under_budget_with_index_loaded(server_url: str) -> None:
     """The full committed error-code index is loaded into the server exactly
     once at startup (fixit_mcp.retrieval.codes.load_index) -- this confirms

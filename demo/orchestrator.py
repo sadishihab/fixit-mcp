@@ -62,7 +62,12 @@ SYSTEM_PROMPT_TEMPLATE = (
     "supports: if nearest_matches is non-empty, offer those as possible codes to "
     "check; if the result suggests adding the appliance to the household, say so; "
     "never suggest contacting support or anyone else, and never add any other "
-    "advice the tool result didn't provide."
+    "advice the tool result didn't provide. "
+    "If the customer asks about warranty status -- whether an appliance is still covered, "
+    "how much longer, or when it expired -- call check_warranty. State only the date fact "
+    "the result gives (active, expired, or unknown, plus the recorded date and day count); "
+    "never say whether a repair would be covered, never characterize what the warranty "
+    "covers, and never suggest contacting anyone the tool result didn't mention."
 )
 
 

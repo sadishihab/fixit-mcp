@@ -302,6 +302,35 @@ Alexa+ MCP Toolkit and helps customers with home appliances:
   Measured: warm Runtime overhead ~125–155ms p50. Cold new sessions (1.3–8s
   initialize, ~2s first call) are the open latency risk.
 
+- **`check_warranty` tool** (step 8a, `fixit_mcp.tools.warranty`). Answers
+  "is it still under warranty?" from a deterministic server-side date
+  comparison only -- the comparison itself always happens in code, never
+  left to Alexa+'s model (rule 3). Resolution: `appliance_id` wins outright
+  (no other filter narrows or excludes on top of it); otherwise the
+  household's appliances are filtered by whichever of `appliance_type`
+  (e.g. "dryer"), `brand`, `model` were given, so "is my dryer still under
+  warranty" can resolve without an id. Exactly one match -> a dated result;
+  several -> `ambiguous_appliance` with candidates, never guessed; none ->
+  `not_found`. A single response model
+  (`status: Literal["active","expired","unknown","ambiguous_appliance","not_found"]`)
+  is used, same reasoning as `diagnose_error`'s single-model-over-`Union`
+  choice. `status="unknown"` when the appliance has no `warranty_end_date`
+  on file -- never guessed. The boundary decision: a `warranty_end_date`
+  equal to today still counts as `active` (`days_remaining=0`) -- the
+  recorded end date is the *last* day of coverage, not the first day of
+  expiry; pinned by a dedicated boundary test. One clock source only: the
+  pure `check_warranty()` function takes `as_of: date` as a required,
+  caller-supplied argument (tests pass a fixed date), and only the
+  `@mcp.tool` wrapper's `_utc_today()` ever reads the real clock, via
+  `datetime.now(UTC)`. The response's `message` field states only the
+  recorded date fact ("The recorded warranty ended on 2025-01-15, 620 days
+  ago") and always says "recorded" -- since the dates come from what the
+  customer registered, not a manufacturer lookup -- and never makes a
+  coverage claim or names what a repair would cost; the demo backend's
+  system prompt (`demo/orchestrator.py`) carries the same restriction
+  forward into the model's own reply, the same class of leak
+  `FRICTION_LOG.md`'s step 6b/6e entries caught for other tools.
+
 ## Testing
 
 **Every change needs tests.** No exceptions for "small" changes.
@@ -327,7 +356,10 @@ persistent state the customer can add to and remove via `add_appliance`/
 `remove_appliance` (step 3c, `fixit_mcp.repository.sqlite`; step 4b adds
 an AgentCore Memory backend for deployment), and
 `diagnose_error` has its first MCP Apps visual card (step 3d,
-`fixit_mcp.apps`) — but nothing beyond that yet: no embeddings, no
+`fixit_mcp.apps`), and a customer can ask whether an appliance is still
+under warranty (`check_warranty`, step 8a, `fixit_mcp.tools.warranty`,
+date comparison only, no coverage claims) — but nothing beyond that yet:
+no embeddings, no
 fuzzy/semantic retrieval beyond `difflib` nearest-match suggestions, no
 Strands, no Alexa+-reachable deployment yet (the server runs on AgentCore
 Runtime with IAM-only inbound auth, step 4c, and household data lives in
