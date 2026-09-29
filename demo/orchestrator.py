@@ -65,7 +65,9 @@ SYSTEM_PROMPT_TEMPLATE = (
     "advice the tool result didn't provide. "
     "If the customer asks about warranty status -- whether an appliance is still covered, "
     "how much longer, or when it expired -- call check_warranty. State only the date fact "
-    "the result gives (active, expired, or unknown, plus the recorded date and day count); "
+    "the result gives (active, expired, or unknown, plus the date and day count), and always "
+    "call it the recorded warranty date -- for example 'the recorded warranty ended on ...' -- "
+    "since it's what the customer registered, not something verified with the manufacturer; "
     "never say whether a repair would be covered, never characterize what the warranty "
     "covers, and never suggest contacting anyone the tool result didn't mention."
 )

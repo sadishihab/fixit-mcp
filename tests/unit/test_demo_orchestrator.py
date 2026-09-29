@@ -224,6 +224,16 @@ def test_system_prompt_restricts_warranty_replies_to_the_recorded_date_fact() ->
     assert "never suggest contacting anyone the tool result didn't mention" in prompt
 
 
+def test_system_prompt_calls_the_warranty_date_recorded() -> None:
+    """Step 8b: the dates come from what the customer registered, not a
+    manufacturer lookup, so a reply must call it the *recorded* warranty
+    date -- not just state a bare date -- to avoid sounding verified."""
+    prompt = build_system_prompt("house-002")
+
+    assert "the recorded warranty ended on" in prompt
+    assert "not something verified with the manufacturer" in prompt
+
+
 # --- run_turn: plain reply, no tool use -------------------------------------------------
 
 
