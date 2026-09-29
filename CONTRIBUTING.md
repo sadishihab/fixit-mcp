@@ -20,7 +20,7 @@ It runs, and reports, each step:
 1. Validates the arguments. Refuses a duplicate `ID` or a duplicate brand+model.
 2. Downloads the URL and checks it is a real PDF (magic bytes, page count),
    using the same code as `make fetch-manuals`.
-3. Content check: the PDF must contain the model number (or its series stem,
+3. Content check: the PDF must contain the model number (exactly, via a wildcard label such as `WM4000H*A`, or its series stem,
    e.g. `GFE28` for `GFE28GYNFS`) and a troubleshooting/error-code keyword.
    This exists because a filename or search title proves nothing: a real,
    valid, model-correct PDF turned out to be a 3-page spec sheet
@@ -33,6 +33,17 @@ It runs, and reports, each step:
    and cost, and needs you to type `yes`.
 7. Merges the records into `data/index/error_codes.json`, replacing only this
    manual's records. Re-running the same command is safe and idempotent.
+
+If the automatic chunk filter misses the code table (some PDFs are split into
+tiny fragments, so the table's chunks do not look like a table), open the PDF,
+note the pages that hold the table, and pass `CODE_PAGES=43-45`. Only those
+pages are sent, merged into one window so a row is never split. It is stored in
+the manifest as `extraction_pages`, so `make extract-codes` repeats it.
+
+Some PDFs draw display codes in a seven-segment font whose text layer uses
+look-alike letters (LG prints `dE2` as `dEz`). If you find one, check the
+rendered page and add `code_fixes: {dEz: dE2}` to the manifest entry. Never
+guess a correction.
 
 Then run `make validate-manifest` and `make test`, review the diff, and commit
 the manifest and index. **Never commit the PDF.**

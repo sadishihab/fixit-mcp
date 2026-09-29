@@ -2525,3 +2525,26 @@ full detail behind each number.
 - **Severity**: Low. **Workaround**: build the synthetic PDF once
   (`functools.cache`) so every mocked download serves identical bytes.
 
+
+### 2026-09-30 — sourcing round 2: manufacturer pages hide their PDF hrefs, and the model check stumbles on wildcard model labels
+
+- **Tool/SDK**: manufacturer support pages (LG, Samsung), `scripts/add_manual.py --dry-run`.
+- **Task attempted**: Find 5 candidate manuals (LG washer, Bosch washer/oven, GE dryer, Samsung) from official domains and dry-run them (step 11b phase 1).
+- **Actual**:
+  - LG's and Samsung's support pages render their manual links with JavaScript, so the PDF href is not in the fetched HTML (LG's page also answered a curl with a 403). The working URLs (`media.us.lg.com/...`, `downloadcenter.samsung.com/...`) came from search results on those official domains, not from following a link on the page.
+  - Bosch's oven page lists the real Use and Care manual on `media3.bsh-group.com`; the first `MCDOC...` oven URL a search returned was, again, a 3-page spec sheet.
+  - The Samsung dryer manual prints its model as `DVE(G)45T6005*/DVE(G)45T6000*`, and the LG washer manual as `WM4000H*A`. The add-manual content check collapses to alphanumerics, so `DVEG45T6000` does not contain the series stem `DVE45T6000`: the Samsung dry-run reported NOT FOUND for a correct manual, and LG only passed as "series".
+- **Severity**: Low to medium: nothing shipped wrongly, but a correct manual is rejected without `--force`.
+- **Not fixed here** (phase 1 is research only). Idea: treat `(X)` and `*` in the manual's model label as wildcards when matching.
+
+### 2026-09-30 — adding the LG washer and Samsung dryer: the chunk filter missed both code tables, and the PDFs' seven-segment font mangled three codes
+
+- **Tool/SDK**: `scripts/extract_codes.py` chunk filter, the parser, LG's `WM4080_2023_Owners-Manual_Washer_Eng.pdf`, Bedrock.
+- **What fought**:
+  - The estimate looked over the cap ($1.12) because of a flat 1,000 output tokens per chunk, but the deeper problem was that the filter would have sent the *wrong* chunks. LG's washer table is shattered by the parser into ~25 fragments (each bold code label such as `INLET ERROR` became a false heading), and Samsung's `Information codes` section has a heading and a table the filter never matched. Tightening the filter alone would have paid to extract nothing useful.
+  - Fix: a page-mode window (`extraction_pages`, a human names the pages; fragments merged into one window). Two real mistakes on the way: my first version dropped 12-char fragments like `WATER OUTLET` (half a code name, so `OE`'s meaning came out as `ERROR - ...`), and a 3,000-char window cap split UE's row across two windows. Each cost a re-extraction (~$0.13).
+  - LG draws display codes in a seven-segment font; the text layer has look-alike letters: `dE2` reads `dEz`, `Sud` reads `svd`, `uS` reads `vs`. Confirmed only by rendering the page. Fixed with a manifest `code_fixes` map, not guessed.
+  - The first Samsung prompt run inferred causes from repair steps ("check for a clogged lint screen" became a cause) and turned an instruction into a safety warning. Prompt tightened; but the extraction cache is keyed by chunk text, not the prompt, so it needed `--force` to take effect.
+  - The calibrated per-chunk output estimate (81) undershot dense code windows by ~4x ($0.04 estimated vs $0.144 real); added a separate per-window figure.
+- **Total Bedrock spend**: about $0.59 across six runs (two were re-runs caused by the mistakes above).
+- **Still open**: a chunk that spans two pages cites its first page (`uS` is on p45, cited p44).

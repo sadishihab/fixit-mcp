@@ -72,9 +72,6 @@ TERMS_REMINDER = (
     "records in data/index/error_codes.json ARE committed (and ship in the image)."
 )
 
-# The extraction prompt asks for a JSON array of full records; a rough guess
-# per chunk, printed as an estimate only.
-ESTIMATED_OUTPUT_TOKENS_PER_CHUNK = 1000
 CHARS_PER_TOKEN = 4
 
 
@@ -104,7 +101,7 @@ class Paths:
 @dataclass(frozen=True)
 class ContentCheck:
     pages: int
-    model_match: str | None  # "exact", "series", or None
+    model_match: str | None  # "exact", "wildcard", "series", or None
     keywords: list[str]
 
     @property
@@ -136,6 +133,14 @@ def validate_args(entry: dict, existing: list[dict]) -> bool:
             raise Abort(f"--{'type' if field == 'appliance_type' else field} must not be empty.")
     if not re.match(r"^https?://\S+$", entry["source_url"]):
         raise Abort(f"--url must be an http(s) URL, got {entry['source_url']!r}.")
+    if "extraction_pages" in entry:
+        try:
+            if not extract_codes.parse_page_spec(entry["extraction_pages"]):
+                raise ValueError
+        except ValueError:
+            raise Abort(
+                f"--code-pages {entry['extraction_pages']!r} is not a page list like '43-45,48'."
+            ) from None
     if len(entry["source_note"].strip()) < MIN_NOTE_CHARS:
         raise Abort(
             f"--note is required (at least {MIN_NOTE_CHARS} characters): say where the URL came from "
@@ -147,7 +152,7 @@ def validate_args(entry: dict, existing: list[dict]) -> bool:
         identical = all(
             str(same_id[k]).strip().lower() == entry[k].strip().lower()
             for k in ("brand", "model", "appliance_type", "source_url")
-        )
+        ) and str(same_id.get("extraction_pages", "")) == entry.get("extraction_pages", "")
         if not identical:
             raise Abort(
                 f"id {entry['id']!r} already exists in the manifest with different "
@@ -176,23 +181,50 @@ def series_stem(model: str) -> str | None:
     return stem if len(stem) >= 4 and re.search(r"\d", stem) else None
 
 
+# A model label as manuals print it: alphanumerics with "*" (any characters)
+# and "(X)" (an optional letter), e.g. "DVE(G)45T6000*" or "WM4000H*A". Slashes
+# and spaces separate labels, so "A* / B*" yields two.
+_WILDCARD_LABEL_RE = re.compile(r"[A-Za-z0-9]*(?:\([A-Za-z]\)|\*)[A-Za-z0-9*()]*")
+MIN_WILDCARD_FIXED_CHARS = 4  # a label like "*" or "W*" must never match everything
+
+
+def wildcard_label_regex(label: str) -> re.Pattern[str] | None:
+    """Compile a wildcard model label to a full-match regex, or None if it has
+    too few literal characters to be trustworthy."""
+    if len(re.sub(r"\([A-Za-z]\)|\*", "", label)) < MIN_WILDCARD_FIXED_CHARS:
+        return None
+    pattern = re.sub(
+        r"\(([A-Za-z])\)|\*|([A-Za-z0-9])",
+        lambda m: f"{m.group(1)}?" if m.group(1) else (".*" if m.group(0) == "*" else m.group(2)),
+        label,
+    )
+    return re.compile(pattern, re.IGNORECASE)
+
+
+def match_model(model: str, text: str) -> str | None:
+    """ "exact" if the model is printed as is, "wildcard" if a wildcard label in
+    the text covers it, "series" if only its series stem appears, else None."""
+    collapsed = _alnum(text)
+    if _alnum(model) in collapsed:
+        return "exact"
+    wanted = _alnum(model)
+    for label in _WILDCARD_LABEL_RE.findall(text):
+        regex = wildcard_label_regex(label)
+        if regex is not None and regex.fullmatch(wanted):
+            return "wildcard"
+    stem = series_stem(model)
+    if stem and stem in collapsed:
+        return "series"
+    return None
+
+
 def check_content(pdf_path: Path, model: str) -> ContentCheck:
     # extract_lines (not raw PyMuPDF) so the encoding repair applies: two of
     # the corpus's manuals have corrupted fonts and a raw scan misses text.
     pages = extract_lines(pdf_path)
     text = "\n".join(line.text for page in pages for line in page)
-    collapsed = _alnum(text)
-
-    model_match = None
-    if _alnum(model) in collapsed:
-        model_match = "exact"
-    else:
-        stem = series_stem(model)
-        if stem and stem in collapsed:
-            model_match = "series"
-
     keywords = sorted({m.lower() for m in TROUBLESHOOTING_KEYWORDS.findall(text)})
-    return ContentCheck(pages=len(pages), model_match=model_match, keywords=keywords)
+    return ContentCheck(pages=len(pages), model_match=match_model(model, text), keywords=keywords)
 
 
 # --- 4. manifest ---------------------------------------------------------
@@ -210,10 +242,12 @@ def append_manifest_entry(path: Path, entry: dict) -> None:
 # --- 6. extraction planning ---------------------------------------------
 
 
-def plan_extraction(manual_id: str, tag: str, paths: Paths, force: bool) -> tuple[int, int, int]:
+def plan_extraction(
+    manual_id: str, tag: str, paths: Paths, force: bool, pages: set[int] | None = None
+) -> tuple[int, int, int]:
     """(chunks worth extracting, chunks that need a real call, estimated input tokens)."""
     chunks = extract_codes.load_chunks(manual_id, paths.parsed_dir)
-    candidates = [c for c in chunks if extract_codes.is_worth_extracting_from(c)]
+    candidates = extract_codes.select_candidates(chunks, pages)
     to_send = [
         c
         for c in candidates
@@ -267,6 +301,8 @@ def run(
         "source_url": args.url.strip(),
         "source_note": " ".join(args.note.split()),
     }
+    if args.code_pages:
+        entry["extraction_pages"] = args.code_pages.strip()
     try:
         return _run(entry, args, paths, transport, extractor, input_fn, say)
     except Abort as exc:
@@ -297,6 +333,8 @@ def _run(entry, args, paths, transport, extractor, input_fn, say) -> int:
         check = check_content(tmp_pdf, entry["model"])
         say(f"      model number: {check.model_match or 'NOT FOUND'}")
         say(f"      keywords: {', '.join(check.keywords) or 'NONE FOUND'}")
+        if check.model_match == "wildcard":
+            say("      note: the model is covered by a wildcard label in the manual (e.g. WM4000H*A).")
         if check.model_match == "series":
             say("      note: only the model's series stem appears, so this looks like a family manual.")
         if not check.ok:
@@ -355,13 +393,21 @@ def _run(entry, args, paths, transport, extractor, input_fn, say) -> int:
         )
 
     tag = "stub" if is_stub else f"bedrock:{settings.bedrock_model_id}"
-    candidates, to_send, est_in = plan_extraction(manual_id, tag, paths, force=False)
+    pages = extract_codes.parse_page_spec(entry["extraction_pages"]) if "extraction_pages" in entry else None
+    candidates, to_send, est_in = plan_extraction(manual_id, tag, paths, force=False, pages=pages)
     say(f"[6/7] Extracting with the {'stub' if is_stub else 'bedrock'} extractor")
     say(f"      {candidates} chunks look worth extracting from, {to_send} not yet cached")
     if not is_stub and to_send:
-        est_out = to_send * ESTIMATED_OUTPUT_TOKENS_PER_CHUNK
+        per_chunk = (
+            extract_codes.CODE_WINDOW_OUTPUT_TOKENS
+            if pages
+            else extract_codes.CALIBRATED_OUTPUT_TOKENS_PER_CHUNK
+        )
+        note = extract_codes.CODE_WINDOW_CALIBRATION_NOTE if pages else extract_codes.CALIBRATION_NOTE
+        est_out = to_send * per_chunk
         say(f"      About to send {to_send} chunks to Amazon Bedrock ({settings.bedrock_model_id}).")
-        say(f"      Estimated tokens: ~{est_in} in / ~{est_out} out (rough guess)")
+        say(f"      Estimated tokens: ~{est_in} in / ~{est_out} out (an estimate)")
+        say(f"      Output is {note}")
         say(f"      Estimated cost: ~${extract_codes.cost_usd(est_in, est_out):.2f}")
         if not args.yes:
             try:
@@ -377,7 +423,14 @@ def _run(entry, args, paths, transport, extractor, input_fn, say) -> int:
 
     paths.cache_dir.mkdir(parents=True, exist_ok=True)
     records, stats = extract_codes.process_manual(
-        manual_id, extractor, tag, False, parsed_dir=paths.parsed_dir, cache_dir=paths.cache_dir
+        manual_id,
+        extractor,
+        tag,
+        False,
+        parsed_dir=paths.parsed_dir,
+        cache_dir=paths.cache_dir,
+        pages=pages,
+        code_fixes=extract_codes.load_manifest_extras(paths.manifest).get(manual_id, {}).get("code_fixes"),
     )
 
     say("[7/7] Merging into the index")
@@ -411,6 +464,11 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--note", required=True, help="Where the URL came from and why it is freely downloadable.")
     p.add_argument("--dry-run", action="store_true", help="Stop after the content check; change nothing.")
     p.add_argument("--force", action="store_true", help="Add even if the content check fails.")
+    p.add_argument(
+        "--code-pages",
+        help="PDF pages that hold the error-code table, e.g. '43-45,48'. Extract only from these pages "
+        "(merged into windows). Use when the automatic filter misses the table; recorded in the manifest.",
+    )
     p.add_argument("--yes", action="store_true", help="Skip the Bedrock cost confirmation.")
     p.add_argument(
         "--allow-downgrade",

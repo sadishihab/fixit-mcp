@@ -135,6 +135,7 @@ def make_args(**overrides) -> argparse.Namespace:
         "force": False,
         "yes": False,
         "allow_downgrade": False,
+        "code_pages": None,
     }
     values.update(overrides)
     return argparse.Namespace(**values)
@@ -225,6 +226,40 @@ def test_series_stem_counts_as_a_model_match(paths) -> None:
     code, lines = run(paths, model="X100ABC", tr=pdf_route("manual", model="X100"))
     assert code == 0
     assert "series" in "\n".join(lines)
+
+
+@pytest.mark.parametrize(
+    ("model", "text"),
+    [
+        ("DVE45T6000W", "User manual\nDVE(G)45T6005*/DVE(G)45T6000*\nContents"),
+        ("WM4000HWA", "ENGLISH WM4000H*A / WM4080H*A MFL00000000"),
+    ],
+)
+def test_wildcard_labels_match_the_model(model, text) -> None:
+    assert add_manual.match_model(model, text) == "wildcard"
+
+
+@pytest.mark.parametrize(
+    ("model", "text"),
+    [
+        ("DVE45T7000W", "DVE(G)45T6005*/DVE(G)45T6000*"),  # different series digit
+        ("WM4100HWA", "WM4000H*A / WM4080H*A"),
+        ("ABCDEFGH1", "* / W*A"),  # too few literal characters to trust
+    ],
+)
+def test_wildcard_labels_do_not_match_other_models(model, text) -> None:
+    assert add_manual.match_model(model, text) is None
+
+
+def test_a_model_the_wildcard_excludes_falls_back_to_series_only() -> None:
+    # WM4000HWB is not covered by "WM4000H*A" (fixed final A), but the series
+    # stem WM4000 is printed, so it is reported as the weaker "series" match.
+    assert add_manual.match_model("WM4000HWB", "WM4000H*A") == "series"
+
+
+def test_exact_and_series_matches_are_still_reported() -> None:
+    assert add_manual.match_model("X100", "the X100 oven") == "exact"
+    assert add_manual.match_model("GFE28GYNFS", "models GFE28 and GFE26") == "series"
 
 
 # --- dry run -------------------------------------------------------------------
@@ -345,3 +380,32 @@ def test_bedrock_rerun_uses_cache_and_sends_nothing(paths) -> None:
     assert run(paths, extractor=bedrock(client), yes=True)[0] == 0
     assert client.calls == 1
     assert paths.index.read_text() == first
+
+
+# --- --code-pages ------------------------------------------------------------------
+
+
+def test_code_pages_are_recorded_in_the_manifest_and_limit_extraction(paths) -> None:
+    code, lines = run(paths, code_pages="1")
+    assert code == 0, lines
+    entry = next(e for e in yaml.safe_load(paths.manifest.read_text()) if e["id"] == "acme-x100-oven")
+    assert str(entry["extraction_pages"]) == "1"
+    records = json.loads(paths.index.read_text())
+    mine = {r["code_normalized"] for r in records if r["manual_id"] == "acme-x100-oven"}
+    assert mine == {"E2400", "E3400", "TE1"}
+
+
+def test_code_pages_on_a_page_without_codes_finds_nothing(paths) -> None:
+    code, lines = run(paths, code_pages="9")
+    assert code == 0
+    assert "codes found: 0" in "\n".join(lines)
+
+
+def test_bad_code_pages_is_rejected(paths) -> None:
+    assert run(paths, code_pages="abc")[0] == 1
+
+
+def test_rerun_with_different_code_pages_is_not_treated_as_a_rerun(paths) -> None:
+    assert run(paths, code_pages="1")[0] == 0
+    code, lines = run(paths, code_pages="2")
+    assert code == 1 and "already exists" in "\n".join(lines)

@@ -58,11 +58,12 @@ extract-codes:
 # check + parse + extract + merge into data/index/error_codes.json. See
 # CONTRIBUTING.md. Required: ID BRAND MODEL TYPE URL NOTE. Optional: DRY_RUN=1
 # (check only, change nothing), FORCE=1 (override the content check), YES=1
-# (skip the Bedrock cost prompt). Avoid double quotes inside NOTE.
+# (skip the Bedrock cost prompt), CODE_PAGES=43-45 (extract only from the PDF
+# pages that hold the code table, when the automatic chunk filter misses it). Avoid double quotes inside NOTE.
 add-manual:
 	uv run python scripts/add_manual.py --id "$(ID)" --brand "$(BRAND)" --model "$(MODEL)" \
 		--type "$(TYPE)" --url "$(URL)" --note "$(NOTE)" \
-		$(if $(DRY_RUN),--dry-run,) $(if $(FORCE),--force,) $(if $(YES),--yes,)
+		$(if $(DRY_RUN),--dry-run,) $(if $(FORCE),--force,) $(if $(YES),--yes,) $(if $(CODE_PAGES),--code-pages "$(CODE_PAGES)",)
 
 # Checks every manifest entry (fields, unique ids, notes, seeded appliances'
 # manual_id). Also runs as part of `make test`.

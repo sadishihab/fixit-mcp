@@ -142,9 +142,16 @@ text. If a field isn't stated, leave it an empty list (or empty string for "mean
 a guess.
 - Preserve the manufacturer's exact spelling and punctuation of each code in "error_code" \
 (e.g. "E:24-00", "tE1", "F1").
+- "likely_causes" only when the text presents something as a cause: a "Possible Cause" \
+column, "caused by", or a sentence naming the condition behind the problem. Do NOT restate the \
+code's meaning as a cause and do NOT turn a repair step into a cause (a step "check for a \
+clogged lint screen" does not make "clogged lint screen" a stated cause). If the text gives only \
+a description and actions, "likely_causes" is [].
 - "repair_steps" must be in the order the manual gives them.
 - "safety_warnings" must carry over what the manual states verbatim in substance (not \
-paraphrased away) when it gives one for that code.
+paraphrased away) when it gives one for that code. Only text the manual marks as a warning, \
+caution, danger or notice, or an explicit hazard statement, is a safety warning: an ordinary \
+instruction such as "unplug the power plug and contact service" is a repair step, not a warning.
 - Set "difficulty" only when the text's own guidance clearly implies one: "easy" (a simple \
 user action fixes it), "moderate" (some disassembly or tools needed), "call_service" (the \
 manual says to call for service or a technician). Use null if genuinely unclear.

@@ -352,6 +352,28 @@ Alexa+ MCP Toolkit and helps customers with home appliances:
   deployed server after an image rebuild and runtime update, because the index
   is baked into the image.
 
+- **Chunk filter, page mode and code fixes** (step 11b). `is_worth_extracting_from`
+  (`scripts/extract_codes.py`) drops chunks under 60 chars and table-of-contents
+  entries (dot leaders) before the old table/heading test; it only ever sends
+  fewer chunks than before, and `tests/unit/test_extract_filter.py` proves every
+  chunk that produced an existing record still passes (skipped when the gitignored
+  parsed files are absent). The parser can shatter a table into tiny fragments
+  (bold code labels become false headings), which the heuristic misses. A manifest
+  entry can therefore set `extraction_pages: 43-45`: only those pages are sent,
+  fragments kept, merged into windows of up to 8,000 chars, and each record's
+  `source_page` is re-pointed at the first chunk containing its code (a chunk that
+  spans two pages can still cite its first). `code_fixes: {wrong: right}` applies
+  reviewed corrections for codes a font renders as look-alike glyphs (LG's
+  `dEz` -> `dE2`, `svd` -> `Sud`, `vs` -> `uS`); check the rendered page first.
+  Bedrock cost estimates use calibrated output tokens: ~81 per chunk (3,311 out /
+  41 chunks, first five real runs) and 1,200 per page-mode window (dense tables);
+  both are labelled estimates and the real cost has been ~2-3x the window figure.
+  The extraction cache is keyed by extractor and chunk text, **not the prompt**:
+  after a prompt change use `FORCE=1` to re-extract.
+  The model check in `add_manual` also accepts wildcard labels (`*`, `(X)` optional
+  letter) as a `wildcard` match. Known cross-manual collision: `PF` (LG dryer and
+  LG washer); `diagnose_error` returns `ambiguous_appliance`, never a silent pick.
+
 ## Testing
 
 **Every change needs tests.** No exceptions for "small" changes.

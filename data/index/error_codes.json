@@ -485,5 +485,581 @@
     "source_section": "Before You Call For Service\u2026",
     "source_chunk_id": "ge-jbp26-range::chunk-0084",
     "extraction_confidence": 0.95
+  },
+  {
+    "manual_id": "samsung-dve45t6000w-dryer",
+    "brand": "Samsung",
+    "model": "DVE45T6000W",
+    "appliance_type": "dryer",
+    "error_code": "dC",
+    "code_normalized": "DC",
+    "meaning": "Operating the dryer with the door open.",
+    "likely_causes": [],
+    "repair_steps": [
+      "Make sure the door is properly closed.",
+      "Make sure laundry is not caught in the door."
+    ],
+    "parts_needed": [],
+    "safety_warnings": [],
+    "difficulty": "easy",
+    "source_page": 48,
+    "source_section": "Troubleshooting",
+    "source_chunk_id": "samsung-dve45t6000w-dryer::chunk-0168",
+    "extraction_confidence": 1.0
+  },
+  {
+    "manual_id": "samsung-dve45t6000w-dryer",
+    "brand": "Samsung",
+    "model": "DVE45T6000W",
+    "appliance_type": "dryer",
+    "error_code": "FC",
+    "code_normalized": "FC",
+    "meaning": "Invalid power source frequency.",
+    "likely_causes": [],
+    "repair_steps": [
+      "Try restarting the cycle.",
+      "If this information code remains, contact a Samsung service center."
+    ],
+    "parts_needed": [],
+    "safety_warnings": [],
+    "difficulty": "easy",
+    "source_page": 48,
+    "source_section": "Troubleshooting",
+    "source_chunk_id": "samsung-dve45t6000w-dryer::chunk-0168",
+    "extraction_confidence": 1.0
+  },
+  {
+    "manual_id": "samsung-dve45t6000w-dryer",
+    "brand": "Samsung",
+    "model": "DVE45T6000W",
+    "appliance_type": "dryer",
+    "error_code": "AC",
+    "code_normalized": "AC",
+    "meaning": "Electronic control problem (Invalid Communication).",
+    "likely_causes": [],
+    "repair_steps": [
+      "Contact a Samsung service center."
+    ],
+    "parts_needed": [],
+    "safety_warnings": [],
+    "difficulty": "call_service",
+    "source_page": 48,
+    "source_section": "Troubleshooting",
+    "source_chunk_id": "samsung-dve45t6000w-dryer::chunk-0168",
+    "extraction_confidence": 1.0
+  },
+  {
+    "manual_id": "samsung-dve45t6000w-dryer",
+    "brand": "Samsung",
+    "model": "DVE45T6000W",
+    "appliance_type": "dryer",
+    "error_code": "HC",
+    "code_normalized": "HC",
+    "meaning": "High temperature heating check.",
+    "likely_causes": [],
+    "repair_steps": [
+      "Clean the lint filter.",
+      "If this information code remains, contact a Samsung service center."
+    ],
+    "parts_needed": [],
+    "safety_warnings": [],
+    "difficulty": "easy",
+    "source_page": 48,
+    "source_section": "Troubleshooting",
+    "source_chunk_id": "samsung-dve45t6000w-dryer::chunk-0168",
+    "extraction_confidence": 1.0
+  },
+  {
+    "manual_id": "samsung-dve45t6000w-dryer",
+    "brand": "Samsung",
+    "model": "DVE45T6000W",
+    "appliance_type": "dryer",
+    "error_code": "9C1",
+    "code_normalized": "9C1",
+    "meaning": "The electronic control needs to be checked.",
+    "likely_causes": [],
+    "repair_steps": [
+      "Check if power is supplied properly.",
+      "If the information code remains, contact a Samsung service center."
+    ],
+    "parts_needed": [],
+    "safety_warnings": [],
+    "difficulty": "easy",
+    "source_page": 48,
+    "source_section": "Troubleshooting",
+    "source_chunk_id": "samsung-dve45t6000w-dryer::chunk-0168",
+    "extraction_confidence": 1.0
+  },
+  {
+    "manual_id": "samsung-dve45t6000w-dryer",
+    "brand": "Samsung",
+    "model": "DVE45T6000W",
+    "appliance_type": "dryer",
+    "error_code": "tC",
+    "code_normalized": "TC",
+    "meaning": "The Thermistor1 resistance is very low or high.",
+    "likely_causes": [],
+    "repair_steps": [
+      "Check for a clogged lint screen.",
+      "Check if the vent system is restricted.",
+      "If this information code remains, contact a Samsung service center."
+    ],
+    "parts_needed": [],
+    "safety_warnings": [],
+    "difficulty": "easy",
+    "source_page": 48,
+    "source_section": "Troubleshooting",
+    "source_chunk_id": "samsung-dve45t6000w-dryer::chunk-0168",
+    "extraction_confidence": 1.0
+  },
+  {
+    "manual_id": "samsung-dve45t6000w-dryer",
+    "brand": "Samsung",
+    "model": "DVE45T6000W",
+    "appliance_type": "dryer",
+    "error_code": "tC5",
+    "code_normalized": "TC5",
+    "meaning": "The Thermistor2 resistance is very low or high.",
+    "likely_causes": [],
+    "repair_steps": [
+      "Check for a clogged lint screen.",
+      "Check if the vent system is restricted.",
+      "If this information code remains, contact a Samsung service center."
+    ],
+    "parts_needed": [],
+    "safety_warnings": [],
+    "difficulty": "easy",
+    "source_page": 48,
+    "source_section": "Troubleshooting",
+    "source_chunk_id": "samsung-dve45t6000w-dryer::chunk-0168",
+    "extraction_confidence": 1.0
+  },
+  {
+    "manual_id": "samsung-dve45t6000w-dryer",
+    "brand": "Samsung",
+    "model": "DVE45T6000W",
+    "appliance_type": "dryer",
+    "error_code": "dF",
+    "code_normalized": "DF",
+    "meaning": "Incorrect door switch.",
+    "likely_causes": [],
+    "repair_steps": [
+      "Contact a Samsung service center."
+    ],
+    "parts_needed": [],
+    "safety_warnings": [],
+    "difficulty": "call_service",
+    "source_page": 48,
+    "source_section": "Troubleshooting",
+    "source_chunk_id": "samsung-dve45t6000w-dryer::chunk-0168",
+    "extraction_confidence": 1.0
+  },
+  {
+    "manual_id": "samsung-dve45t6000w-dryer",
+    "brand": "Samsung",
+    "model": "DVE45T6000W",
+    "appliance_type": "dryer",
+    "error_code": "3C",
+    "code_normalized": "3C",
+    "meaning": "The PBA needs to be checked.",
+    "likely_causes": [],
+    "repair_steps": [
+      "Unplug the power plug and contact a Samsung service center."
+    ],
+    "parts_needed": [],
+    "safety_warnings": [],
+    "difficulty": "call_service",
+    "source_page": 48,
+    "source_section": "Troubleshooting",
+    "source_chunk_id": "samsung-dve45t6000w-dryer::chunk-0168",
+    "extraction_confidence": 1.0
+  },
+  {
+    "manual_id": "lg-wm4000hwa-washer",
+    "brand": "LG",
+    "model": "WM4000HWA",
+    "appliance_type": "washing_machine",
+    "error_code": "IE",
+    "code_normalized": "IE",
+    "meaning": "INLET ERROR",
+    "likely_causes": [
+      "Water supply faucets are not fully open",
+      "Water inlet hoses are kinked, pinched, or crushed",
+      "Water inlet filters are clogged",
+      "Water supply pressure to faucet or house is too low",
+      "Water supply connected with leak-limiting hoses"
+    ],
+    "repair_steps": [
+      "Make sure that the water faucets are fully open",
+      "Make sure that the hoses are not kinked, pinched or crushed behind or under the washer. Be careful when moving the washer during cleaning or maintenance",
+      "Clean the inlet filters. See MAINTENANCE",
+      "Check another faucet in the house to make sure that household water pressure is adequate and flow is not restricted",
+      "Disconnect the water inlet hoses from the washer and run a few gallons of water through the hoses to flush out any dirt",
+      "If flow is too low, contact a plumber to have the water supply lines repaired"
+    ],
+    "parts_needed": [],
+    "safety_warnings": [],
+    "difficulty": "moderate",
+    "source_page": 43,
+    "source_section": "TROUBLESHOOTING",
+    "source_chunk_id": "lg-wm4000hwa-washer::chunk-0195",
+    "extraction_confidence": 0.95
+  },
+  {
+    "manual_id": "lg-wm4000hwa-washer",
+    "brand": "LG",
+    "model": "WM4000HWA",
+    "appliance_type": "washing_machine",
+    "error_code": "UE",
+    "code_normalized": "UE",
+    "meaning": "UNBALANCE ERROR",
+    "likely_causes": [
+      "The load is too small",
+      "Heavy articles are mixed with lighter items",
+      "The load is out of balance"
+    ],
+    "repair_steps": [
+      "Add additional items to allow the washer to balance the load",
+      "Always try to wash articles of somewhat similar weight to allow the washer to evenly distribute the weight of the load for spinning",
+      "Manually redistribute the load if articles have become tangled, preventing the automatic rebalancing from working properly"
+    ],
+    "parts_needed": [],
+    "safety_warnings": [],
+    "difficulty": "easy",
+    "source_page": 44,
+    "source_section": "TROUBLESHOOTING",
+    "source_chunk_id": "lg-wm4000hwa-washer::chunk-0198",
+    "extraction_confidence": 0.95
+  },
+  {
+    "manual_id": "lg-wm4000hwa-washer",
+    "brand": "LG",
+    "model": "WM4000HWA",
+    "appliance_type": "washing_machine",
+    "error_code": "dE",
+    "code_normalized": "DE",
+    "meaning": "DOOR OPEN ERROR",
+    "likely_causes": [
+      "The door is not secured"
+    ],
+    "repair_steps": [
+      "Close and secure the door. If the message keeps appearing, unplug the power cord and call for service"
+    ],
+    "parts_needed": [],
+    "safety_warnings": [],
+    "difficulty": "easy",
+    "source_page": 44,
+    "source_section": "TROUBLESHOOTING",
+    "source_chunk_id": "lg-wm4000hwa-washer::chunk-0199",
+    "extraction_confidence": 0.95
+  },
+  {
+    "manual_id": "lg-wm4000hwa-washer",
+    "brand": "LG",
+    "model": "WM4000HWA",
+    "appliance_type": "washing_machine",
+    "error_code": "dE1",
+    "code_normalized": "DE1",
+    "meaning": "DOOR OPEN ERROR",
+    "likely_causes": [
+      "The door is not secured"
+    ],
+    "repair_steps": [
+      "Close and secure the door. If the message keeps appearing, unplug the power cord and call for service"
+    ],
+    "parts_needed": [],
+    "safety_warnings": [],
+    "difficulty": "easy",
+    "source_page": 44,
+    "source_section": "TROUBLESHOOTING",
+    "source_chunk_id": "lg-wm4000hwa-washer::chunk-0199",
+    "extraction_confidence": 0.95
+  },
+  {
+    "manual_id": "lg-wm4000hwa-washer",
+    "brand": "LG",
+    "model": "WM4000HWA",
+    "appliance_type": "washing_machine",
+    "error_code": "dE2",
+    "code_normalized": "DE2",
+    "meaning": "DOOR OPEN ERROR",
+    "likely_causes": [
+      "The door is not secured"
+    ],
+    "repair_steps": [
+      "Close and secure the door. If the message keeps appearing, unplug the power cord and call for service"
+    ],
+    "parts_needed": [],
+    "safety_warnings": [],
+    "difficulty": "easy",
+    "source_page": 44,
+    "source_section": "TROUBLESHOOTING",
+    "source_chunk_id": "lg-wm4000hwa-washer::chunk-0199",
+    "extraction_confidence": 0.95
+  },
+  {
+    "manual_id": "lg-wm4000hwa-washer",
+    "brand": "LG",
+    "model": "WM4000HWA",
+    "appliance_type": "washing_machine",
+    "error_code": "dE4",
+    "code_normalized": "DE4",
+    "meaning": "DOOR OPEN ERROR",
+    "likely_causes": [
+      "The door is not secured"
+    ],
+    "repair_steps": [
+      "Close and secure the door. If the message keeps appearing, unplug the power cord and call for service"
+    ],
+    "parts_needed": [],
+    "safety_warnings": [],
+    "difficulty": "easy",
+    "source_page": 44,
+    "source_section": "TROUBLESHOOTING",
+    "source_chunk_id": "lg-wm4000hwa-washer::chunk-0199",
+    "extraction_confidence": 0.95
+  },
+  {
+    "manual_id": "lg-wm4000hwa-washer",
+    "brand": "LG",
+    "model": "WM4000HWA",
+    "appliance_type": "washing_machine",
+    "error_code": "OE",
+    "code_normalized": "OE",
+    "meaning": "WATER OUTLET ERROR",
+    "likely_causes": [
+      "Drain hose is kinked, pinched, or clogged",
+      "The end of the drain hose is more than 96 inches (2.4 m) above the bottom of the washer"
+    ],
+    "repair_steps": [
+      "Make sure that the drain hose is free of clogs or kinks and is not pinched behind or under the washer",
+      "Move the end of the drain hose so that it is lower than 96 inches (2.4 m)"
+    ],
+    "parts_needed": [],
+    "safety_warnings": [],
+    "difficulty": "moderate",
+    "source_page": 44,
+    "source_section": "TROUBLESHOOTING",
+    "source_chunk_id": "lg-wm4000hwa-washer::chunk-0200",
+    "extraction_confidence": 0.95
+  },
+  {
+    "manual_id": "lg-wm4000hwa-washer",
+    "brand": "LG",
+    "model": "WM4000HWA",
+    "appliance_type": "washing_machine",
+    "error_code": "tE",
+    "code_normalized": "TE",
+    "meaning": "TEMPERATURE SENSOR ERROR",
+    "likely_causes": [
+      "Control error"
+    ],
+    "repair_steps": [
+      "Unplug the washer and wait 60 minutes. Reconnect power and try again",
+      "If the error code is still displayed, call for service"
+    ],
+    "parts_needed": [],
+    "safety_warnings": [],
+    "difficulty": "call_service",
+    "source_page": 44,
+    "source_section": "TROUBLESHOOTING",
+    "source_chunk_id": "lg-wm4000hwa-washer::chunk-0202",
+    "extraction_confidence": 0.95
+  },
+  {
+    "manual_id": "lg-wm4000hwa-washer",
+    "brand": "LG",
+    "model": "WM4000HWA",
+    "appliance_type": "washing_machine",
+    "error_code": "FE",
+    "code_normalized": "FE",
+    "meaning": "OVERFLOW ERROR",
+    "likely_causes": [
+      "Water level is too high due to a faulty water valve"
+    ],
+    "repair_steps": [
+      "Close the water faucets, unplug the washer, and call for service"
+    ],
+    "parts_needed": [],
+    "safety_warnings": [],
+    "difficulty": "call_service",
+    "source_page": 44,
+    "source_section": "TROUBLESHOOTING",
+    "source_chunk_id": "lg-wm4000hwa-washer::chunk-0204",
+    "extraction_confidence": 0.95
+  },
+  {
+    "manual_id": "lg-wm4000hwa-washer",
+    "brand": "LG",
+    "model": "WM4000HWA",
+    "appliance_type": "washing_machine",
+    "error_code": "PE",
+    "code_normalized": "PE",
+    "meaning": "PRESSURE SENSOR ERROR",
+    "likely_causes": [
+      "The water level sensor is not working correctly"
+    ],
+    "repair_steps": [
+      "Close the water faucets, unplug the washer, and call for service"
+    ],
+    "parts_needed": [],
+    "safety_warnings": [],
+    "difficulty": "call_service",
+    "source_page": 44,
+    "source_section": "TROUBLESHOOTING",
+    "source_chunk_id": "lg-wm4000hwa-washer::chunk-0205",
+    "extraction_confidence": 0.95
+  },
+  {
+    "manual_id": "lg-wm4000hwa-washer",
+    "brand": "LG",
+    "model": "WM4000HWA",
+    "appliance_type": "washing_machine",
+    "error_code": "LE",
+    "code_normalized": "LE",
+    "meaning": "MOTOR LOCKED ERROR",
+    "likely_causes": [
+      "A motor error has occurred"
+    ],
+    "repair_steps": [
+      "Allow the washer to stand for 30 minutes and then restart the cycle",
+      "If the error code is still displayed, call for service"
+    ],
+    "parts_needed": [],
+    "safety_warnings": [],
+    "difficulty": "call_service",
+    "source_page": 44,
+    "source_section": "TROUBLESHOOTING",
+    "source_chunk_id": "lg-wm4000hwa-washer::chunk-0207",
+    "extraction_confidence": 0.95
+  },
+  {
+    "manual_id": "lg-wm4000hwa-washer",
+    "brand": "LG",
+    "model": "WM4000HWA",
+    "appliance_type": "washing_machine",
+    "error_code": "Sud",
+    "code_normalized": "SUD",
+    "meaning": "OVERSUDSING DETECTION",
+    "likely_causes": [
+      "Oversudsing of detergent"
+    ],
+    "repair_steps": [
+      "Do not add more than the manufacturer's recommended amount of detergent",
+      "To remove suds, turn the washer off then back on, then run the Rinse+Spin cycle"
+    ],
+    "parts_needed": [],
+    "safety_warnings": [],
+    "difficulty": "easy",
+    "source_page": 44,
+    "source_section": "TROUBLESHOOTING",
+    "source_chunk_id": "lg-wm4000hwa-washer::chunk-0209",
+    "extraction_confidence": 0.95
+  },
+  {
+    "manual_id": "lg-wm4000hwa-washer",
+    "brand": "LG",
+    "model": "WM4000HWA",
+    "appliance_type": "washing_machine",
+    "error_code": "PF",
+    "code_normalized": "PF",
+    "meaning": "POWER FAILURE",
+    "likely_causes": [
+      "Power failure or inadequate electrical service may have occurred during operation"
+    ],
+    "repair_steps": [
+      "Press the Start/Pause button to restart the cycle"
+    ],
+    "parts_needed": [],
+    "safety_warnings": [],
+    "difficulty": "easy",
+    "source_page": 44,
+    "source_section": "TROUBLESHOOTING",
+    "source_chunk_id": "lg-wm4000hwa-washer::chunk-0211",
+    "extraction_confidence": 0.95
+  },
+  {
+    "manual_id": "lg-wm4000hwa-washer",
+    "brand": "LG",
+    "model": "WM4000HWA",
+    "appliance_type": "washing_machine",
+    "error_code": "FF",
+    "code_normalized": "FF",
+    "meaning": "FROZEN ERROR",
+    "likely_causes": [
+      "Inlet hose, drain hose or drain pump is frozen"
+    ],
+    "repair_steps": [
+      "See Care in Cold Climates"
+    ],
+    "parts_needed": [],
+    "safety_warnings": [],
+    "difficulty": null,
+    "source_page": 44,
+    "source_section": "TROUBLESHOOTING",
+    "source_chunk_id": "lg-wm4000hwa-washer::chunk-0212",
+    "extraction_confidence": 0.9
+  },
+  {
+    "manual_id": "lg-wm4000hwa-washer",
+    "brand": "LG",
+    "model": "WM4000HWA",
+    "appliance_type": "washing_machine",
+    "error_code": "CL",
+    "code_normalized": "CL",
+    "meaning": "CONTROL LOCK FUNCTION",
+    "likely_causes": [
+      "The Control Lock function is on to prevent anyone from changing cycles or operating the washer"
+    ],
+    "repair_steps": [
+      "Turn off the Control Lock function in the control panel. See Control Lock under Options and Extra Functions"
+    ],
+    "parts_needed": [],
+    "safety_warnings": [],
+    "difficulty": "easy",
+    "source_page": 44,
+    "source_section": "TROUBLESHOOTING",
+    "source_chunk_id": "lg-wm4000hwa-washer::chunk-0213",
+    "extraction_confidence": 0.95
+  },
+  {
+    "manual_id": "lg-wm4000hwa-washer",
+    "brand": "LG",
+    "model": "WM4000HWA",
+    "appliance_type": "washing_machine",
+    "error_code": "tcL",
+    "code_normalized": "TCL",
+    "meaning": "TUB CLEAN ALARM",
+    "likely_causes": [],
+    "repair_steps": [],
+    "parts_needed": [],
+    "safety_warnings": [],
+    "difficulty": "easy",
+    "source_page": 44,
+    "source_section": "TROUBLESHOOTING",
+    "source_chunk_id": "lg-wm4000hwa-washer::chunk-0215",
+    "extraction_confidence": 0.95
+  },
+  {
+    "manual_id": "lg-wm4000hwa-washer",
+    "brand": "LG",
+    "model": "WM4000HWA",
+    "appliance_type": "washing_machine",
+    "error_code": "uS",
+    "code_normalized": "US",
+    "meaning": "VIBRATION SENSOR ERROR",
+    "likely_causes": [
+      "Vibration sensor malfunctions"
+    ],
+    "repair_steps": [
+      "Call for service"
+    ],
+    "parts_needed": [],
+    "safety_warnings": [],
+    "difficulty": "call_service",
+    "source_page": 44,
+    "source_section": "TROUBLESHOOTING",
+    "source_chunk_id": "lg-wm4000hwa-washer::chunk-0216",
+    "extraction_confidence": 0.95
   }
 ]

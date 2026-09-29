@@ -72,3 +72,29 @@
     owner's manual jointly covering the electric DLEX8000W/DLEX8000V and gas
     DLGX8001W/DLGX8001V dryers; has a dedicated numeric "Error Code" table
     ("Other problems may also be shown with error codes...").
+
+- id: samsung-dve45t6000w-dryer
+  brand: Samsung
+  model: DVE45T6000W
+  appliance_type: dryer
+  source_url: https://downloadcenter.samsung.com/content/UM/202401/20240129150303040/DC68-03381W-04_IB_DV6000_EN_231006.pdf
+  source_note: User manual PDF (DC68-03381W, covers DVE(G)45T6000*) from Samsung's official
+    download center downloadcenter.samsung.com, the host behind the User Manual and Download
+    section of Samsung US support; no login or purchase needed.
+  extraction_pages: '48'
+
+- id: lg-wm4000hwa-washer
+  brand: LG
+  model: WM4000HWA
+  appliance_type: washing_machine
+  source_url: https://media.us.lg.com/m/12df7154cf356724/original/WM4080_2023_Owners-Manual_Washer_Eng.pdf
+  source_note: Owner's Manual PDF listed as a public download on LG USA's WM4000HWA support
+    page and served from LG's own media host media.us.lg.com; no login or purchase needed.
+    Manual covers WM4000H*A / WM4080H*A.
+  extraction_pages: 43-45
+  # The manual prints display codes in a seven-segment font whose text layer uses look-alike
+  # letters; both corrections were checked against the rendered pages 44-45 (dE2, Sud, uS).
+  code_fixes:
+    dEz: dE2
+    svd: Sud
+    vs: uS

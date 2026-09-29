@@ -291,6 +291,19 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) for what makes a good source and the
 terms-of-use rule. A new manual only reaches the deployed server after an image
 rebuild and runtime update.
 
+## Data and sources
+
+The error-code records in `data/index/error_codes.json` are factual, cited
+extractions from manufacturers' publicly downloadable manuals: each record names
+its manual and page. Every source is linked in
+[`data/manuals/manifest.yaml`](data/manuals/manifest.yaml), with a note on where
+the URL came from. The manual PDFs themselves are not stored in this repository,
+and the records do not reproduce manual text.
+
+All trademarks belong to their owners. This project is not affiliated with or
+endorsed by any manufacturer. A manufacturer that wants its records removed can
+ask, and the maintainer will remove them.
+
 ## Running tests
 
 ```bash
