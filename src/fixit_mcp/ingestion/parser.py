@@ -125,6 +125,12 @@ class ManualChunk(BaseModel):
     is_table: bool = Field(
         description="Best-effort flag: does this section read like a code/troubleshooting table?"
     )
+    line_pages: list[int] = Field(
+        default_factory=list,
+        description="1-indexed page of each line of `text` (same length as text.split('\\n')), so a "
+        "chunk that spans two pages can still cite the exact page. Empty for chunks parsed before "
+        "this field existed: callers fall back to page_start.",
+    )
     uncertain_repairs: list[UncertainRepair] = Field(
         default_factory=list,
         description="Token-level repairs in this chunk applied at confidence < 0.6 -- see UncertainRepair.",
@@ -336,6 +342,7 @@ def split_section_into_chunks(
                 section_heading=section.heading,
                 section_path=section.section_path,
                 is_table=is_table,
+                line_pages=[line.page_no for line in chunk_lines],
                 uncertain_repairs=uncertain_repairs,
             )
         )

@@ -98,6 +98,13 @@ def parse_page_spec(spec: str) -> set[int]:
 WINDOW_MAX_CHARS = 8000  # a whole code table in one window: a row split across two loses its code or causes
 
 
+def line_pages_of(chunk: ManualChunk) -> list[int]:
+    """The page of every line of chunk.text; chunks parsed before `line_pages`
+    existed fall back to their first page."""
+    n_lines = chunk.text.count("\n") + 1
+    return chunk.line_pages if len(chunk.line_pages) == n_lines else [chunk.page_start] * n_lines
+
+
 def select_candidates(chunks: list[ManualChunk], pages: set[int] | None = None) -> list[ManualChunk]:
     """The chunks to extract from. Normally the heuristic filter. When a human
     has named the pages that hold the code table (`pages`, from the manifest's
@@ -117,32 +124,43 @@ def select_candidates(chunks: list[ManualChunk], pages: set[int] | None = None) 
             windows[-1] = last.model_copy(
                 update={
                     "text": last.text + "\n" + chunk.text,
+                    "line_pages": line_pages_of(last) + line_pages_of(chunk),
                     "page_end": max(last.page_end, chunk.page_end),
                     "is_table": True,
                     "uncertain_repairs": last.uncertain_repairs + chunk.uncertain_repairs,
                 }
             )
         else:
-            windows.append(chunk.model_copy(update={"is_table": True}))
+            windows.append(chunk.model_copy(update={"is_table": True, "line_pages": line_pages_of(chunk)}))
     return windows
 
 
 def refine_citations(
-    records: list[ErrorCodeRecord], chunks: list[ManualChunk], pages: set[int]
+    records: list[ErrorCodeRecord], chunks: list[ManualChunk], pages: set[int] | None = None
 ) -> list[ErrorCodeRecord]:
-    """A merged window reports its *first* chunk's page, so a code on the
-    window's third page would cite the wrong page. Re-point each record at the
-    first original chunk on the named pages whose text contains its code as a
-    whole word; keep the window's citation if none does."""
-    on_pages = [c for c in chunks if pages & set(range(c.page_start, c.page_end + 1))]
+    """A chunk can span two pages and a merged window spans several, but a
+    record cites one page, so citing the first page is wrong whenever the code
+    sits on a later one. Re-point each record at the first *line* that contains
+    its code as a whole word: the citation becomes that line's own page.
+    Searches the record's own source chunk first, then (page mode) the named
+    pages' chunks in order; never the rest of the manual, where a short code
+    like "PS" appears in ordinary text. Keeps the old citation if no line matches."""
+    by_id = {c.chunk_id: c for c in chunks}
+    on_pages = [c for c in chunks if pages and pages & set(range(c.page_start, c.page_end + 1))]
     refined = []
     for record in records:
         pattern = re.compile(rf"(?<![A-Za-z0-9]){re.escape(record.error_code)}(?![A-Za-z0-9])")
-        first = next((c for c in on_pages if pattern.search(c.text)), None)
-        if first is not None:
-            record = record.model_copy(
-                update={"source_page": first.page_start, "source_chunk_id": first.chunk_id}
-            )
+        own = by_id.get(record.source_chunk_id)
+        hit = None
+        for c in ([own] if own else []) + on_pages:
+            for line, page in zip(c.text.split("\n"), line_pages_of(c), strict=True):
+                if (not pages or page in pages) and pattern.search(line):
+                    hit = (page, c.chunk_id)
+                    break
+            if hit:
+                break
+        if hit is not None:
+            record = record.model_copy(update={"source_page": hit[0], "source_chunk_id": hit[1]})
         refined.append(record)
     return refined
 
@@ -239,8 +257,7 @@ def process_manual(
             input_tokens += extractor.last_usage["input_tokens"]
             output_tokens += extractor.last_usage["output_tokens"]
 
-    if pages:
-        records = refine_citations(records, chunks, pages)
+    records = refine_citations(records, chunks, pages)
     if code_fixes:
         records = apply_code_fixes(records, code_fixes)
 

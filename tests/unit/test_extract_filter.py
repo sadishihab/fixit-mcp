@@ -156,3 +156,56 @@ def test_manifest_extras_read_pages_and_code_fixes(tmp_path) -> None:
     extras = ec.load_manifest_extras(manifest)
     assert extras["a"] == {"pages": {43, 44, 45}, "code_fixes": {"x": "y"}}
     assert extras["b"] == {"pages": None, "code_fixes": {}}
+
+
+def test_a_chunk_spanning_two_pages_cites_the_page_of_the_line_with_the_code() -> None:
+    spanning = ManualChunk(
+        manual_id="m", brand="B", model="M1", appliance_type="oven", chunk_id="m::chunk-0009",
+        text="TUB CLEAN ALARM\ntcL  time to clean\nProblem\nvs  Vibration sensor fault.\nCall for service.",
+        page_start=44, page_end=45, section_heading="TUB CLEAN ALARM", section_path=[], is_table=True,
+        line_pages=[44, 44, 45, 45, 45],
+    )  # fmt: skip
+    window = ec.select_candidates([spanning], {44, 45})[0]
+    assert window.page_start == 44 and window.line_pages == [44, 44, 45, 45, 45]
+
+    def record(code: str):
+        return ec.ErrorCodeRecord(
+            manual_id="m", brand="B", model="M1", appliance_type="oven", error_code=code,
+            code_normalized=code.upper(), source_page=window.page_start, source_section=None,
+            source_chunk_id=window.chunk_id, extraction_confidence=0.9,
+        )  # fmt: skip
+
+    refined = ec.refine_citations([record("tcL"), record("vs")], [spanning], {44, 45})
+    assert [r.source_page for r in refined] == [44, 45]
+
+
+def test_windows_merge_line_pages_and_old_chunks_fall_back_to_page_start() -> None:
+    a = chunk("first line long enough to be kept as text\nsecond", "H", page=43, n=1)  # no line_pages
+    b = ManualChunk(
+        manual_id="m", brand="B", model="M1", appliance_type="oven", chunk_id="m::chunk-0002",
+        text="third line here that is long enough to keep\nfourth", page_start=43, page_end=44,
+        section_heading="H", section_path=[], is_table=False, line_pages=[43, 44],
+    )  # fmt: skip
+    (window,) = ec.select_candidates([a, b], {43, 44})
+    assert window.line_pages == [43, 43, 43, 44]
+
+
+def test_a_normal_chunk_that_spans_two_pages_is_refined_within_its_own_chunk_only() -> None:
+    earlier = chunk("PS appears in ordinary prose here, a long enough line.", "Intro", page=29, n=1)
+    spanning = ManualChunk(
+        manual_id="m", brand="B", model="M1", appliance_type="oven", chunk_id="m::chunk-0002",
+        text="E:34-00 first row\nE:90-01 second row", page_start=39, page_end=40,
+        section_heading="Codes", section_path=[], is_table=True, line_pages=[39, 40],
+    )  # fmt: skip
+
+    def record(code: str, page: int):
+        return ec.ErrorCodeRecord(
+            manual_id="m", brand="B", model="M1", appliance_type="oven", error_code=code,
+            code_normalized=code, source_page=page, source_section="Codes",
+            source_chunk_id="m::chunk-0002", extraction_confidence=0.9,
+        )  # fmt: skip
+
+    refined = ec.refine_citations([record("E:34-00", 39), record("E:90-01", 39)], [earlier, spanning])
+    assert [r.source_page for r in refined] == [39, 40]  # no pages given: own chunk only
+    ps = ec.refine_citations([record("PS", 39)], [earlier, spanning])
+    assert ps[0].source_page == 39  # not in its own chunk: never re-pointed at page 29 prose

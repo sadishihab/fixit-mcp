@@ -361,8 +361,10 @@ Alexa+ MCP Toolkit and helps customers with home appliances:
   (bold code labels become false headings), which the heuristic misses. A manifest
   entry can therefore set `extraction_pages: 43-45`: only those pages are sent,
   fragments kept, merged into windows of up to 8,000 chars, and each record's
-  `source_page` is re-pointed at the first chunk containing its code (a chunk that
-  spans two pages can still cite its first). `code_fixes: {wrong: right}` applies
+  `source_page` is the page of the first *line* containing its code
+  (`ManualChunk.line_pages`), for every extraction, so a chunk or window that
+  spans pages cites the right one (page citations are the PDF's page index,
+  which equals the printed page number in every manual that has records). `code_fixes: {wrong: right}` applies
   reviewed corrections for codes a font renders as look-alike glyphs (LG's
   `dEz` -> `dE2`, `svd` -> `Sud`, `vs` -> `uS`); check the rendered page first.
   Bedrock cost estimates use calibrated output tokens: ~81 per chunk (3,311 out /

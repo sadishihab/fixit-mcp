@@ -267,7 +267,7 @@
     "parts_needed": [],
     "safety_warnings": [],
     "difficulty": "easy",
-    "source_page": 39,
+    "source_page": 40,
     "source_section": "17\u2000Troubleshooting",
     "source_chunk_id": "bosch-she53b75uc-dishwasher::chunk-0276",
     "extraction_confidence": 0.95
@@ -365,7 +365,7 @@
     "parts_needed": [],
     "safety_warnings": [],
     "difficulty": "call_service",
-    "source_page": 40,
+    "source_page": 41,
     "source_section": "17\u2000Troubleshooting",
     "source_chunk_id": "bosch-she53b75uc-dishwasher::chunk-0277",
     "extraction_confidence": 1.0
@@ -387,7 +387,7 @@
     "parts_needed": [],
     "safety_warnings": [],
     "difficulty": "easy",
-    "source_page": 40,
+    "source_page": 41,
     "source_section": "17\u2000Troubleshooting",
     "source_chunk_id": "bosch-she53b75uc-dishwasher::chunk-0277",
     "extraction_confidence": 1.0
@@ -414,7 +414,7 @@
     "parts_needed": [],
     "safety_warnings": [],
     "difficulty": "easy",
-    "source_page": 40,
+    "source_page": 41,
     "source_section": "17\u2000Troubleshooting",
     "source_chunk_id": "bosch-she53b75uc-dishwasher::chunk-0277",
     "extraction_confidence": 0.9
@@ -485,194 +485,6 @@
     "source_section": "Before You Call For Service\u2026",
     "source_chunk_id": "ge-jbp26-range::chunk-0084",
     "extraction_confidence": 0.95
-  },
-  {
-    "manual_id": "samsung-dve45t6000w-dryer",
-    "brand": "Samsung",
-    "model": "DVE45T6000W",
-    "appliance_type": "dryer",
-    "error_code": "dC",
-    "code_normalized": "DC",
-    "meaning": "Operating the dryer with the door open.",
-    "likely_causes": [],
-    "repair_steps": [
-      "Make sure the door is properly closed.",
-      "Make sure laundry is not caught in the door."
-    ],
-    "parts_needed": [],
-    "safety_warnings": [],
-    "difficulty": "easy",
-    "source_page": 48,
-    "source_section": "Troubleshooting",
-    "source_chunk_id": "samsung-dve45t6000w-dryer::chunk-0168",
-    "extraction_confidence": 1.0
-  },
-  {
-    "manual_id": "samsung-dve45t6000w-dryer",
-    "brand": "Samsung",
-    "model": "DVE45T6000W",
-    "appliance_type": "dryer",
-    "error_code": "FC",
-    "code_normalized": "FC",
-    "meaning": "Invalid power source frequency.",
-    "likely_causes": [],
-    "repair_steps": [
-      "Try restarting the cycle.",
-      "If this information code remains, contact a Samsung service center."
-    ],
-    "parts_needed": [],
-    "safety_warnings": [],
-    "difficulty": "easy",
-    "source_page": 48,
-    "source_section": "Troubleshooting",
-    "source_chunk_id": "samsung-dve45t6000w-dryer::chunk-0168",
-    "extraction_confidence": 1.0
-  },
-  {
-    "manual_id": "samsung-dve45t6000w-dryer",
-    "brand": "Samsung",
-    "model": "DVE45T6000W",
-    "appliance_type": "dryer",
-    "error_code": "AC",
-    "code_normalized": "AC",
-    "meaning": "Electronic control problem (Invalid Communication).",
-    "likely_causes": [],
-    "repair_steps": [
-      "Contact a Samsung service center."
-    ],
-    "parts_needed": [],
-    "safety_warnings": [],
-    "difficulty": "call_service",
-    "source_page": 48,
-    "source_section": "Troubleshooting",
-    "source_chunk_id": "samsung-dve45t6000w-dryer::chunk-0168",
-    "extraction_confidence": 1.0
-  },
-  {
-    "manual_id": "samsung-dve45t6000w-dryer",
-    "brand": "Samsung",
-    "model": "DVE45T6000W",
-    "appliance_type": "dryer",
-    "error_code": "HC",
-    "code_normalized": "HC",
-    "meaning": "High temperature heating check.",
-    "likely_causes": [],
-    "repair_steps": [
-      "Clean the lint filter.",
-      "If this information code remains, contact a Samsung service center."
-    ],
-    "parts_needed": [],
-    "safety_warnings": [],
-    "difficulty": "easy",
-    "source_page": 48,
-    "source_section": "Troubleshooting",
-    "source_chunk_id": "samsung-dve45t6000w-dryer::chunk-0168",
-    "extraction_confidence": 1.0
-  },
-  {
-    "manual_id": "samsung-dve45t6000w-dryer",
-    "brand": "Samsung",
-    "model": "DVE45T6000W",
-    "appliance_type": "dryer",
-    "error_code": "9C1",
-    "code_normalized": "9C1",
-    "meaning": "The electronic control needs to be checked.",
-    "likely_causes": [],
-    "repair_steps": [
-      "Check if power is supplied properly.",
-      "If the information code remains, contact a Samsung service center."
-    ],
-    "parts_needed": [],
-    "safety_warnings": [],
-    "difficulty": "easy",
-    "source_page": 48,
-    "source_section": "Troubleshooting",
-    "source_chunk_id": "samsung-dve45t6000w-dryer::chunk-0168",
-    "extraction_confidence": 1.0
-  },
-  {
-    "manual_id": "samsung-dve45t6000w-dryer",
-    "brand": "Samsung",
-    "model": "DVE45T6000W",
-    "appliance_type": "dryer",
-    "error_code": "tC",
-    "code_normalized": "TC",
-    "meaning": "The Thermistor1 resistance is very low or high.",
-    "likely_causes": [],
-    "repair_steps": [
-      "Check for a clogged lint screen.",
-      "Check if the vent system is restricted.",
-      "If this information code remains, contact a Samsung service center."
-    ],
-    "parts_needed": [],
-    "safety_warnings": [],
-    "difficulty": "easy",
-    "source_page": 48,
-    "source_section": "Troubleshooting",
-    "source_chunk_id": "samsung-dve45t6000w-dryer::chunk-0168",
-    "extraction_confidence": 1.0
-  },
-  {
-    "manual_id": "samsung-dve45t6000w-dryer",
-    "brand": "Samsung",
-    "model": "DVE45T6000W",
-    "appliance_type": "dryer",
-    "error_code": "tC5",
-    "code_normalized": "TC5",
-    "meaning": "The Thermistor2 resistance is very low or high.",
-    "likely_causes": [],
-    "repair_steps": [
-      "Check for a clogged lint screen.",
-      "Check if the vent system is restricted.",
-      "If this information code remains, contact a Samsung service center."
-    ],
-    "parts_needed": [],
-    "safety_warnings": [],
-    "difficulty": "easy",
-    "source_page": 48,
-    "source_section": "Troubleshooting",
-    "source_chunk_id": "samsung-dve45t6000w-dryer::chunk-0168",
-    "extraction_confidence": 1.0
-  },
-  {
-    "manual_id": "samsung-dve45t6000w-dryer",
-    "brand": "Samsung",
-    "model": "DVE45T6000W",
-    "appliance_type": "dryer",
-    "error_code": "dF",
-    "code_normalized": "DF",
-    "meaning": "Incorrect door switch.",
-    "likely_causes": [],
-    "repair_steps": [
-      "Contact a Samsung service center."
-    ],
-    "parts_needed": [],
-    "safety_warnings": [],
-    "difficulty": "call_service",
-    "source_page": 48,
-    "source_section": "Troubleshooting",
-    "source_chunk_id": "samsung-dve45t6000w-dryer::chunk-0168",
-    "extraction_confidence": 1.0
-  },
-  {
-    "manual_id": "samsung-dve45t6000w-dryer",
-    "brand": "Samsung",
-    "model": "DVE45T6000W",
-    "appliance_type": "dryer",
-    "error_code": "3C",
-    "code_normalized": "3C",
-    "meaning": "The PBA needs to be checked.",
-    "likely_causes": [],
-    "repair_steps": [
-      "Unplug the power plug and contact a Samsung service center."
-    ],
-    "parts_needed": [],
-    "safety_warnings": [],
-    "difficulty": "call_service",
-    "source_page": 48,
-    "source_section": "Troubleshooting",
-    "source_chunk_id": "samsung-dve45t6000w-dryer::chunk-0168",
-    "extraction_confidence": 1.0
   },
   {
     "manual_id": "lg-wm4000hwa-washer",
@@ -1057,9 +869,197 @@
     "parts_needed": [],
     "safety_warnings": [],
     "difficulty": "call_service",
-    "source_page": 44,
+    "source_page": 45,
     "source_section": "TROUBLESHOOTING",
     "source_chunk_id": "lg-wm4000hwa-washer::chunk-0216",
     "extraction_confidence": 0.95
+  },
+  {
+    "manual_id": "samsung-dve45t6000w-dryer",
+    "brand": "Samsung",
+    "model": "DVE45T6000W",
+    "appliance_type": "dryer",
+    "error_code": "dC",
+    "code_normalized": "DC",
+    "meaning": "Operating the dryer with the door open.",
+    "likely_causes": [],
+    "repair_steps": [
+      "Make sure the door is properly closed.",
+      "Make sure laundry is not caught in the door."
+    ],
+    "parts_needed": [],
+    "safety_warnings": [],
+    "difficulty": "easy",
+    "source_page": 48,
+    "source_section": "Troubleshooting",
+    "source_chunk_id": "samsung-dve45t6000w-dryer::chunk-0168",
+    "extraction_confidence": 1.0
+  },
+  {
+    "manual_id": "samsung-dve45t6000w-dryer",
+    "brand": "Samsung",
+    "model": "DVE45T6000W",
+    "appliance_type": "dryer",
+    "error_code": "FC",
+    "code_normalized": "FC",
+    "meaning": "Invalid power source frequency.",
+    "likely_causes": [],
+    "repair_steps": [
+      "Try restarting the cycle.",
+      "If this information code remains, contact a Samsung service center."
+    ],
+    "parts_needed": [],
+    "safety_warnings": [],
+    "difficulty": "easy",
+    "source_page": 48,
+    "source_section": "Troubleshooting",
+    "source_chunk_id": "samsung-dve45t6000w-dryer::chunk-0168",
+    "extraction_confidence": 1.0
+  },
+  {
+    "manual_id": "samsung-dve45t6000w-dryer",
+    "brand": "Samsung",
+    "model": "DVE45T6000W",
+    "appliance_type": "dryer",
+    "error_code": "AC",
+    "code_normalized": "AC",
+    "meaning": "Electronic control problem (Invalid Communication).",
+    "likely_causes": [],
+    "repair_steps": [
+      "Contact a Samsung service center."
+    ],
+    "parts_needed": [],
+    "safety_warnings": [],
+    "difficulty": "call_service",
+    "source_page": 48,
+    "source_section": "Troubleshooting",
+    "source_chunk_id": "samsung-dve45t6000w-dryer::chunk-0168",
+    "extraction_confidence": 1.0
+  },
+  {
+    "manual_id": "samsung-dve45t6000w-dryer",
+    "brand": "Samsung",
+    "model": "DVE45T6000W",
+    "appliance_type": "dryer",
+    "error_code": "HC",
+    "code_normalized": "HC",
+    "meaning": "High temperature heating check.",
+    "likely_causes": [],
+    "repair_steps": [
+      "Clean the lint filter.",
+      "If this information code remains, contact a Samsung service center."
+    ],
+    "parts_needed": [],
+    "safety_warnings": [],
+    "difficulty": "easy",
+    "source_page": 48,
+    "source_section": "Troubleshooting",
+    "source_chunk_id": "samsung-dve45t6000w-dryer::chunk-0168",
+    "extraction_confidence": 1.0
+  },
+  {
+    "manual_id": "samsung-dve45t6000w-dryer",
+    "brand": "Samsung",
+    "model": "DVE45T6000W",
+    "appliance_type": "dryer",
+    "error_code": "9C1",
+    "code_normalized": "9C1",
+    "meaning": "The electronic control needs to be checked.",
+    "likely_causes": [],
+    "repair_steps": [
+      "Check if power is supplied properly.",
+      "If the information code remains, contact a Samsung service center."
+    ],
+    "parts_needed": [],
+    "safety_warnings": [],
+    "difficulty": "easy",
+    "source_page": 48,
+    "source_section": "Troubleshooting",
+    "source_chunk_id": "samsung-dve45t6000w-dryer::chunk-0168",
+    "extraction_confidence": 1.0
+  },
+  {
+    "manual_id": "samsung-dve45t6000w-dryer",
+    "brand": "Samsung",
+    "model": "DVE45T6000W",
+    "appliance_type": "dryer",
+    "error_code": "tC",
+    "code_normalized": "TC",
+    "meaning": "The Thermistor1 resistance is very low or high.",
+    "likely_causes": [],
+    "repair_steps": [
+      "Check for a clogged lint screen.",
+      "Check if the vent system is restricted.",
+      "If this information code remains, contact a Samsung service center."
+    ],
+    "parts_needed": [],
+    "safety_warnings": [],
+    "difficulty": "easy",
+    "source_page": 48,
+    "source_section": "Troubleshooting",
+    "source_chunk_id": "samsung-dve45t6000w-dryer::chunk-0168",
+    "extraction_confidence": 1.0
+  },
+  {
+    "manual_id": "samsung-dve45t6000w-dryer",
+    "brand": "Samsung",
+    "model": "DVE45T6000W",
+    "appliance_type": "dryer",
+    "error_code": "tC5",
+    "code_normalized": "TC5",
+    "meaning": "The Thermistor2 resistance is very low or high.",
+    "likely_causes": [],
+    "repair_steps": [
+      "Check for a clogged lint screen.",
+      "Check if the vent system is restricted.",
+      "If this information code remains, contact a Samsung service center."
+    ],
+    "parts_needed": [],
+    "safety_warnings": [],
+    "difficulty": "easy",
+    "source_page": 48,
+    "source_section": "Troubleshooting",
+    "source_chunk_id": "samsung-dve45t6000w-dryer::chunk-0168",
+    "extraction_confidence": 1.0
+  },
+  {
+    "manual_id": "samsung-dve45t6000w-dryer",
+    "brand": "Samsung",
+    "model": "DVE45T6000W",
+    "appliance_type": "dryer",
+    "error_code": "dF",
+    "code_normalized": "DF",
+    "meaning": "Incorrect door switch.",
+    "likely_causes": [],
+    "repair_steps": [
+      "Contact a Samsung service center."
+    ],
+    "parts_needed": [],
+    "safety_warnings": [],
+    "difficulty": "call_service",
+    "source_page": 48,
+    "source_section": "Troubleshooting",
+    "source_chunk_id": "samsung-dve45t6000w-dryer::chunk-0168",
+    "extraction_confidence": 1.0
+  },
+  {
+    "manual_id": "samsung-dve45t6000w-dryer",
+    "brand": "Samsung",
+    "model": "DVE45T6000W",
+    "appliance_type": "dryer",
+    "error_code": "3C",
+    "code_normalized": "3C",
+    "meaning": "The PBA needs to be checked.",
+    "likely_causes": [],
+    "repair_steps": [
+      "Unplug the power plug and contact a Samsung service center."
+    ],
+    "parts_needed": [],
+    "safety_warnings": [],
+    "difficulty": "call_service",
+    "source_page": 48,
+    "source_section": "Troubleshooting",
+    "source_chunk_id": "samsung-dve45t6000w-dryer::chunk-0168",
+    "extraction_confidence": 1.0
   }
 ]

@@ -2548,3 +2548,9 @@ full detail behind each number.
   - The calibrated per-chunk output estimate (81) undershot dense code windows by ~4x ($0.04 estimated vs $0.144 real); added a separate per-window figure.
 - **Total Bedrock spend**: about $0.59 across six runs (two were re-runs caused by the mistakes above).
 - **Still open**: a chunk that spans two pages cites its first page (`uS` is on p45, cited p44).
+
+### 2026-09-30 — citations used a chunk's first page; also, the LG dryer's cache predates the cache-key fix
+
+- **Tool/SDK**: `refine_citations`, `ManualChunk.page_start`, the extraction cache.
+- **Actual**: A chunk or merged window cited its first page even when the code sat on a later one: LG `uS` (p45, cited 44) and four Bosch records (`E:34-00`, `E:90-01`, `E:92-40`, the range row: cited one page early). Chunks did not record which page each line came from, so the fix needed a new `line_pages` field on `ManualChunk`.
+- **Also found**: the LG dryer's six chunks are *uncached* under the current key, because they were extracted before the cache-key fix (which added the extractor tag). Re-running `extract_codes.py` for it would silently spend ~$0.1 and rewrite its records, so its citations were checked by hand instead (all p31, one chunk spanning only p31).
