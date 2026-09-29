@@ -1,3 +1,4 @@
+# ruff: noqa: E501  (embedded JavaScript harness lines)
 """Tests for the pure/DOM-free functions in demo/static/index.html's
 script: the card-ownership decision (pickCardForTurn), the MCP Apps
 handshake message builders, and the chip-text formatter.
@@ -184,3 +185,95 @@ def test_size_reporter_is_appended_without_breaking_the_outer_script_tag() -> No
     # *executed/concatenated* output string to contain it, since by then
     # it's just string data, not live markup.
     assert "</" + "script>" in out
+
+
+# --- one turn at a time: the DOM wiring, run against a stub DOM --------------------------------
+
+_STUB_DOM = r"""
+function makeEl(id) {
+  return {
+    id: id, disabled: false, value: "", className: "", textContent: "", style: {}, children: [],
+    handlers: {}, firstChild: null, scrollTop: 0, scrollHeight: 0,
+    classList: { add: function () {}, remove: function () {} },
+    addEventListener: function (ev, fn) { this.handlers[ev] = fn; },
+    appendChild: function (c) { this.children.push(c); return c; },
+    setAttribute: function () {}, focus: function () {},
+  };
+}
+var els = {};
+["conversation","textInput","sendBtn","micBtn","muteBtn","newConvoBtn"].forEach(function (id) { els[id] = makeEl(id); });
+var document = { getElementById: function (id) { return els[id]; }, createElement: function () { return makeEl("x"); } };
+var window = { addEventListener: function () {}, crypto: { randomUUID: function () { return "sid-" + Math.random(); } } };
+var pendingFetches = [];
+var fetchBodies = [];
+function fetch(url, opts) {
+  fetchBodies.push(JSON.parse(opts.body));
+  return new Promise(function (resolve, reject) { pendingFetches.push({ resolve: resolve, reject: reject }); });
+}
+"""
+
+
+def _run_wiring(driver_js: str) -> object:
+    script = re.search(r"<script>([\s\S]*?)</script>", INDEX_HTML).group(1)
+    js = _STUB_DOM + script + "\n" + driver_js
+    completed = subprocess.run([NODE_PATH, "-e", js], capture_output=True, text=True, timeout=10, check=True)
+    return json.loads(completed.stdout.strip().splitlines()[-1])
+
+
+_OK_RESPONSE = (
+    '{ ok: true, json: function () { return Promise.resolve({ reply_text: "hi", tool_calls: [] }); } }'
+)
+
+
+@requires_node
+def test_input_and_send_are_disabled_while_a_turn_is_pending_and_a_second_message_is_not_sent() -> None:
+    result = _run_wiring(
+        f"""
+(async function () {{
+  var t = els.textInput, s = els.sendBtn;
+  t.value = "first"; s.handlers.click();
+  var during = {{ input: t.disabled, send: s.disabled, mic: els.micBtn.disabled, newConvo: els.newConvoBtn.disabled }};
+  t.value = "second"; s.handlers.click(); t.handlers.keydown({{ key: "Enter" }});
+  var sentWhilePending = fetchBodies.length;
+  pendingFetches[0].resolve({_OK_RESPONSE});
+  await new Promise(function (r) {{ setTimeout(r, 20); }});
+  var after = {{ input: t.disabled, send: s.disabled }};
+  t.value = "third"; s.handlers.click();
+  console.log(JSON.stringify({{ during: during, sentWhilePending: sentWhilePending, after: after, total: fetchBodies.length }}));
+  process.exit(0);
+}})();
+"""
+    )
+    assert result["during"] == {"input": True, "send": True, "mic": True, "newConvo": True}
+    assert result["sentWhilePending"] == 1  # neither the click nor Enter sent a second request
+    assert result["after"] == {"input": False, "send": False}
+    assert result["total"] == 2  # a later message goes through once the turn finished
+
+
+@requires_node
+def test_input_is_re_enabled_after_a_failed_turn_and_a_409_says_to_wait() -> None:
+    result = _run_wiring(
+        """
+(async function () {
+  var t = els.textInput, s = els.sendBtn;
+  t.value = "first"; s.handlers.click();
+  pendingFetches[0].resolve({ ok: false, status: 409, json: function () { return Promise.resolve({ error: "turn_in_progress", retryable: true }); } });
+  await new Promise(function (r) { setTimeout(r, 20); });
+  var afterConflict = { input: t.disabled, send: s.disabled };
+  t.value = "second"; s.handlers.click();
+  pendingFetches[1].reject(new Error("network down"));
+  await new Promise(function (r) { setTimeout(r, 20); });
+  console.log(JSON.stringify({ afterConflict: afterConflict, afterNetworkError: { input: t.disabled, send: s.disabled },
+    msg409: chatErrorMessage(true, 409), msgOther: chatErrorMessage(true, 504) }));
+  process.exit(0);
+})();
+"""
+    )
+    assert result["afterConflict"] == {"input": False, "send": False}
+    assert result["afterNetworkError"] == {"input": False, "send": False}
+    assert "still working" in result["msg409"]
+    assert "hiccup" in result["msgOther"]
+
+
+def test_the_page_gives_up_on_a_request_that_never_answers() -> None:
+    assert "AbortController" in INDEX_HTML and "REQUEST_TIMEOUT_MS" in INDEX_HTML

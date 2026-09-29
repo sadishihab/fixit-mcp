@@ -33,6 +33,13 @@ class DemoSettings(BaseSettings):
     # forever calling tools without ever producing a final answer.
     max_tool_rounds: int = 4
 
+    # Time budgets, so one dropped response can never hang a turn (FRICTION_LOG.md,
+    # step 13): each MCP tool call / resource read, each Bedrock Converse call,
+    # and the whole turn (which bounds the sum of several rounds).
+    tool_timeout_seconds: float = 15.0
+    converse_timeout_seconds: float = 30.0
+    turn_timeout_seconds: float = 90.0
+
     # Only read by the opt-in live test (FIXIT_DEMO_TESTS=1) -- a deployed
     # AgentCore Runtime ARN to run one real conversation against.
     live_agent_arn: str = ""

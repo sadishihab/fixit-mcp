@@ -12,6 +12,7 @@ tool-use-client-side.md before writing this, not guessed.
 from __future__ import annotations
 
 import asyncio
+import copy
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -152,6 +153,91 @@ def build_tool_config(tool_defs: list[ToolDef]) -> dict[str, Any] | None:
             for tool in tool_defs
         ]
     }
+
+
+DEFAULT_TOOL_TIMEOUT_S = 15.0
+DEFAULT_CONVERSE_TIMEOUT_S = 30.0
+
+
+class OperationTimeout(Exception):
+    """One awaited step of a turn (a tool call, a resource read, a Converse
+    call, or the whole turn) exceeded its time budget. Carries which step and
+    how long the budget was, so /chat's failure log can name both, instead of
+    the turn hanging with no signal at all (FRICTION_LOG.md, step 13)."""
+
+    def __init__(self, operation: str, timeout_s: float) -> None:
+        super().__init__(f"{operation} timed out after {timeout_s:g}s")
+        self.operation = operation
+        self.timeout_s = timeout_s
+        self.fixit_operation = operation
+
+
+async def within(timeout_s: float | None, operation: str, awaitable: Awaitable[Any]) -> Any:
+    """Await `awaitable`, raising OperationTimeout if it takes longer than
+    `timeout_s` (None disables the limit)."""
+    if timeout_s is None:
+        return await awaitable
+    try:
+        return await asyncio.wait_for(awaitable, timeout_s)
+    except TimeoutError:
+        raise OperationTimeout(operation, timeout_s) from None
+
+
+def _tool_use_ids(message: dict[str, Any]) -> list[str]:
+    return [b["toolUse"]["toolUseId"] for b in message.get("content", []) if "toolUse" in b]
+
+
+def _tool_result_ids(message: dict[str, Any]) -> list[str]:
+    return [b["toolResult"]["toolUseId"] for b in message.get("content", []) if "toolResult" in b]
+
+
+def repair_history(messages: list[dict[str, Any]]) -> int:
+    """Repairs, in place, a Converse history a failed turn left half-written:
+    an assistant toolUse that is not answered by a toolResult for every one of
+    its ids in the very next message (Bedrock rejects the whole conversation
+    with "tool_use ids were found without tool_result blocks immediately
+    after"). The dangling assistant message is dropped, as is any toolResult
+    block that no longer has its toolUse; then adjacent same-role messages are
+    merged (the API wants strictly alternating roles) and empty messages
+    removed. Returns how many dangling toolUse messages were dropped, so the
+    caller can log that it happened."""
+    dropped = 0
+    i = 0
+    while i < len(messages):
+        message = messages[i]
+        if message.get("role") == "assistant":
+            ids = _tool_use_ids(message)
+            if ids:
+                following = messages[i + 1] if i + 1 < len(messages) else None
+                answered = (
+                    following is not None
+                    and following.get("role") == "user"
+                    and set(ids) <= set(_tool_result_ids(following))
+                )
+                if not answered:
+                    del messages[i]
+                    dropped += 1
+                    continue
+        i += 1
+
+    if dropped:
+        live_ids = {tid for m in messages if m.get("role") == "assistant" for tid in _tool_use_ids(m)}
+        for message in messages:
+            if message.get("role") == "user":
+                message["content"] = [
+                    b
+                    for b in message["content"]
+                    if "toolResult" not in b or b["toolResult"]["toolUseId"] in live_ids
+                ]
+        messages[:] = [m for m in messages if m.get("content")]
+        merged: list[dict[str, Any]] = []
+        for message in messages:
+            if merged and merged[-1]["role"] == message["role"]:
+                merged[-1]["content"] = merged[-1]["content"] + message["content"]
+            else:
+                merged.append(message)
+        messages[:] = merged
+    return dropped
 
 
 @dataclass(frozen=True)
@@ -315,6 +401,8 @@ async def run_turn(
     user_message: str,
     max_rounds: int = 4,
     refresh_session: RefreshSession | None = None,
+    tool_timeout_s: float | None = DEFAULT_TOOL_TIMEOUT_S,
+    converse_timeout_s: float | None = DEFAULT_CONVERSE_TIMEOUT_S,
 ) -> TurnResult:
     """Runs one user turn to completion: possibly several rounds of
     tool_use, ending either with a plain text reply or (if max_rounds is
@@ -326,11 +414,70 @@ async def run_turn(
     hits the "session terminated" failure (see _call_tool_with_retry) swaps
     it for a freshly-opened one via `refresh_session`, and every later
     round's tool calls -- and any read_resource card fetch -- in *this*
-    turn use that new session too, never the stale reference."""
+    turn use that new session too, never the stale reference.
+
+    History integrity: a turn either completes and leaves its messages in
+    `messages`, or leaves `messages` exactly as it found it (after repairing
+    any corruption an earlier failure left, see repair_history). Every
+    failure path restores it -- an exception, a timeout, asyncio.
+    CancelledError (a client disconnect), and the max_rounds fallback -- so a
+    turn that dies after the model's toolUse message can never leave an
+    unanswered toolUse for every later turn on this session to trip over.
+
+    Each Converse call and each tool call / resource read has its own time
+    budget (`converse_timeout_s`, `tool_timeout_s`); exceeding one raises
+    OperationTimeout naming the step."""
+    repaired = repair_history(messages)
+    if repaired:
+        structlog.get_logger().warning("demo_history_repaired", dropped_tool_use_messages=repaired)
+    # The snapshot is a deep copy: after a repair the new user message may be
+    # merged into the history's last (user) message, which an in-place
+    # truncation could not undo.
+    snapshot = copy.deepcopy(messages)
+    try:
+        return await _run_turn_body(
+            snapshot=snapshot,
+            converse=converse,
+            model_id=model_id,
+            system_prompt=system_prompt,
+            messages=messages,
+            tool_defs=tool_defs,
+            session=session,
+            user_message=user_message,
+            max_rounds=max_rounds,
+            refresh_session=refresh_session,
+            tool_timeout_s=tool_timeout_s,
+            converse_timeout_s=converse_timeout_s,
+        )
+    except BaseException:
+        messages[:] = snapshot
+        raise
+
+
+async def _run_turn_body(
+    *,
+    snapshot: list[dict[str, Any]],
+    converse: Callable[..., dict[str, Any]],
+    model_id: str,
+    system_prompt: str,
+    messages: list[dict[str, Any]],
+    tool_defs: list[ToolDef],
+    session: ClientSession,
+    user_message: str,
+    max_rounds: int,
+    refresh_session: RefreshSession | None,
+    tool_timeout_s: float | None,
+    converse_timeout_s: float | None,
+) -> TurnResult:
     tool_config = build_tool_config(tool_defs)
     resource_uri_by_name = {tool.name: tool.resource_uri for tool in tool_defs if tool.resource_uri}
 
-    messages.append({"role": "user", "content": [{"text": user_message}]})
+    if messages and messages[-1]["role"] == "user":
+        # Only possible after repair_history dropped a dangling toolUse: the
+        # API wants alternating roles, so this message joins the last one.
+        messages[-1]["content"] = messages[-1]["content"] + [{"text": user_message}]
+    else:
+        messages.append({"role": "user", "content": [{"text": user_message}]})
 
     tool_calls: list[ToolCallRecord] = []
     card: CardResult | None = None
@@ -347,7 +494,7 @@ async def run_turn(
         if tool_config:
             kwargs["toolConfig"] = tool_config
 
-        response = await asyncio.to_thread(converse, **kwargs)
+        response = await within(converse_timeout_s, "bedrock_converse", asyncio.to_thread(converse, **kwargs))
         usage = response.get("usage", {})
         input_tokens += usage.get("inputTokens", 0)
         output_tokens += usage.get("outputTokens", 0)
@@ -372,8 +519,10 @@ async def run_turn(
             name = tool_use["name"]
             arguments = tool_use.get("input", {})
 
-            record, result_block, is_error, session = await _dispatch_tool_call(
-                session, name, arguments, refresh_session
+            record, result_block, is_error, session = await within(
+                tool_timeout_s,
+                f"tool_call:{name}",
+                _dispatch_tool_call(session, name, arguments, refresh_session),
             )
             tool_calls.append(record)
             result_blocks.append({"toolUseId": tool_use["toolUseId"], **result_block})
@@ -386,12 +535,19 @@ async def run_turn(
                 and resource_uri_by_name.get(name)
             ):
                 resource_uri = resource_uri_by_name[name]
-                read = await session.read_resource(resource_uri)
+                read = await within(
+                    tool_timeout_s, f"read_resource:{resource_uri}", session.read_resource(resource_uri)
+                )
                 html = read.contents[0].text if read.contents else ""
                 card = CardResult(resource_uri=resource_uri, html=html)
 
         messages.append({"role": "user", "content": [{"toolResult": b} for b in result_blocks]})
 
+    # The last message is the tool results, never an assistant reply: leaving
+    # them would end the history on a user turn, so the next user message
+    # would be a second consecutive one. Treat the exhausted turn as not
+    # having happened.
+    messages[:] = snapshot
     return TurnResult(
         reply_text="Sorry, I'm having trouble with that one -- could you try asking again?",
         tool_calls=tool_calls,

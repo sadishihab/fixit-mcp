@@ -114,6 +114,17 @@ Send the same `session_id` for every turn of one conversation.
 
 ## Design notes
 
+- **A turn never leaves the history half-written, and never hangs** (step 13).
+  `run_turn` snapshots the session's Converse history and restores it on every
+  failure path (an exception, a timeout, cancellation from a client disconnect,
+  or exhausting `max_tool_rounds`); a history already corrupted by an earlier
+  failure (a `toolUse` with no `toolResult`) is repaired first and logged as
+  `demo_history_repaired`. Each tool call, card fetch and Converse call has a
+  time budget; exceeding one is a `demo_chat_turn_failed` log line naming the
+  operation and `timeout_s`, and a 504. `/chat` runs one turn per `session_id`
+  at a time: a second request gets a 409 `turn_in_progress`, and the page
+  disables its input while a turn is pending.
+
 - **Tool definitions are never hardcoded.** At startup, the app calls
   `tools/list` once against the FixIt server and builds Amazon Bedrock's
   `toolConfig` from exactly what the server advertises (names,
@@ -166,6 +177,9 @@ All `FIXIT_DEMO_*` environment variables (`demo/config.py`):
 | `FIXIT_DEMO_BEDROCK_REGION` | `us-east-1` | Bedrock region |
 | `FIXIT_DEMO_BEDROCK_MODEL_ID` | `us.anthropic.claude-sonnet-4-5-20250929-v1:0` | Converse model id |
 | `FIXIT_DEMO_MAX_TOOL_ROUNDS` | `4` | cap on tool-use rounds per turn |
+| `FIXIT_DEMO_TOOL_TIMEOUT_SECONDS` | `15` | budget for each MCP tool call / card fetch |
+| `FIXIT_DEMO_CONVERSE_TIMEOUT_SECONDS` | `30` | budget for each Bedrock Converse call |
+| `FIXIT_DEMO_TURN_TIMEOUT_SECONDS` | `90` | budget for a whole turn |
 | `FIXIT_DEMO_LIVE_AGENT_ARN` | *(unset)* | only for the opt-in live test, below |
 
 ## Tests

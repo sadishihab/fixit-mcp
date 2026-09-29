@@ -338,7 +338,10 @@
   // plain network exception or an unexpected shape) -- never the raw
   // status code or exception text, so no internal detail reaches the
   // customer either way. Pure: no DOM, no network.
-  function chatErrorMessage(retryable) {
+  function chatErrorMessage(retryable, status) {
+    if (status === 409) {
+      return "FixIt is still working on your last question. Please wait a moment.";
+    }
     return retryable
       ? "FixIt had a brief hiccup reaching the runtime. Please try again."
       : "Sorry, something went wrong reaching FixIt. Please try again.";
@@ -422,6 +425,20 @@
     var muted = false;
     var recognizing = false;
     var cardsByWindow = new WeakMap();
+    // One turn at a time: while a /chat request is in flight the input, the
+    // send button and the mic are disabled and sendMessage() ignores calls,
+    // so a second message can never be sent into the same session (the
+    // backend rejects it with a 409 anyway).
+    var pending = false;
+    var REQUEST_TIMEOUT_MS = 120000;
+
+    function setPending(value) {
+      pending = value;
+      textInput.disabled = value;
+      sendBtn.disabled = value;
+      micBtn.disabled = value;
+      newConvoBtn.disabled = value;
+    }
 
     function clearConversation() {
       while (conversation.firstChild) {
@@ -542,17 +559,24 @@
 
     function sendMessage(text) {
       var trimmed = (text || "").trim();
-      if (!trimmed) {
+      if (!trimmed || pending) {
         return;
       }
       textInput.value = "";
       var turn = addUserBubble(trimmed);
       var thinking = addThinkingBubble(turn);
+      setPending(true);
+
+      // Never spin forever: give up after REQUEST_TIMEOUT_MS even if the
+      // backend never answers.
+      var controller = typeof AbortController === "function" ? new AbortController() : null;
+      var abortTimer = controller ? setTimeout(function () { controller.abort(); }, REQUEST_TIMEOUT_MS) : null;
 
       fetch("/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: trimmed, session_id: sessionId }),
+        signal: controller ? controller.signal : undefined,
       })
         .then(function (response) {
           if (!response.ok) {
@@ -569,6 +593,7 @@
               .then(function (body) {
                 var err = new Error("chat request failed");
                 err.retryable = !!(body && body.retryable);
+                err.status = response.status;
                 throw err;
               });
           }
@@ -591,8 +616,15 @@
         })
         .catch(function (err) {
           thinking.className = "msg assistant error";
-          thinking.textContent = chatErrorMessage(err && err.retryable);
+          thinking.textContent = chatErrorMessage(err && err.retryable, err && err.status);
           scrollToBottom();
+        })
+        .then(function () {
+          if (abortTimer) {
+            clearTimeout(abortTimer);
+          }
+          setPending(false);
+          textInput.focus();
         });
     }
 

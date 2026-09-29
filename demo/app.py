@@ -13,6 +13,7 @@ server-side: never returned to the caller or logged.
 
 from __future__ import annotations
 
+import asyncio
 import time
 import uuid
 from collections.abc import AsyncIterator
@@ -21,6 +22,7 @@ from typing import Any
 
 import boto3
 import structlog
+from botocore.config import Config
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -29,7 +31,14 @@ from pydantic import BaseModel
 
 from demo.config import DemoSettings
 from demo.mcp_session import MCPTarget, SessionManager, ToolDef, discover_tool_defs
-from demo.orchestrator import ConversationStore, build_system_prompt, is_transient_transport_error, run_turn
+from demo.orchestrator import (
+    ConversationStore,
+    OperationTimeout,
+    build_system_prompt,
+    is_transient_transport_error,
+    run_turn,
+    within,
+)
 from demo.web import INDEX_HTML
 
 # Any localhost origin, any port -- this demo has no web UI of its own yet
@@ -66,7 +75,20 @@ def create_app(target: MCPTarget, settings: DemoSettings | None = None) -> FastA
     settings = settings or DemoSettings()
     sessions = SessionManager(target)
     conversations = ConversationStore()
-    bedrock = boto3.client("bedrock-runtime", region_name=settings.bedrock_region)
+    # The client's own limits sit just above the per-call budget, so a stuck
+    # socket thread ends soon after the orchestrator has already given up on it.
+    bedrock = boto3.client(
+        "bedrock-runtime",
+        region_name=settings.bedrock_region,
+        config=Config(
+            connect_timeout=5,
+            read_timeout=settings.converse_timeout_seconds + 5,
+            retries={"max_attempts": 2},
+        ),
+    )
+    # One turn at a time per session_id: two interleaved turns would write
+    # into the same Converse history (FRICTION_LOG.md, step 13).
+    turn_locks: dict[str, asyncio.Lock] = {}
     system_prompt = build_system_prompt(settings.household_id)
     state: dict[str, list[ToolDef]] = {}
 
@@ -105,6 +127,19 @@ def create_app(target: MCPTarget, settings: DemoSettings | None = None) -> FastA
         turn_id = uuid.uuid4().hex[:12]
         total_start = time.perf_counter()
 
+        lock = turn_locks.setdefault(request.session_id, asyncio.Lock())
+        if lock.locked():
+            # No await between this check and the acquire below, so no other
+            # request can slip in between them.
+            logger.warning("demo_chat_turn_rejected", session_id=request.session_id, turn_id=turn_id)
+            return JSONResponse(status_code=409, content={"error": "turn_in_progress", "retryable": True})
+        async with lock:
+            return await _chat_turn(request, logger, turn_id, total_start)
+
+    async def _chat_turn(
+        request: ChatRequest, logger: Any, turn_id: str, total_start: float
+    ) -> ChatResponse | JSONResponse:
+
         # A session_id not seen before means the next line pays for a
         # brand-new MCP session -- against a deployed AgentCore Runtime,
         # that's a cold session (FRICTION_LOG.md's cold-start entries).
@@ -135,18 +170,35 @@ def create_app(target: MCPTarget, settings: DemoSettings | None = None) -> FastA
 
             operation = "run_turn"
             turn_start = time.perf_counter()
-            result = await run_turn(
-                converse=converse,
-                model_id=settings.bedrock_model_id,
-                system_prompt=system_prompt,
-                messages=history,
-                tool_defs=state["tool_defs"],
-                session=session,
-                user_message=request.message,
-                max_rounds=settings.max_tool_rounds,
-                refresh_session=refresh_session,
+            result = await within(
+                settings.turn_timeout_seconds,
+                "run_turn",
+                run_turn(
+                    converse=converse,
+                    model_id=settings.bedrock_model_id,
+                    system_prompt=system_prompt,
+                    messages=history,
+                    tool_defs=state["tool_defs"],
+                    session=session,
+                    user_message=request.message,
+                    max_rounds=settings.max_tool_rounds,
+                    refresh_session=refresh_session,
+                    tool_timeout_s=settings.tool_timeout_seconds,
+                    converse_timeout_s=settings.converse_timeout_seconds,
+                ),
             )
             turn_ms = (time.perf_counter() - turn_start) * 1000
+        except asyncio.CancelledError:
+            # A client disconnect (or shutdown) cancelled the turn; run_turn
+            # already restored the history on its way out.
+            logger.warning(
+                "demo_chat_turn_cancelled",
+                session_id=request.session_id,
+                turn_id=turn_id,
+                operation=operation,
+                elapsed_ms=round((time.perf_counter() - total_start) * 1000, 1),
+            )
+            raise
         except Exception as exc:
             # Whatever failed, get a record of it before anything else --
             # this is the one place a failing turn produces any signal at
@@ -156,7 +208,12 @@ def create_app(target: MCPTarget, settings: DemoSettings | None = None) -> FastA
             # never invented, only reported when the code that raised it
             # actually knows. Never logs request/response bodies, headers,
             # or credentials -- only the exception's own type and message.
-            retryable = is_transient_transport_error(exc)
+            timed_out = isinstance(exc, OperationTimeout)
+            retryable = timed_out or is_transient_transport_error(exc)
+            if timed_out and exc.operation.split(":")[0] in ("tool_call", "read_resource", "run_turn"):
+                # The MCP session may be wedged on the request that never
+                # answered; the next turn gets a fresh one.
+                await sessions.evict(request.session_id)
             logger.warning(
                 "demo_chat_turn_failed",
                 session_id=request.session_id,
@@ -164,10 +221,16 @@ def create_app(target: MCPTarget, settings: DemoSettings | None = None) -> FastA
                 operation=getattr(exc, "fixit_operation", operation),
                 exception_type=type(exc).__name__,
                 exception_message=str(exc),
+                timeout_s=exc.timeout_s if timed_out else None,
                 retryable=retryable,
                 session_was_cold=session_was_cold,
                 elapsed_ms=round((time.perf_counter() - total_start) * 1000, 1),
             )
+            if timed_out:
+                return JSONResponse(
+                    status_code=504,
+                    content={"error": "turn_timeout", "operation": exc.operation, "retryable": True},
+                )
             if retryable:
                 return JSONResponse(
                     status_code=502, content={"error": "runtime_transport_error", "retryable": True}
