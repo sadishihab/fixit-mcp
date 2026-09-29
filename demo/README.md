@@ -20,6 +20,28 @@ make demo AGENT_ARN=arn:aws:bedrock-agentcore:...   # against a deployed AgentCo
 Binds to `127.0.0.1` only. It is never meant to be exposed beyond your own
 machine. Open `http://127.0.0.1:8090/` in a browser for the web UI.
 
+## Fresh household per conversation (for recording)
+
+By default every conversation serves the one household in
+`FIXIT_DEMO_HOUSEHOLD_ID` (`house-002`), so anything a conversation adds stays
+there. For a clean start every time, turn on fresh-household mode:
+
+```bash
+FIXIT_DEMO_FRESH_HOUSEHOLD=1 make demo AGENT_ARN=<deployed runtime ARN>   # or without AGENT_ARN for the local server
+make demo-cleanup AGENT_ARN=<the same ARN>                                # when you are done
+```
+
+Each new conversation (each new `session_id`, which is what the page's "New
+conversation" button starts) gets its own `house-demo-<random>` household, and
+the system prompt names it. On that conversation's first turn the backend
+calls the server's `add_appliance` tool to give it the LG DLEX8000W dryer and
+the GE GTW680BSJWS washer with house-002's dates (through the MCP server,
+never straight into AgentCore Memory; it lists first, so a retry never
+duplicates). The household id is written to `data/state/demo_households.txt`
+(gitignored) before it is seeded; `make demo-cleanup` removes their
+appliances with `remove_appliance` and only ever touches ids starting
+`house-demo-`. House-002 is never touched in this mode.
+
 ## Web UI
 
 `GET /` serves a single self-contained page (`demo/static/index.html`,
@@ -176,6 +198,8 @@ All `FIXIT_DEMO_*` environment variables (`demo/config.py`):
 | `FIXIT_DEMO_HOUSEHOLD_ID` | `house-002` | the one household every conversation is served as |
 | `FIXIT_DEMO_BEDROCK_REGION` | `us-east-1` | Bedrock region |
 | `FIXIT_DEMO_BEDROCK_MODEL_ID` | `us.anthropic.claude-sonnet-4-5-20250929-v1:0` | Converse model id |
+| `FIXIT_DEMO_FRESH_HOUSEHOLD` | `0` | `1`: every new conversation gets its own seeded `house-demo-<random>` household (see below) |
+| `FIXIT_DEMO_HOUSEHOLDS_FILE` | `data/state/demo_households.txt` | ledger of the demo households created (gitignored), used by `make demo-cleanup` |
 | `FIXIT_DEMO_MAX_TOOL_ROUNDS` | `4` | cap on tool-use rounds per turn |
 | `FIXIT_DEMO_TOOL_TIMEOUT_SECONDS` | `15` | budget for each MCP tool call / card fetch |
 | `FIXIT_DEMO_CONVERSE_TIMEOUT_SECONDS` | `30` | budget for each Bedrock Converse call |

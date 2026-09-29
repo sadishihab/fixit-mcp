@@ -23,6 +23,15 @@ class DemoSettings(BaseSettings):
     # household until a real front end can supply its own.
     household_id: str = "house-002"
 
+    # Fresh-household mode (step 14), OFF by default so behavior is unchanged:
+    # when on, every new conversation (every new session_id, which is what the
+    # page's "New conversation" makes) gets its own throwaway `house-demo-<random>`
+    # household, seeded on its first turn with the same LG dryer and GE washer
+    # as house-002. `household_id` above is then unused. `make demo-cleanup`
+    # removes the households listed in `households_file`.
+    fresh_household: bool = False
+    households_file: str = "data/state/demo_households.txt"
+
     # Same defaults as fixit_mcp.ingestion.extraction.ExtractionSettings --
     # see there for why this exact dated/cross-region model id, not a bare
     # or undated one (verified working in this project's dev AWS account).

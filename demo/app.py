@@ -18,6 +18,7 @@ import time
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any
 
 import boto3
@@ -30,6 +31,7 @@ from mcp import ClientSession
 from pydantic import BaseModel
 
 from demo.config import DemoSettings
+from demo.households import HouseholdLedger, HouseholdProvisioner
 from demo.mcp_session import MCPTarget, SessionManager, ToolDef, discover_tool_defs
 from demo.orchestrator import (
     ConversationStore,
@@ -89,7 +91,13 @@ def create_app(target: MCPTarget, settings: DemoSettings | None = None) -> FastA
     # One turn at a time per session_id: two interleaved turns would write
     # into the same Converse history (FRICTION_LOG.md, step 13).
     turn_locks: dict[str, asyncio.Lock] = {}
-    system_prompt = build_system_prompt(settings.household_id)
+    # Which household each conversation serves: the one fixed household by
+    # default, or (FIXIT_DEMO_FRESH_HOUSEHOLD=1) a throwaway one per session_id.
+    provisioner = HouseholdProvisioner(
+        fixed_household_id=settings.household_id,
+        fresh=settings.fresh_household,
+        ledger=HouseholdLedger(Path(settings.households_file)),
+    )
     state: dict[str, list[ToolDef]] = {}
 
     @asynccontextmanager
@@ -153,6 +161,12 @@ def create_app(target: MCPTarget, settings: DemoSettings | None = None) -> FastA
             session = await sessions.get(request.session_id)
             session_setup_ms = (time.perf_counter() - session_start) * 1000
 
+            household_id = provisioner.household_for(request.session_id)
+            if provisioner.needs_seeding(request.session_id):
+                operation = "seed_household"
+                await provisioner.ensure_seeded(request.session_id, session, settings.tool_timeout_seconds)
+                session_setup_ms = (time.perf_counter() - session_start) * 1000
+
             history = conversations.get(request.session_id)
 
             def converse(**kwargs: Any) -> dict[str, Any]:
@@ -176,7 +190,7 @@ def create_app(target: MCPTarget, settings: DemoSettings | None = None) -> FastA
                 run_turn(
                     converse=converse,
                     model_id=settings.bedrock_model_id,
-                    system_prompt=system_prompt,
+                    system_prompt=build_system_prompt(household_id),
                     messages=history,
                     tool_defs=state["tool_defs"],
                     session=session,
@@ -241,6 +255,7 @@ def create_app(target: MCPTarget, settings: DemoSettings | None = None) -> FastA
             "demo_chat_turn",
             session_id=request.session_id,
             turn_id=turn_id,
+            household_id=household_id,
             session_was_cold=session_was_cold,
             session_setup_ms=round(session_setup_ms, 1),
             turn_ms=round(turn_ms, 1),

@@ -2,7 +2,7 @@
 	add-manual validate-manifest \
 	docker-build docker-run docker-smoke docker-run-agentcore seed-agentcore \
 	iam-policies docker-push deploy-runtime runtime-smoke runtime-latency teardown-runtime teardown-runtime-all \
-	demo
+	demo demo-cleanup
 
 run:
 	uv run python -m fixit_mcp
@@ -35,6 +35,14 @@ tunnel:
 # AGENT_ARN to point it at a deployed AgentCore Runtime instead (SigV4-signed).
 demo:
 	uv run --group demo python -m demo $(if $(AGENT_ARN),--agent-arn $(AGENT_ARN),)
+
+# Fresh-household demo (each new conversation gets its own seeded, throwaway
+# house-demo-<random> household): FIXIT_DEMO_FRESH_HOUSEHOLD=1 make demo ...
+# Removes every house-demo-* household this machine created (listed in the
+# gitignored data/state/demo_households.txt), through remove_appliance. Pass the
+# same AGENT_ARN you ran the demo against.
+demo-cleanup:
+	uv run --group demo python -m demo.cleanup $(if $(AGENT_ARN),--agent-arn $(AGENT_ARN),)
 
 # Downloads manuals listed in data/manuals/manifest.yaml to data/manuals/pdf/.
 # Pass FORCE=1 to re-download files that already exist.
