@@ -1,5 +1,8 @@
 # FixIt MCP
 
+[![CI](https://github.com/sadishihab/fixit-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/sadishihab/fixit-mcp/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 A self-hosted MCP server for diagnosing appliance problems, built for the
 **Build, Ship, Shape: Amazon Developer Hackathon** (Alexa+ track).
 
@@ -26,6 +29,29 @@ architecture.
 | `remove_appliance` | Removes an appliance from a household's registry. |
 | `diagnose_error` | Looks up an appliance error code's meaning, causes, repair steps, parts, and safety warnings, cited to the source manual; has an MCP Apps visual card. |
 | `check_warranty` | Reports whether a registered appliance's recorded warranty is active or expired, from a deterministic server-side date comparison — never a coverage claim. |
+
+## Project status
+
+**Works today**
+- The MCP server (spec 2025-11-25, also negotiates 2025-03-26) with five tools:
+  appliance registry, error-code diagnosis from real manuals (with a visual
+  card), and a recorded-date warranty check.
+- Offline ingestion of manuals into a committed error-code index, and a
+  one-command way to add a manual (`make add-manual`).
+- A container image and a deployment to AgentCore Runtime with household data
+  in AgentCore Memory (IAM auth only).
+
+**Simulated**
+- The **Alexa+ client**. There is no real Alexa+ connection yet; the demo
+  (`make demo`) is a small local backend that plays Alexa+'s role: an MCP
+  client driving an LLM tool-use loop. It is not the real client.
+
+**Roadmap**
+- OAuth account linking, so real Alexa+ can reach the deployed server.
+- Parts ordering.
+- Maintenance scheduling.
+- More manuals (see [`CONTRIBUTING.md`](CONTRIBUTING.md) and
+  [`docs/good-first-issues/`](docs/good-first-issues/)).
 
 ## Demo video
 

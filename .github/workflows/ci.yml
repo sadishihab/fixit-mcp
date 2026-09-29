@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Set up Python 3.12
+        run: uv python install 3.12
+
+      # Node is only needed by the visual-card tests (they run the card's
+      # JavaScript); without it they skip rather than fail.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install dependencies
+        run: uv sync --locked --group demo
+
+      - name: Lint
+        run: make lint
+
+      - name: Format check
+        run: uv run ruff format --check .
+
+      # Includes validate-manifest (tests/unit/test_manifest_validation.py).
+      # No AWS credentials or secrets exist in this workflow, so the opt-in
+      # live tests (FIXIT_AGENTCORE_TESTS, FIXIT_DOCKER_TESTS) stay skipped.
+      - name: Test
+        run: make test
