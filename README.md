@@ -8,17 +8,21 @@ A self-hosted MCP server for diagnosing appliance problems, built for the
 
 ## Overview
 
-FixIt connects to Alexa+ via the official Alexa+ MCP Toolkit and helps
-customers with home appliances: diagnosing error codes from real appliance
-manuals, remembering which appliances a household owns, guiding repairs with
-visual cards, ordering replacement parts, and scheduling maintenance.
+FixIt is a self-hosted MCP server (spec 2025-11-25, Streamable HTTP) for home
+appliance help, built for the Alexa+ track of the **Build, Ship, Shape: Amazon
+Developer Hackathon**. It works today: it diagnoses appliance error codes from
+structured, cited data extracted offline from real manuals (extraction runs on
+Amazon Bedrock at ingestion time, never inside the live tools); it keeps a
+household's appliances across sessions in Amazon Bedrock AgentCore Memory; it
+answers "is it still under warranty?" with a deterministic date comparison; it
+returns an MCP Apps visual card for diagnoses; and it runs on Amazon Bedrock
+AgentCore Runtime.
 
-This repository is a tested MCP server running locally with five tools (see
-below). RAG/ingestion, an Alexa+-reachable deployment with OAuth, parts
-ordering, and maintenance scheduling are not built yet — see
-[`docs/alexa-plus-requirements.md`](docs/alexa-plus-requirements.md) for the
-full requirements checklist and [`CLAUDE.md`](CLAUDE.md) for the target
-architecture.
+Not built: OAuth account linking, so the deployed server accepts IAM (SigV4)
+callers only and the real Alexa+ client cannot call it yet; parts ordering;
+maintenance scheduling. The demo client is a simulated Alexa+, not the real one.
+See [`docs/alexa-plus-requirements.md`](docs/alexa-plus-requirements.md) for the
+full requirements checklist and [`CLAUDE.md`](CLAUDE.md) for the architecture.
 
 ## Tools
 
@@ -60,17 +64,22 @@ TODO: link once recorded.
 ## Architecture
 
 ```
-Alexa+  <-- Streamable HTTP, MCP 2025-11-25 -->  FixIt MCP server (this repo)
-                                                        |
-                                          in-memory repository (today)
-                                          -> swappable for a real DB later
+Alexa+ (real client: not connected yet; the demo simulates it)
+   |  Streamable HTTP, MCP 2025-11-25 (also negotiates 2025-03-26)
+   v
+FixIt MCP server  (AgentCore Runtime; `make run` locally)
+   |-- error-code index: data/index/error_codes.json, loaded once at startup
+   `-- household appliances: AgentCore Memory (`agentcore` backend), SQLite
+       or in-memory for local dev
+
+Offline, never in a request: manual PDFs -> parser -> Bedrock extraction ->
+committed error-code index (`make add-manual`)
 ```
 
-Planned (not built yet): an offline ingestion pipeline using Amazon Bedrock +
-Strands parses appliance manuals into a searchable knowledge base; the runtime
-server (this repo) stays a thin, fast lookup layer with **no LLM calls in tool
-handlers** — Alexa+ does all language generation. The runtime is intended to
-deploy to Amazon Bedrock AgentCore Runtime.
+The runtime server is a thin, fast lookup layer with **no LLM calls in tool
+handlers**: Alexa+ does all language generation from the structured data the
+tools return. The heavy AI work (parsing and extracting manuals) happens
+offline, in the ingestion pipeline.
 
 ## How this meets the Alexa+ track requirements
 
@@ -84,12 +93,15 @@ deploy to Amazon Bedrock AgentCore Runtime.
   Alexa+ client sends (verified in `tests/integration/`).
 - **Transport**: Streamable HTTP, stateless mode, served at `0.0.0.0:8000/mcp`
   — matching both the Alexa+ Toolkit's requirements and Amazon Bedrock
-  AgentCore Runtime's container contract for a future deployment.
+  AgentCore Runtime's container contract (the image is deployed there today).
 - **Latency**: no LLM calls in any tool handler; `tests/integration/test_latency.py`
   asserts p95 < 100ms locally over 50 calls. On the deployed AgentCore Runtime,
-  **warm calls fit the 500ms Alexa+ budget** (~200-250ms p50 in-region); **cold
-  sessions are a known limitation** (a brand-new session can cost ~5s end to
-  end) — see `FRICTION_LOG.md`'s "Cold-start latency: known limitation" entry.
+  the **measured** warm p50 was about 572 ms from Dhaka, of which about 320 ms is
+  network to us-east-1. The in-region figure of roughly 200-250 ms is an
+  **estimate**, not a measurement, so the 500ms Alexa+ budget is not yet
+  confirmed from inside the region. **Cold sessions** (a brand-new session) take
+  about 5 seconds and are a known limitation; see `FRICTION_LOG.md`'s
+  "Cold-start latency: known limitation" entry.
 - Full requirement-by-requirement checklist: [`docs/alexa-plus-requirements.md`](docs/alexa-plus-requirements.md).
 
 ## Quickstart
@@ -246,7 +258,7 @@ make runtime-latency RUNTIME_ARN=<arn>   # cold vs warm latency, with the Runtim
 > **AgentCore Runtime has no such volume by default.** Every new session
 > runs in a fresh microVM created from the image, so appliances added in one
 > Alexa+ conversation are gone in the next. Deploy with the `agentcore`
-> backend (below) instead, which keeps household data outside the container.
+> backend (above) instead, which keeps household data outside the container.
 
 ## Simulated Alexa+ demo
 
@@ -255,8 +267,8 @@ There's no real Alexa+ integration yet (see the OAuth row in
 the meantime, [`demo/`](demo/README.md) is a local FastAPI backend that
 plays Alexa+'s role -- a real MCP client driving a tool-use LLM loop
 against this server, including the MCP Apps card -- so the tool-calling
-behavior can be exercised and demoed. Backend only, no web UI yet, always
-clearly labeled `"simulated_alexa_plus": true`.
+behavior can be exercised and demoed. It has a small single-page web UI, and every
+response is clearly labeled `"simulated_alexa_plus": true`.
 
 ```bash
 make demo                                          # against the local dev server
@@ -324,7 +336,8 @@ Test suite:
   with no LLM extraction strategies.
 - **Amazon Bedrock** (Claude): offline error-code extraction from manuals
   (`FIXIT_EXTRACTOR=bedrock`), never at request time.
-- Planned: Amazon Bedrock AgentCore Runtime (hosting).
+- **Amazon Bedrock AgentCore Runtime**: hosts the server (IAM inbound auth only
+  for now).
 
 ## Open-source components
 
