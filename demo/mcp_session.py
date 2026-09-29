@@ -126,6 +126,17 @@ class _SessionOwner:
         assert self.session is not None
         return self.session
 
+    def is_dead(self) -> bool:
+        """True once the background task has exited with a fatal error --
+        e.g. the underlying connection/session itself broke, not just a
+        single request on it (that's a per-call failure, handled by
+        orchestrator._call_tool_with_retry, and never touches this).
+        Checked without blocking: unlike wait_ready(), this never waits on
+        an owner that's still starting up -- one still becoming ready is not
+        dead, so SessionManager.get() doesn't evict it out from under
+        whichever caller is already waiting on it."""
+        return self._ready.is_set() and self._error is not None
+
     async def aclose(self) -> None:
         self._close_requested.set()
         await self._task
@@ -140,23 +151,66 @@ class SessionManager:
     microVM," i.e. a fresh cold start (FRICTION_LOG.md's cold-start
     entries), rather than a fresh MCP session (and a fresh cold start) per
     message.
+
+    get() also recovers from a dead owner (its background task exited with a
+    fatal error -- see _SessionOwner.is_dead): rather than replaying that
+    cached error forever, the next get() for that session_id closes it and
+    starts a fresh one, so one bad session doesn't stay broken for every
+    later turn without the customer having to start a new conversation. A
+    per-session_id lock (created lazily, one per session_id ever seen --
+    unbounded but negligible for a demo's session count) serializes the
+    "is it dead, do I need to replace it" decision so two concurrent /chat
+    requests for the *same* session_id can't each spawn their own owner;
+    requests for different session_ids use different locks and never block
+    each other on this.
     """
 
     def __init__(self, target: MCPTarget) -> None:
         self._target = target
         self._owners: dict[str, _SessionOwner] = {}
+        self._locks: dict[str, asyncio.Lock] = {}
+
+    def _lock_for(self, session_id: str) -> asyncio.Lock:
+        lock = self._locks.get(session_id)
+        if lock is None:
+            lock = self._locks[session_id] = asyncio.Lock()
+        return lock
 
     def is_open(self, session_id: str) -> bool:
-        """True if this session_id already has a live session -- so a
-        caller can tell, before calling get(), whether the next get() will
-        pay for a fresh MCP session (a cold AgentCore Runtime session, if
-        pointed at a deployed runtime) or reuse a warm one."""
-        return session_id in self._owners
+        """True if this session_id already has a live (not dead) session --
+        so a caller can tell, before calling get(), whether the next get()
+        will pay for a fresh MCP session (a cold AgentCore Runtime session,
+        if pointed at a deployed runtime) or reuse a warm one."""
+        owner = self._owners.get(session_id)
+        return owner is not None and not owner.is_dead()
 
     async def get(self, session_id: str) -> ClientSession:
-        if session_id not in self._owners:
-            self._owners[session_id] = _SessionOwner(self._target)
-        return await self._owners[session_id].wait_ready()
+        async with self._lock_for(session_id):
+            owner = self._owners.get(session_id)
+            if owner is not None and owner.is_dead():
+                await owner.aclose()
+                owner = None
+            if owner is None:
+                owner = self._owners[session_id] = _SessionOwner(self._target)
+            return await owner.wait_ready()
+
+    async def evict(self, session_id: str) -> None:
+        """Force the next get() for this session_id to open a brand-new
+        session, even though the current owner's background task hasn't
+        itself failed -- is_dead() can't detect this case. Needed for the
+        MCP transport's own "Session terminated" signal (a stale/misrouted
+        Mcp-Session-Id the platform no longer recognizes): the transport
+        never clears its stored session id after that error (confirmed by
+        reading mcp.client.streamable_http and by
+        tests/unit/test_demo_session_recovery.py), so retrying a tool call
+        on the *same* owner would send the identical stale id and fail
+        identically forever -- only a fresh owner (a fresh `initialize()`,
+        a fresh id) can recover. A no-op if the session_id has no owner.
+        """
+        async with self._lock_for(session_id):
+            owner = self._owners.pop(session_id, None)
+        if owner is not None:
+            await owner.aclose()
 
     async def aclose(self) -> None:
         for owner in self._owners.values():

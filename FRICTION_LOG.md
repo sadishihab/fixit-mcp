@@ -1307,7 +1307,7 @@ Template for each entry:
 
 > **Resolved:** in-region measurements confirm this was network distance only. See [the resolution entry](#2026-09-24--resolution-in-region-agentcore-memory-latency-is-well-under-budget-laptop-failures-were-rtt-only).
 
-- **Tool/SDK**: AgentCore Memory `FixItHouseholds-6DbWhxEuY7` (us-east-1,
+- **Tool/SDK**: AgentCore Memory `FixItHouseholds-<memory-id>` (us-east-1,
   365-day expiry, no strategies), `tests/integration/test_agentcore_memory_live.py`.
 - **Task attempted**: First verification of the `agentcore` backend against
   real AgentCore Memory: seed, read-after-write, smoke suite, measured latency.
@@ -1358,7 +1358,7 @@ Template for each entry:
 ### 2026-09-24 — Resolution: in-region AgentCore Memory latency is well under budget (laptop failures were RTT only)
 
 - **Resolves**: [First live AgentCore Memory run: …latency from this laptop is dominated by distance to us-east-1](#2026-09-24--first-live-agentcore-memory-run-functionally-correct-latency-from-this-laptop-is-dominated-by-distance-to-us-east-1).
-- **Tool/SDK**: Same memory resource (`FixItHouseholds-6DbWhxEuY7`,
+- **Tool/SDK**: Same memory resource (`FixItHouseholds-<memory-id>`,
   us-east-1), `tests/integration/test_agentcore_memory_live.py`, run from
   **AWS CloudShell in us-east-1**, the same region as the memory.
 - **Task attempted**: Get an in-region latency verdict for the `agentcore`
@@ -2421,3 +2421,78 @@ full detail behind each number.
   all" -- when a schema's absence of a field is meant to convey a scope
   boundary, not just missing data, the system prompt needs to say so
   explicitly, the same lesson as step 6b's empty-`safety_warnings` case.
+
+### 2026-09-29 — Steps 8d/8e: an intermittent demo /chat failure investigated and partially fixed, but not root-caused
+
+- **Tool/SDK**: `demo/app.py`, `demo/orchestrator.py`, `demo/mcp_session.py`,
+  the deployed AgentCore Runtime (`fixit_mcp`, v3), CloudWatch Logs, `mcp`
+  1.30's `streamable_http_client`.
+- **Task attempted**: Diagnose a live browser incident against the deployed
+  runtime: turn 1 ("my dryer is showing tE1") succeeded (`diagnose_error`,
+  2083ms, cold session); turn 2 on the *same* session ("is it still under
+  warranty?") showed the frontend's generic "Sorry, something went wrong
+  reaching FixIt"; the identical message, resent on the same session with
+  no "new conversation" click, succeeded immediately.
+- **Steps taken**: Read the frontend's fetch/catch logic (any non-2xx
+  response or network-level exception collapses into that one generic
+  message, with no distinguishing detail). Read `demo/app.py`'s `/chat`
+  handler and found it had **no try/except and no failure-path logging at
+  all** -- a failing turn produced zero application-level signal, only
+  whatever uvicorn printed to a terminal nobody captured. Pulled CloudWatch
+  container logs for the deployed runtime's log group
+  (`/aws/bedrock-agentcore/runtimes/fixit_mcp-<runtime-id>-DEFAULT`) across
+  and beyond the incident's plausible time window. Reproduced the two-turn
+  pattern directly at the MCP transport layer (no Bedrock, to isolate
+  transport behavior) against the live deployed runtime, 5 times with fresh
+  sessions, varying the gap between the two tool calls (1/3/5/8/12s) to
+  bracket a possible stale-pooled-connection window.
+- **What we know (documented)**: CloudWatch showed **no trace of the actual
+  failed browser request anywhere** -- only our own scripted
+  smoke-test/verification traffic in the same window. **All 5 reproduction
+  attempts succeeded** on the first try; turn-2 latency rose somewhat with a
+  longer gap (540ms to 1450ms) but nothing ever errored.
+- **What we don't know (root cause, not established)**: What specifically
+  happened during the actual browser incident is **unconfirmed**. A prior
+  entry in this log (step 4c) documented one intermittent 504 Gateway
+  Time-out on an otherwise-healthy warm AgentCore Runtime session (about 1
+  in 110 calls, the container log showing the request never arrived) with
+  the same *character* as this incident -- a single dropped call, immediate
+  success on retry, nothing surfaced at the application layer -- but this
+  stays a **hypothesis**, not a proven cause. The 0/5 reproduction result
+  neither confirms nor rules it out; it only shows the failure isn't
+  trivially reproducible on demand.
+- **A real bug found and fixed along the way**: while building an automatic
+  retry for this class of failure, reading `mcp.client.streamable_http` --
+  and proving it with a fake-transport test,
+  `tests/unit/test_demo_session_recovery.py` -- showed that after a 404
+  (`McpError(code=32600, message="Session terminated")`), the client
+  **never clears its stored `Mcp-Session-Id`**: a retry on the same
+  `ClientSession` resends the identical stale id and fails identically,
+  forever. The first version of this fix (retry blindly on the same
+  session) would never have worked for that specific failure mode -- caught
+  by re-reading the SDK before committing, not by a production failure.
+- **Severity**: Medium. The original browser incident is unconfirmed and
+  not reproduced on demand; the session-terminated retry bug was real but
+  narrow in scope, and was caught before being committed to `main`.
+- **What the fix does and doesn't prove**: `SessionManager.evict()` plus a
+  `refresh_session` callback (threaded through `orchestrator.run_turn` /
+  `_dispatch_tool_call` / `_call_tool_with_retry`) now open a genuinely
+  fresh MCP session (a fresh `initialize()`, a fresh session id) before
+  retrying a "session terminated" failure, and `demo/app.py`'s `/chat`
+  handler now logs every failure (`demo_chat_turn_failed`, with the
+  operation, exception type, and whether it's classified retryable) before
+  responding. This **does** prove: (a) a same-session retry for a stale or
+  misrouted session id can never work (proven directly against the real SDK,
+  not inferred); (b) evicting and reopening before retrying does work, end
+  to end, against a real local server
+  (`tests/integration/test_demo_chat_reliability.py::test_chat_recovers_through_evict_then_get_after_session_terminated`);
+  (c) any future transient-transport-classified failure will now be logged,
+  instead of leaving zero trace the way this one did. It does **not** prove
+  that a "session terminated" error -- or any AgentCore-side hiccup at all
+  -- actually caused the original browser incident; that remains
+  unconfirmed, and the fix targets the *class* of failure the investigation
+  could support, not a diagnosed root cause.
+- **Actionable suggestion**: When a backend proxies a stateful protocol like
+  MCP, log the failure path from day one, not just the success path -- the
+  single biggest reason this incident couldn't be root-caused after the
+  fact was that nothing recorded it happened at all.

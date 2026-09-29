@@ -46,3 +46,58 @@ async def test_a_second_conversation_gets_its_own_independent_session(server_url
     assert not sessions.is_open("conversation-c")
 
     await sessions.aclose()
+
+
+async def test_a_healthy_session_is_reused_not_replaced(server_url: str) -> None:
+    target = MCPTarget(url=server_url, auth=None)
+    sessions = SessionManager(target)
+
+    session_a = await sessions.get("conversation-healthy")
+    session_b = await sessions.get("conversation-healthy")
+
+    assert session_a is session_b
+    assert sessions.is_open("conversation-healthy")
+
+    await sessions.aclose()
+
+
+async def test_a_dead_session_owner_is_evicted_and_replaced(server_url: str) -> None:
+    """Regression for the "one bad session stays broken forever" gap: once
+    an owner's background task has died (simulated here by cancelling it,
+    the same BaseException path a real connection failure would take --
+    _SessionOwner._run's `except BaseException` catches and caches it
+    either way), the next get() for that session_id must not keep replaying
+    the cached error -- it should close the dead owner and hand back a
+    fresh, working session instead."""
+    target = MCPTarget(url=server_url, auth=None)
+    sessions = SessionManager(target)
+
+    session_a = await sessions.get("conversation-dead")
+    dead_owner = sessions._owners["conversation-dead"]
+    dead_owner._task.cancel()
+    await dead_owner._task  # let the cancellation land; _run's except sets _error
+    assert dead_owner.is_dead()
+    assert not sessions.is_open("conversation-dead")
+
+    session_b = await sessions.get("conversation-dead")
+
+    assert session_b is not session_a
+    assert sessions._owners["conversation-dead"] is not dead_owner
+    result = await session_b.call_tool("list_my_appliances", {"household_id": "house-002"})
+    assert result.isError is False
+
+    await sessions.aclose()
+
+
+async def test_concurrent_get_for_the_same_session_id_never_creates_duplicate_owners(
+    server_url: str,
+) -> None:
+    target = MCPTarget(url=server_url, auth=None)
+    sessions = SessionManager(target)
+
+    results = await asyncio.gather(*[sessions.get("conversation-concurrent") for _ in range(8)])
+
+    assert all(session is results[0] for session in results)
+    assert len(sessions._owners) == 1
+
+    await sessions.aclose()

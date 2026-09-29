@@ -333,6 +333,17 @@
     };
   }
 
+  // Picks the user-facing message for a failed /chat call. `retryable` is
+  // whatever /chat's structured error body said (undefined/false for a
+  // plain network exception or an unexpected shape) -- never the raw
+  // status code or exception text, so no internal detail reaches the
+  // customer either way. Pure: no DOM, no network.
+  function chatErrorMessage(retryable) {
+    return retryable
+      ? "FixIt had a brief hiccup reaching the runtime. Please try again."
+      : "Sorry, something went wrong reaching FixIt. Please try again.";
+  }
+
   function buildInitResult(id) {
     return {
       jsonrpc: "2.0",
@@ -545,7 +556,21 @@
       })
         .then(function (response) {
           if (!response.ok) {
-            throw new Error("HTTP " + response.status);
+            // /chat returns a small structured body on a handled failure
+            // ({error, retryable}) -- fall back to a plain, non-retryable
+            // error if the body isn't that shape (e.g. a proxy's own error
+            // page). Never surfaces the status code or body to the customer;
+            // only chatErrorMessage's fixed, friendly text does.
+            return response
+              .json()
+              .catch(function () {
+                return null;
+              })
+              .then(function (body) {
+                var err = new Error("chat request failed");
+                err.retryable = !!(body && body.retryable);
+                throw err;
+              });
           }
           return response.json();
         })
@@ -564,9 +589,9 @@
           scrollToBottom();
           speak(data.reply_text);
         })
-        .catch(function () {
+        .catch(function (err) {
           thinking.className = "msg assistant error";
-          thinking.textContent = "Sorry, something went wrong reaching FixIt. Please try again.";
+          thinking.textContent = chatErrorMessage(err && err.retryable);
           scrollToBottom();
         });
     }

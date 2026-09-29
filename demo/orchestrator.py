@@ -13,13 +13,21 @@ from __future__ import annotations
 
 import asyncio
 import time
-from collections.abc import Callable
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
-from mcp import ClientSession
+import httpx
+import structlog
+from mcp import ClientSession, McpError
 
 from demo.mcp_session import ToolDef
+
+# Reopens a fresh MCP session for the same conversation -- called only when
+# a "session terminated" failure proves the current one is permanently stale
+# (see _call_tool_with_retry). Provided by whoever owns the SessionManager
+# (demo/app.py); orchestrator.py has no session-storage knowledge of its own.
+RefreshSession = Callable[[], Awaitable[ClientSession]]
 
 # A tool result is worth fetching a card for when its structuredContent's
 # status is one of these -- generalized rather than hardcoded to
@@ -31,6 +39,56 @@ _CARD_STATUSES = frozenset({"found", "not_found", "ambiguous_appliance"})
 
 MAX_REPLY_TOKENS = 1024
 DEFAULT_TEMPERATURE = 0.3
+
+# Tools whose repeated invocation with the same arguments can't create a
+# duplicate side effect -- safe to retry after an ambiguous "did the server
+# even see this" failure. add_appliance is deliberately excluded: retrying it
+# after a lost response risks registering the same appliance twice.
+_IDEMPOTENT_TOOLS = frozenset({"list_my_appliances", "diagnose_error", "check_warranty", "remove_appliance"})
+
+# mcp.client.streamable_http._handle_post_request's own 404 branch: a stale
+# or misrouted Mcp-Session-Id short-circuits *before* any tool code runs and
+# is turned into this specific McpError (never a real tool-level error), so
+# retrying it can never duplicate a side effect -- the request is known not
+# to have reached the tool handler at all.
+_SESSION_TERMINATED_ERROR_CODE = 32600
+
+
+def _session_terminated_before_reaching_handler(exc: BaseException) -> bool:
+    return isinstance(exc, McpError) and exc.error.code == _SESSION_TERMINATED_ERROR_CODE
+
+
+def is_transient_transport_error(exc: BaseException) -> bool:
+    """A failure that looks like a runtime/transport/session communication
+    problem rather than a deterministic application or tool error: the MCP
+    transport's own "session terminated" signal (see
+    _session_terminated_before_reaching_handler), a real httpx transport-level
+    failure (connection reset, timeout, protocol error), or a 502/503/504 from
+    an intermediary. This is a *hypothesis* about a failure's likely cause,
+    not a proven diagnosis -- used to label a /chat error response as
+    retryable, and (narrowed further by tool idempotency, see
+    _is_retryable_tool_call) to decide whether to automatically retry a tool
+    call once."""
+    if _session_terminated_before_reaching_handler(exc):
+        return True
+    if isinstance(exc, httpx.TransportError):
+        return True
+    if isinstance(exc, httpx.HTTPStatusError):
+        return exc.response.status_code in (502, 503, 504)
+    return False
+
+
+def _is_retryable_tool_call(exc: BaseException, tool_name: str) -> bool:
+    """Safe to automatically retry this tool call exactly once. The "session
+    terminated" signal is always safe (the request is known never to have
+    reached the tool handler); any other transient transport error is only
+    retried for a tool in _IDEMPOTENT_TOOLS, so a lost response never risks a
+    duplicate side effect. A deterministic McpError (a real tool/application
+    error) is never retried."""
+    if _session_terminated_before_reaching_handler(exc):
+        return True
+    return tool_name in _IDEMPOTENT_TOOLS and is_transient_transport_error(exc)
+
 
 SYSTEM_PROMPT_TEMPLATE = (
     "You are a voice assistant helping a customer with home appliances, in the "
@@ -102,6 +160,10 @@ class ToolCallRecord:
     arguments: dict[str, Any]
     result: dict[str, Any] | None
     latency_ms: float
+    # True if a transient transport/session failure on the first attempt was
+    # retried once (see _is_retryable_tool_call) -- for observability, not
+    # behavior; a successful retried call looks the same to Bedrock either way.
+    retried: bool = False
 
 
 @dataclass(frozen=True)
@@ -140,23 +202,106 @@ def _text_of(content: list[Any]) -> str:
     return "".join(getattr(block, "text", "") for block in content)
 
 
+async def _call_tool_with_retry(
+    session: ClientSession,
+    name: str,
+    arguments: dict[str, Any],
+    refresh_session: RefreshSession | None,
+) -> tuple[Any, bool, ClientSession]:
+    """Calls a tool, retrying exactly once when the failure is classified as
+    a transient transport/session communication problem for this tool (see
+    _is_retryable_tool_call) -- a deterministic tool/application error is
+    never retried. Returns (result, whether a retry was attempted, the
+    session subsequent calls this turn should use).
+
+    The "session terminated" signal is special: mcp.client.streamable_http
+    never clears its stored Mcp-Session-Id after that error (confirmed by
+    reading the SDK and by tests/unit/test_demo_session_recovery.py's fake-
+    transport test), so retrying on the *same* session would resend the
+    identical stale id and get the identical 404 forever -- retrying it is
+    only attempted if `refresh_session` is given, and the retry runs against
+    the *fresh* session it returns, not the old one. An ordinary transient
+    transport error (a one-off timeout, a dropped connection) doesn't have
+    this problem and is retried on the same session as before.
+
+    Logs the first failure before retrying, and the retry's own outcome, so
+    a demo operator can see this happened without it silently masking a
+    real problem."""
+    logger = structlog.get_logger()
+    try:
+        return await session.call_tool(name, arguments), False, session
+    except Exception as exc:
+        if not _is_retryable_tool_call(exc, name):
+            exc.fixit_operation = f"tool_call:{name}"  # type: ignore[attr-defined]
+            raise
+
+        session_terminated = _session_terminated_before_reaching_handler(exc)
+        logger.warning(
+            "tool_call_transient_failure",
+            tool=name,
+            attempt=1,
+            exception_type=type(exc).__name__,
+            exception_message=str(exc),
+            session_terminated=session_terminated,
+        )
+
+        retry_session = session
+        if session_terminated:
+            if refresh_session is None:
+                # No way to open a fresh session -- retrying this one is
+                # known to be futile (see the docstring above), so don't.
+                exc.fixit_operation = f"tool_call:{name}"  # type: ignore[attr-defined]
+                raise
+            retry_session = await refresh_session()
+
+        retry_start = time.perf_counter()
+        try:
+            result = await retry_session.call_tool(name, arguments)
+        except Exception as retry_exc:
+            retry_exc.fixit_operation = f"tool_call:{name}"  # type: ignore[attr-defined]
+            logger.warning(
+                "tool_call_retry_failed",
+                tool=name,
+                attempt=2,
+                exception_type=type(retry_exc).__name__,
+                exception_message=str(retry_exc),
+                session_refreshed=session_terminated,
+                elapsed_ms=round((time.perf_counter() - retry_start) * 1000, 1),
+            )
+            raise
+        logger.info(
+            "tool_call_retry_succeeded",
+            tool=name,
+            attempt=2,
+            session_refreshed=session_terminated,
+            elapsed_ms=round((time.perf_counter() - retry_start) * 1000, 1),
+        )
+        return result, True, retry_session
+
+
 async def _dispatch_tool_call(
-    session: ClientSession, name: str, arguments: dict[str, Any]
-) -> tuple[ToolCallRecord, dict[str, Any], bool]:
+    session: ClientSession,
+    name: str,
+    arguments: dict[str, Any],
+    refresh_session: RefreshSession | None,
+) -> tuple[ToolCallRecord, dict[str, Any], bool, ClientSession]:
     """Calls the tool, returning (record for the API response, the Bedrock
-    toolResult content block, whether the result was an error)."""
+    toolResult content block, whether the result was an error, the session
+    subsequent calls this turn should use -- see _call_tool_with_retry)."""
     start = time.perf_counter()
-    result = await session.call_tool(name, arguments)
+    result, retried, session = await _call_tool_with_retry(session, name, arguments, refresh_session)
     latency_ms = (time.perf_counter() - start) * 1000
     structured = result.structuredContent
 
-    record = ToolCallRecord(name=name, arguments=arguments, result=structured, latency_ms=latency_ms)
+    record = ToolCallRecord(
+        name=name, arguments=arguments, result=structured, latency_ms=latency_ms, retried=retried
+    )
 
     if result.isError:
-        return record, {"content": [{"text": _text_of(result.content)}], "status": "error"}, True
+        return record, {"content": [{"text": _text_of(result.content)}], "status": "error"}, True, session
     if structured is not None:
-        return record, {"content": [{"json": structured}]}, False
-    return record, {"content": [{"text": _text_of(result.content)}]}, False
+        return record, {"content": [{"json": structured}]}, False, session
+    return record, {"content": [{"text": _text_of(result.content)}]}, False, session
 
 
 async def run_turn(
@@ -169,12 +314,19 @@ async def run_turn(
     session: ClientSession,
     user_message: str,
     max_rounds: int = 4,
+    refresh_session: RefreshSession | None = None,
 ) -> TurnResult:
     """Runs one user turn to completion: possibly several rounds of
     tool_use, ending either with a plain text reply or (if max_rounds is
     exhausted) a fallback apology rather than hanging forever. `messages`
     is the session's Converse history, mutated in place so the next turn
-    sees this one."""
+    sees this one.
+
+    `session` is a local variable, not just a parameter: a tool call that
+    hits the "session terminated" failure (see _call_tool_with_retry) swaps
+    it for a freshly-opened one via `refresh_session`, and every later
+    round's tool calls -- and any read_resource card fetch -- in *this*
+    turn use that new session too, never the stale reference."""
     tool_config = build_tool_config(tool_defs)
     resource_uri_by_name = {tool.name: tool.resource_uri for tool in tool_defs if tool.resource_uri}
 
@@ -220,7 +372,9 @@ async def run_turn(
             name = tool_use["name"]
             arguments = tool_use.get("input", {})
 
-            record, result_block, is_error = await _dispatch_tool_call(session, name, arguments)
+            record, result_block, is_error, session = await _dispatch_tool_call(
+                session, name, arguments, refresh_session
+            )
             tool_calls.append(record)
             result_blocks.append({"toolUseId": tool_use["toolUseId"], **result_block})
 

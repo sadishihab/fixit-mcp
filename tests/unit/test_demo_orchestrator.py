@@ -5,10 +5,19 @@ from __future__ import annotations
 
 from typing import Any
 
-from mcp import types
+import httpx
+import pytest
+from mcp import McpError, types
+from mcp.types import ErrorData
 
 from demo.mcp_session import ToolDef
-from demo.orchestrator import ConversationStore, build_system_prompt, build_tool_config, run_turn
+from demo.orchestrator import (
+    ConversationStore,
+    build_system_prompt,
+    build_tool_config,
+    is_transient_transport_error,
+    run_turn,
+)
 
 DIAGNOSE_TOOL = ToolDef(
     name="diagnose_error",
@@ -86,6 +95,23 @@ class FakeSession:
         self.read_resource_calls.append(uri)
         assert self._resource is not None
         return self._resource
+
+
+class FakeFlakySession:
+    """Raises each of `exceptions` in order on call_tool, then returns
+    `result` -- for testing the retry boundary with controlled failures,
+    never a real network outage."""
+
+    def __init__(self, exceptions: list[Exception], result: types.CallToolResult) -> None:
+        self._exceptions = list(exceptions)
+        self._result = result
+        self.calls: list[tuple[str, dict[str, Any]]] = []
+
+    async def call_tool(self, name: str, arguments: dict[str, Any]) -> types.CallToolResult:
+        self.calls.append((name, arguments))
+        if self._exceptions:
+            raise self._exceptions.pop(0)
+        return self._result
 
 
 def _found_result(household_id: str = "house-002") -> types.CallToolResult:
@@ -449,6 +475,228 @@ async def test_tool_error_is_reported_to_bedrock_as_an_error_result() -> None:
     assert result.card is None
     tool_result_message = converse.calls[1]["messages"][-1]
     assert tool_result_message["content"][0]["toolResult"]["status"] == "error"
+
+
+# --- is_transient_transport_error classification -------------------------------------------------
+
+
+def test_httpx_transport_error_is_transient() -> None:
+    assert is_transient_transport_error(httpx.ConnectError("connection refused")) is True
+    assert is_transient_transport_error(httpx.ReadTimeout("timed out")) is True
+
+
+def test_httpx_gateway_status_errors_are_transient() -> None:
+    request = httpx.Request("POST", "https://example.invalid/mcp")
+    for status in (502, 503, 504):
+        response = httpx.Response(status, request=request)
+        exc = httpx.HTTPStatusError("bad gateway", request=request, response=response)
+        assert is_transient_transport_error(exc) is True
+
+
+def test_httpx_client_error_status_is_not_transient() -> None:
+    request = httpx.Request("POST", "https://example.invalid/mcp")
+    response = httpx.Response(400, request=request)
+    exc = httpx.HTTPStatusError("bad request", request=request, response=response)
+    assert is_transient_transport_error(exc) is False
+
+
+def test_session_terminated_mcp_error_is_transient() -> None:
+    exc = McpError(ErrorData(code=32600, message="Session terminated"))
+    assert is_transient_transport_error(exc) is True
+
+
+def test_an_ordinary_mcp_error_is_not_transient() -> None:
+    """A real tool/application-level error over MCP (e.g. bad arguments) is
+    deterministic -- retrying it would just get the same answer again."""
+    exc = McpError(ErrorData(code=-32602, message="Invalid params"))
+    assert is_transient_transport_error(exc) is False
+
+
+def test_a_plain_value_error_is_not_transient() -> None:
+    assert is_transient_transport_error(ValueError("something else broke")) is False
+
+
+# --- run_turn: one automatic retry for a transient transport failure --------------------------
+
+
+async def test_transient_failure_on_an_idempotent_tool_is_retried_and_succeeds() -> None:
+    converse = FakeConverse(
+        [
+            _tool_use_response("t1", "check_warranty", {"household_id": "house-002"}),
+            _text_response("The recorded warranty ended a while ago."),
+        ]
+    )
+    session = FakeFlakySession(exceptions=[httpx.ReadTimeout("timed out")], result=_found_result())
+
+    result = await run_turn(
+        converse=converse,
+        model_id="test-model",
+        system_prompt="be helpful",
+        messages=[],
+        tool_defs=[DIAGNOSE_TOOL],
+        session=session,
+        user_message="is it still under warranty",
+    )
+
+    assert len(session.calls) == 2  # the failed attempt, then the retry
+    assert result.tool_calls[0].retried is True
+    assert result.tool_calls[0].result == {
+        "status": "found",
+        "appliance": {"brand": "LG"},
+        "meaning": "temperature sensor",
+    }
+
+
+async def test_transient_failure_on_an_idempotent_tool_is_retried_and_still_fails() -> None:
+    session = FakeFlakySession(
+        exceptions=[httpx.ReadTimeout("timed out"), httpx.ReadTimeout("still timed out")],
+        result=_found_result(),
+    )
+    converse = FakeConverse([_tool_use_response("t1", "check_warranty", {"household_id": "house-002"})])
+
+    with pytest.raises(httpx.ReadTimeout):
+        await run_turn(
+            converse=converse,
+            model_id="test-model",
+            system_prompt="be helpful",
+            messages=[],
+            tool_defs=[DIAGNOSE_TOOL],
+            session=session,
+            user_message="is it still under warranty",
+        )
+
+    assert len(session.calls) == 2  # first attempt + the one retry, never a third
+
+
+async def test_a_deterministic_mcp_error_is_never_retried() -> None:
+    """An ordinary tool-level McpError (e.g. bad arguments) must not be
+    retried -- it's a deterministic response, not a transport hiccup."""
+    session = FakeFlakySession(
+        exceptions=[McpError(ErrorData(code=-32602, message="Invalid params"))],
+        result=_found_result(),
+    )
+    converse = FakeConverse([_tool_use_response("t1", "diagnose_error", {"error_code": "tE1"})])
+
+    with pytest.raises(McpError):
+        await run_turn(
+            converse=converse,
+            model_id="test-model",
+            system_prompt="be helpful",
+            messages=[],
+            tool_defs=[DIAGNOSE_TOOL],
+            session=session,
+            user_message="tE1",
+        )
+
+    assert len(session.calls) == 1  # never retried
+
+
+async def test_a_transient_failure_on_a_non_idempotent_tool_is_not_retried() -> None:
+    """add_appliance isn't safe to blindly retry: a lost response after the
+    server actually applied the write would duplicate the appliance."""
+    add_appliance_tool = ToolDef(
+        name="add_appliance",
+        description="Add an appliance.",
+        input_schema={"type": "object"},
+        resource_uri=None,
+    )
+    session = FakeFlakySession(exceptions=[httpx.ReadTimeout("timed out")], result=_found_result())
+    converse = FakeConverse(
+        [_tool_use_response("t1", "add_appliance", {"household_id": "house-002", "brand": "GE"})]
+    )
+
+    with pytest.raises(httpx.ReadTimeout):
+        await run_turn(
+            converse=converse,
+            model_id="test-model",
+            system_prompt="be helpful",
+            messages=[],
+            tool_defs=[add_appliance_tool],
+            session=session,
+            user_message="add my new fridge",
+        )
+
+    assert len(session.calls) == 1  # never retried
+
+
+async def test_session_terminated_error_with_a_fresh_session_retries_and_succeeds() -> None:
+    """The MCP transport's own "session terminated" signal (a stale/
+    misrouted Mcp-Session-Id caught before the request reached the tool
+    handler) means the request is known never to have run -- safe to retry
+    even for add_appliance, unlike an ordinary transport error. But (see
+    tests/unit/test_demo_session_recovery.py) the transport never clears its
+    stale session id, so the retry can only succeed against a genuinely
+    fresh session -- never the one that just failed. refresh_session models
+    exactly that: it hands back a different, healthy session object."""
+    add_appliance_tool = ToolDef(
+        name="add_appliance",
+        description="Add an appliance.",
+        input_schema={"type": "object"},
+        resource_uri=None,
+    )
+    stale_session = FakeFlakySession(
+        exceptions=[McpError(ErrorData(code=32600, message="Session terminated"))],
+        result=_found_result(),
+    )
+    fresh_session = FakeFlakySession(exceptions=[], result=_found_result())
+
+    async def refresh_session() -> FakeFlakySession:
+        return fresh_session
+
+    converse = FakeConverse(
+        [
+            _tool_use_response("t1", "add_appliance", {"household_id": "house-002", "brand": "GE"}),
+            _text_response("Added."),
+        ]
+    )
+
+    result = await run_turn(
+        converse=converse,
+        model_id="test-model",
+        system_prompt="be helpful",
+        messages=[],
+        tool_defs=[add_appliance_tool],
+        session=stale_session,
+        user_message="add my new fridge",
+        refresh_session=refresh_session,
+    )
+
+    assert len(stale_session.calls) == 1  # the one failed attempt, never retried on the stale session
+    assert len(fresh_session.calls) == 1  # the retry, on the fresh session
+    assert result.tool_calls[0].retried is True
+
+
+async def test_session_terminated_error_without_a_fresh_session_fails_fast() -> None:
+    """Without a way to open a fresh session, retrying on the same (known-
+    stale) one is pointless -- proven in test_demo_session_recovery.py, it
+    would just get the identical "Session terminated" error again. No
+    refresh_session means no retry attempt at all, not a wasted one."""
+    add_appliance_tool = ToolDef(
+        name="add_appliance",
+        description="Add an appliance.",
+        input_schema={"type": "object"},
+        resource_uri=None,
+    )
+    session = FakeFlakySession(
+        exceptions=[McpError(ErrorData(code=32600, message="Session terminated"))],
+        result=_found_result(),
+    )
+    converse = FakeConverse(
+        [_tool_use_response("t1", "add_appliance", {"household_id": "house-002", "brand": "GE"})]
+    )
+
+    with pytest.raises(McpError):
+        await run_turn(
+            converse=converse,
+            model_id="test-model",
+            system_prompt="be helpful",
+            messages=[],
+            tool_defs=[add_appliance_tool],
+            session=session,
+            user_message="add my new fridge",
+        )
+
+    assert len(session.calls) == 1  # never retried
 
 
 # --- run_turn: max_rounds caps a runaway loop -------------------------------------------------

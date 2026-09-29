@@ -119,6 +119,30 @@ def test_card_owner_matches_not_found_and_ambiguous_statuses_too() -> None:
         assert result["structuredContent"]["status"] == status
 
 
+# --- chatErrorMessage -------------------------------------------------
+
+
+@requires_node
+def test_chat_error_message_distinguishes_retryable_from_other_failures() -> None:
+    retryable = _run("console.log(chatErrorMessage(true));")
+    other = _run("console.log(chatErrorMessage(false));")
+
+    assert retryable != other
+    # Neither ever leaks an internal detail (status code, exception text).
+    assert "HTTP" not in retryable and "HTTP" not in other
+    assert "Error" not in retryable and "Error" not in other
+
+
+@requires_node
+def test_chat_error_message_treats_undefined_as_not_retryable() -> None:
+    """A plain network exception (no structured body to read `retryable`
+    from) must fall back to the same message as any other failure."""
+    undefined = _run("console.log(chatErrorMessage(undefined));")
+    other = _run("console.log(chatErrorMessage(false));")
+
+    assert undefined == other
+
+
 # --- handshake message builders -------------------------------------------------
 
 
