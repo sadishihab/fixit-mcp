@@ -329,6 +329,7 @@ def test_every_committed_template_renders_to_valid_json_with_no_placeholders(tmp
 
     assert {p.name for p in written} == {
         "deployer-policy.json",
+        "observability-policy.json",
         "runtime-execution-policy.json",
         "runtime-execution-trust.json",
     }
@@ -408,6 +409,9 @@ IAM_SIZE_LIMITS = {
     "deployer-policy.json": 6144,  # customer managed policy (too big for a 2,048-char user inline policy)
     "runtime-execution-policy.json": 10240,  # role inline policy
     "runtime-execution-trust.json": 2048,  # role trust policy (default quota)
+    # customer managed policy FixItObservability: fixit-dev's inline policies already
+    # share one 2,048-char budget, so this one isn't added to it
+    "observability-policy.json": 6144,
 }
 
 
@@ -419,6 +423,27 @@ def test_rendered_policies_fit_the_iam_size_limit_where_they_are_attached(
     size = len("".join((tmp_path / name).read_text().split()))
 
     assert size <= limit, f"{name} is {size} chars, over IAM's {limit} for where it's attached"
+
+
+def test_observability_policy_scopes_every_write_to_fixit_resources(tmp_path: Path) -> None:
+    """Only read-only CloudWatch actions (which don't support resource-level
+    permissions) get Resource "*"; every create/delete is name-scoped (step 23b)."""
+    render_iam.render_all(VALUES, output_dir=tmp_path)
+    policy = json.loads((tmp_path / "observability-policy.json").read_text())
+
+    for statement in policy["Statement"]:
+        if statement["Resource"] == "*":
+            assert statement["Sid"] == "ReadMetricsAndAlarms"
+            assert all(a.split(":")[1].startswith(("List", "Get", "Describe")) for a in statement["Action"])
+    resources = {s["Sid"]: s["Resource"] for s in policy["Statement"]}
+    assert resources["Dashboard"] == "arn:aws:cloudwatch::111122223333:dashboard/FixIt*"
+    assert resources["Alarms"] == "arn:aws:cloudwatch:us-east-1:111122223333:alarm:fixit-*"
+    assert resources["MetricFilters"] == (
+        "arn:aws:logs:us-east-1:111122223333:log-group:/aws/bedrock-agentcore/runtimes/fixit_mcp-*"
+    )
+    assert resources["AlertTopic"] == "arn:aws:sns:us-east-1:111122223333:fixit-alerts"
+    metric_filters = next(s for s in policy["Statement"] if s["Sid"] == "MetricFilters")
+    assert "logs:PutRetentionPolicy" in metric_filters["Action"]
 
 
 def test_deployer_can_create_the_implicit_default_endpoint(tmp_path: Path) -> None:

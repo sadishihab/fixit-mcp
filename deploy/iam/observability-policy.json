@@ -1,0 +1,35 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "Dashboard",
+      "Effect": "Allow",
+      "Action": ["cloudwatch:PutDashboard", "cloudwatch:GetDashboard", "cloudwatch:DeleteDashboards"],
+      "Resource": "arn:aws:cloudwatch::${AWS_ACCOUNT_ID}:dashboard/FixIt*"
+    },
+    {
+      "Sid": "Alarms",
+      "Effect": "Allow",
+      "Action": ["cloudwatch:PutMetricAlarm", "cloudwatch:DeleteAlarms"],
+      "Resource": "arn:aws:cloudwatch:${AWS_REGION}:${AWS_ACCOUNT_ID}:alarm:fixit-*"
+    },
+    {
+      "Sid": "ReadMetricsAndAlarms",
+      "Effect": "Allow",
+      "Action": ["cloudwatch:ListMetrics", "cloudwatch:GetMetricData", "cloudwatch:DescribeAlarms", "cloudwatch:ListDashboards"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "MetricFilters",
+      "Effect": "Allow",
+      "Action": ["logs:PutMetricFilter", "logs:DeleteMetricFilter", "logs:DescribeMetricFilters", "logs:PutRetentionPolicy"],
+      "Resource": "arn:aws:logs:${AWS_REGION}:${AWS_ACCOUNT_ID}:log-group:/aws/bedrock-agentcore/runtimes/fixit_mcp-*"
+    },
+    {
+      "Sid": "AlertTopic",
+      "Effect": "Allow",
+      "Action": ["sns:CreateTopic", "sns:Subscribe", "sns:GetTopicAttributes", "sns:ListSubscriptionsByTopic", "sns:DeleteTopic"],
+      "Resource": "arn:aws:sns:${AWS_REGION}:${AWS_ACCOUNT_ID}:fixit-alerts"
+    }
+  ]
+}
