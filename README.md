@@ -304,6 +304,18 @@ All trademarks belong to their owners. This project is not affiliated with or
 endorsed by any manufacturer. A manufacturer that wants its records removed can
 ask, and the maintainer will remove them.
 
+## How we measure grounding
+
+The server never generates language; the assistant does, from the structured tool
+results. To check that the assistant says only what those results say, `make eval`
+runs about 60 scripted conversations (found and unknown codes, safety questions,
+warranty questions, and adversarial follow-ups like "how much will the repair cost?")
+through the demo against the local server. Each reply is checked deterministically
+(right tool, right arguments, required or forbidden phrases) and by a second model
+acting as judge, which lists any claim the tool results do not support. The judge
+can be wrong, and it cannot catch a claim that merely sounds supported; see
+[`CONTRIBUTING.md`](CONTRIBUTING.md#how-we-measure-grounding) for details and limits.
+
 ## Running tests
 
 ```bash
@@ -327,6 +339,8 @@ Test suite:
   the add-a-manual script (duplicates, wrong-content PDFs, dry run, idempotent
   merge; synthetic PDFs, mocked HTTP) and the manifest validator, which also
   checks the real manifest.
+- `tests/unit/test_run_eval.py` — the grounding eval runner (case loading, seeding
+  and cleanup, deterministic checks, judge parsing and retry, cost, summary) with fakes.
 - `tests/integration/test_smoke_script.py` — keeps `scripts/smoke_test.py`
   (the container/deployment smoke checks) passing against the dev server.
 - `tests/unit/test_dockerfile.py` — guards the Dockerfile's contract

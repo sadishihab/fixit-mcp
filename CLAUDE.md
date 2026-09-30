@@ -376,6 +376,16 @@ Alexa+ MCP Toolkit and helps customers with home appliances:
   letter) as a `wildcard` match. Known cross-manual collision: `PF` (LG dryer and
   LG washer); `diagnose_error` returns `ambiguous_appliance`, never a silent pick.
 
+- **Grounding eval** (step 16a, `evals/cases.yaml`, `scripts/run_eval.py`,
+  `make eval`). Drives `demo.orchestrator.run_turn` against the LOCAL server, one
+  fresh `house-eval-<random>` household per case (seeded via `add_appliance`,
+  removed after), grades the final reply with deterministic checks and a Bedrock
+  judge given only the tool results and the reply. Judge default
+  `us.anthropic.claude-opus-4-6-v1` (strongest invokable for this account on
+  2026-09-30; newer Opus/Fable models are listed but AccessDenied). Estimate first,
+  `--max-cost` guard (default $10). Evaluation tooling only; never imported by
+  `src/` (a test checks). Results in gitignored `evals/results-*.json`.
+
 ## Testing
 
 **Every change needs tests.** No exceptions for "small" changes.

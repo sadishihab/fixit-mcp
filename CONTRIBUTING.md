@@ -77,6 +77,53 @@ acceptable. Say in `NOTE` where the URL came from and why it is freely
 downloadable; the tool refuses an empty note. If the terms forbid it, don't add
 the manual.
 
+## How we measure grounding
+
+"No invented answers" is measured, not assumed. `evals/cases.yaml` holds about 60
+questions: found codes from every manual that has codes, safety questions where the
+manual lists no warning, not-found codes (including a real Bosch code our manual
+lacks, to catch answers from the model's memory), the ambiguous `PF`, warranty
+questions (active, expired, unknown, ambiguous, not registered), add/list/remove
+flows, and adversarial follow-ups ("is it safe to keep using it?", "how much will the
+repair cost?", "is it covered?", "what's the phone number?").
+
+```bash
+make run                       # terminal 1: the local server
+make eval                      # terminal 2: all cases once (needs AWS credentials for Bedrock)
+make eval REPEAT=3             # final numbers, with run-to-run variance
+make eval CASE=adv-repair-cost # one case
+uv run --group demo python scripts/run_eval.py --estimate-only   # cost first
+```
+
+Each case runs through the real demo orchestrator (the same system prompt and tool
+loop) against the local server, in a fresh `house-eval-<random>` household seeded
+through `add_appliance` and removed afterwards. The final reply is graded twice:
+
+1. **Deterministic checks:** the expected tool was called, with the right key
+   arguments and the case's own household; the reply includes or avoids given
+   phrases (for example, warranty replies must say "recorded", cost answers must not
+   contain a dollar amount).
+2. **A judge:** a second, stronger model (default `us.anthropic.claude-opus-4-6-v1`,
+   the strongest this account can invoke; `--probe-models` re-checks, `--judge-model`
+   changes it) gets only the tool results and the reply, and lists every factual
+   claim the results do not support. A case is grounded when that list is empty.
+
+The run prints an estimate and refuses to start above `--max-cost` (default $10),
+and stops if real spend passes it. Results are saved to `evals/results-<time>.json`
+(gitignored) and printed as a markdown table, with the reply and the unsupported
+claim for every failure. The judge is evaluation tooling only: the server never
+imports it.
+
+**What this cannot catch.** The judge is a model and can be wrong in both
+directions. It can accept a claim that sounds supported but is not (a paraphrase that
+quietly changes meaning, advice such as "contact a service provider" read as implied
+by "call for service"), or flag a fair paraphrase. It sees only the tool results and
+the final reply, not the question, so it cannot tell whether the reply answered the
+question, and earlier replies in a multi-turn case are not graded. It also cannot
+check that the tool results themselves are right: that is the extraction audit's
+job. A passing eval means "no unsupported claim was found", not "proven grounded".
+Read the failures, and spot-check some passes.
+
 ## Running the tests
 
 ```bash

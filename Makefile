@@ -2,7 +2,7 @@
 	add-manual validate-manifest \
 	docker-build docker-run docker-smoke docker-run-agentcore seed-agentcore \
 	iam-policies docker-push deploy-runtime runtime-smoke runtime-latency teardown-runtime teardown-runtime-all \
-	demo demo-cleanup
+	demo demo-cleanup eval
 
 run:
 	uv run python -m fixit_mcp
@@ -77,6 +77,11 @@ add-manual:
 # manual_id). Also runs as part of `make test`.
 validate-manifest:
 	uv run python scripts/validate_manifest.py
+
+# Grounding eval (evals/cases.yaml, see CONTRIBUTING.md): needs `make run` in another
+# terminal and AWS credentials for Bedrock. REPEAT=3 for final numbers; CASE=<id> for one.
+eval:
+	uv run --group demo python scripts/run_eval.py $(if $(REPEAT),--repeat $(REPEAT),) $(if $(CASE),--case $(CASE),)
 
 # --- Container (AgentCore Runtime target: linux/arm64) -----------------------
 # See README's "Running in Docker" section. On an x86_64 host, arm64 builds and

@@ -24,3 +24,6 @@ data/index/.extract_cache/
 # Local SQLite persistence for household appliance state (dev/demo backend --
 # see CLAUDE.md; production is intended to use AgentCore Memory instead).
 data/state/
+
+# Grounding eval results (scripts/run_eval.py) -- local, per run.
+evals/results-*.json

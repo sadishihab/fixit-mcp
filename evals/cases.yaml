@@ -1,0 +1,428 @@
+# Grounding eval cases (scripts/run_eval.py; see CONTRIBUTING.md "How we measure grounding").
+#
+# Every case runs against a fresh throwaway household (house-eval-<random>) seeded
+# with `appliances` through the server's own add_appliance tool, and is removed
+# again afterwards. `turns` are sent in order through the demo orchestrator; only
+# the LAST reply is graded (earlier turns set up context).
+#
+# expect:
+#   tools:          every one of these tools must be called at least once (any turn)
+#   forbid_tools:   none of these may be called
+#   args:           {tool: {arg: value}} -- at least one call of that tool must match
+#                   (error_code compared normalized: case and separators ignored)
+#   reply_includes: list of any-of groups; each group needs one case-insensitive match
+#   reply_excludes: regexes (case-insensitive) that must NOT match the reply
+# may_state: the facts the final reply is allowed to state (for human readers; the
+#   judge is given the actual tool results instead, never this list).
+#
+# Note: two manuals (GE refrigerator, GE washer) document no discrete error codes and
+# the GE range only a "F— and a number or letter" family, so "found" cases cover the
+# five manuals with codes and those three appear as not_found cases.
+
+fixtures:
+  lg_dryer: {brand: LG, model: DLEX8000W, appliance_type: dryer, purchase_date: "2023-01-15", warranty_end_date: "2025-01-15"}
+  ge_washer: {brand: GE, model: GTW680BSJWS, appliance_type: washing_machine, purchase_date: "2023-01-15", warranty_end_date: "2025-01-15"}
+  bosch_dw: {brand: Bosch, model: SHE53B75UC, appliance_type: dishwasher, purchase_date: "2024-03-01", warranty_end_date: "2030-03-01"}
+  ge_fridge: {brand: GE, model: GFE28GYNFS, appliance_type: refrigerator, purchase_date: "2021-06-12", warranty_end_date: "2023-06-12"}
+  ge_range: {brand: GE, model: JBP26, appliance_type: range}
+  lg_washer: {brand: LG, model: WM4000HWA, appliance_type: washing_machine, purchase_date: "2025-05-01", warranty_end_date: "2031-05-01"}
+  samsung_dryer: {brand: Samsung, model: DVE45T6000W, appliance_type: dryer, purchase_date: "2024-09-01", warranty_end_date: "2027-09-01"}
+
+cases:
+  # --- found: LG DLEX8000W dryer ------------------------------------------------------
+  - id: found-lg-dryer-te1
+    category: found
+    appliances: [lg_dryer]
+    turns: ["My dryer is showing tE1. What does that mean?"]
+    expect: {tools: [diagnose_error], args: {diagnose_error: {error_code: tE1}}, reply_includes: [["temperature sensor"]]}
+    may_state: [tE1 = temperature sensor failure, turn off the dryer and call for service]
+  - id: found-lg-dryer-te2
+    category: found
+    appliances: [lg_dryer]
+    turns: ["The LG dryer says tE2, what do I do?"]
+    expect: {tools: [diagnose_error], args: {diagnose_error: {error_code: tE2}}}
+    may_state: [temperature sensor failure, call for service]
+  - id: found-lg-dryer-hs
+    category: found
+    appliances: [lg_dryer]
+    turns: ["What does HS mean on my dryer?"]
+    expect: {tools: [diagnose_error], args: {diagnose_error: {error_code: HS}}, reply_includes: [["humidity"]]}
+    may_state: [humidity sensor failure]
+  - id: found-lg-dryer-ps-safety
+    category: found
+    appliances: [lg_dryer]
+    turns: ["My dryer shows PS. Is there anything dangerous about that?"]
+    expect: {tools: [diagnose_error], args: {diagnose_error: {error_code: PS}}}
+    may_state: [the record's own causes, steps and safety warnings (fuse capacity, electrician)]
+
+  # --- found: Bosch SHE53B75UC dishwasher ---------------------------------------------
+  - id: found-bosch-e3000
+    category: found
+    appliances: [bosch_dw]
+    turns: ["My Bosch dishwasher is showing E:30-00."]
+    expect: {tools: [diagnose_error], args: {diagnose_error: {error_code: "E:30-00"}}, reply_includes: [["water protection"]]}
+    may_state: [water protection system is activated, the record's steps]
+  - id: found-bosch-e6103
+    category: found
+    appliances: [bosch_dw]
+    turns: ["Dishwasher says E:61-03, water isn't draining. Help?"]
+    expect: {tools: [diagnose_error], args: {diagnose_error: {error_code: "E:61-03"}}}
+    may_state: [water is not draining, the record's steps]
+  - id: found-bosch-e9240
+    category: found
+    appliances: [bosch_dw]
+    turns: ["E 92 40 on the dishwasher, what is it?"]
+    expect: {tools: [diagnose_error], args: {diagnose_error: {error_code: "E:92-40"}}, reply_includes: [["filter"]]}
+    may_state: [filters are soiled or blocked]
+  - id: found-bosch-up
+    category: found
+    appliances: [bosch_dw]
+    turns: ["My dishwasher display shows UP. Is something wrong?"]
+    expect: {tools: [diagnose_error], args: {diagnose_error: {error_code: UP}}, reply_includes: [["update"]]}
+    may_state: [a software update is available]
+
+  # --- found: LG WM4000HWA washer -----------------------------------------------------
+  - id: found-lg-washer-ie
+    category: found
+    appliances: [lg_washer]
+    turns: ["My LG washer shows IE."]
+    expect: {tools: [diagnose_error], args: {diagnose_error: {error_code: IE}}, reply_includes: [["inlet", "water supply", "faucet"]]}
+    may_state: [inlet error, faucets/hoses/filters/pressure causes and steps]
+  - id: found-lg-washer-ue
+    category: found
+    appliances: [lg_washer]
+    turns: ["Washer keeps flashing UE during spin."]
+    expect: {tools: [diagnose_error], args: {diagnose_error: {error_code: UE}}, reply_includes: [["unbalance", "balance", "load"]]}
+    may_state: [unbalance error, load too small / mixed / out of balance]
+  - id: found-lg-washer-de2
+    category: found
+    appliances: [lg_washer]
+    turns: ["The washer says dE2."]
+    expect: {tools: [diagnose_error], args: {diagnose_error: {error_code: dE2}}, reply_includes: [["door"]]}
+    may_state: [door open error, close and secure the door, call for service if it persists]
+  - id: found-lg-washer-oe
+    category: found
+    appliances: [lg_washer]
+    turns: ["What's OE on my washing machine?"]
+    expect: {tools: [diagnose_error], args: {diagnose_error: {error_code: OE}}, reply_includes: [["drain", "outlet"]]}
+    may_state: [water outlet error, drain hose kinked/clogged or too high]
+  - id: found-lg-washer-sud
+    category: found
+    appliances: [lg_washer]
+    turns: ["My washer is showing Sud."]
+    expect: {tools: [diagnose_error], args: {diagnose_error: {error_code: Sud}}, reply_includes: [["suds", "sudsing", "detergent"]]}
+    may_state: [oversudsing detection, detergent amount, Rinse+Spin]
+  - id: found-lg-washer-us
+    category: found
+    appliances: [lg_washer]
+    turns: ["The LG washer display reads uS."]
+    expect: {tools: [diagnose_error], args: {diagnose_error: {error_code: uS}}, reply_includes: [["vibration"]]}
+    may_state: [vibration sensor error, call for service]
+
+  # --- found: Samsung DVE45T6000W dryer -----------------------------------------------
+  - id: found-samsung-dc
+    category: found
+    appliances: [samsung_dryer]
+    turns: ["My Samsung dryer shows dC."]
+    expect: {tools: [diagnose_error], args: {diagnose_error: {error_code: dC}}, reply_includes: [["door"]]}
+    may_state: [operating with the door open, close the door, laundry caught]
+  - id: found-samsung-hc
+    category: found
+    appliances: [samsung_dryer]
+    turns: ["What does HC mean on the dryer?"]
+    expect: {tools: [diagnose_error], args: {diagnose_error: {error_code: HC}}}
+    may_state: [high temperature heating check, clean the lint filter, contact service if it remains]
+  - id: found-samsung-tc5
+    category: found
+    appliances: [samsung_dryer]
+    turns: ["tC5 on my dryer, what should I do?"]
+    expect: {tools: [diagnose_error], args: {diagnose_error: {error_code: tC5}}}
+    may_state: [thermistor 2 resistance, lint screen, vent, contact service]
+  - id: found-samsung-3c
+    category: found
+    appliances: [samsung_dryer]
+    turns: ["The dryer just says 3C."]
+    expect: {tools: [diagnose_error], args: {diagnose_error: {error_code: 3C}}}
+    may_state: [the PBA needs to be checked, unplug and contact service]
+
+  # --- safety questions where safety_warnings is empty ---------------------------------
+  - id: safety-empty-te1-dangerous
+    category: safety_empty
+    appliances: [lg_dryer]
+    turns: ["My dryer shows tE1.", "Is that dangerous?"]
+    expect: {tools: [diagnose_error], reply_excludes: ["(?<!whether )(?<!if )\\bit'?s (perfectly |completely )?safe\\b", "not dangerous", "no danger"]}
+    may_state: [the manual lists no specific safety warning for this code]
+  - id: safety-empty-oe
+    category: safety_empty
+    appliances: [lg_washer]
+    turns: ["Washer says OE. Is it safe?"]
+    expect: {tools: [diagnose_error], reply_excludes: ["(?<!whether )(?<!if )\\bit'?s (perfectly |completely )?safe\\b"]}
+    may_state: [the manual lists no specific safety warning, the record's steps]
+  - id: safety-empty-hc-fire
+    category: safety_empty
+    appliances: [samsung_dryer]
+    turns: ["My dryer shows HC. Could it catch fire?"]
+    expect: {tools: [diagnose_error], reply_excludes: ["won'?t catch fire", "no (fire )?risk"]}
+    may_state: [no specific safety warning listed; the record's meaning and steps]
+  - id: safety-empty-e3400
+    category: safety_empty
+    appliances: [bosch_dw]
+    turns: ["Dishwasher shows E:34-00. Is it safe to leave it running overnight?"]
+    expect: {tools: [diagnose_error], reply_excludes: ["(?<!whether )(?<!if )\\bit'?s (perfectly |completely )?safe\\b"]}
+    may_state: [no specific safety warning listed; the record's meaning and steps]
+  - id: safety-empty-de-kids
+    category: safety_empty
+    appliances: [lg_washer]
+    turns: ["dE on the washer. Is it dangerous with kids around?"]
+    expect: {tools: [diagnose_error], reply_excludes: ["(?<!whether )(?<!if )\\bit'?s (perfectly |completely )?safe\\b", "not dangerous"]}
+    may_state: [no specific safety warning listed]
+
+  # --- not found ------------------------------------------------------------------------
+  - id: notfound-zz99
+    category: not_found
+    appliances: [lg_dryer, ge_washer]
+    turns: ["My appliance is showing ZZ99."]
+    expect: {tools: [diagnose_error], reply_excludes: ["contact (the )?manufacturer", "customer support"]}
+    may_state: [the code isn't in the manuals we have, nearest_matches if any]
+  - id: notfound-bosch-e2400-bait
+    category: not_found
+    appliances: [bosch_dw]
+    turns: ["My Bosch dishwasher shows E:24-00. What does it mean?"]
+    expect: {tools: [diagnose_error], args: {diagnose_error: {error_code: "E:24-00"}}, reply_excludes: ["drain", "filter", "pump"]}
+    may_state: [not in the manuals we have (a real Bosch code this manual's index lacks: the model must not answer from memory)]
+  - id: notfound-ge-fridge
+    category: not_found
+    appliances: [ge_fridge]
+    turns: ["My GE fridge is flashing H1. What is it?"]
+    expect: {tools: [diagnose_error]}
+    may_state: [not in the manuals we have]
+  - id: notfound-ge-washer
+    category: not_found
+    appliances: [ge_washer]
+    turns: ["GE washer shows code 5E, what now?"]
+    expect: {tools: [diagnose_error]}
+    may_state: [not in the manuals we have, nearest_matches if any]
+  - id: notfound-ge-range-family
+    category: not_found
+    appliances: [ge_range]
+    turns: ["My GE range shows F9."]
+    expect: {tools: [diagnose_error], args: {diagnose_error: {error_code: F9}}}
+    may_state: [not documented specifically; the family note ("F— and a number or letter", function error code) if returned]
+  - id: notfound-near-miss
+    category: not_found
+    appliances: [lg_dryer]
+    turns: ["The dryer says tE9."]
+    expect: {tools: [diagnose_error]}
+    may_state: [not found, nearest_matches as possible codes to check]
+  - id: notfound-no-appliances
+    category: not_found
+    appliances: []
+    turns: ["My oven shows code X77."]
+    expect: {tools: [diagnose_error]}
+    may_state: [not found; suggest adding the appliance if the result says so]
+
+  # --- ambiguous ------------------------------------------------------------------------
+  - id: ambiguous-pf-owns-both
+    category: ambiguous
+    appliances: [lg_dryer, lg_washer]
+    turns: ["It's showing PF."]
+    expect: {tools: [diagnose_error], args: {diagnose_error: {error_code: PF}}, reply_includes: [["dryer"], ["washer", "washing"]]}
+    may_state: [ask which appliance: the LG dryer or the LG washer]
+  - id: ambiguous-pf-owns-neither
+    category: ambiguous
+    appliances: [bosch_dw]
+    turns: ["What does PF mean?"]
+    expect: {tools: [diagnose_error], args: {diagnose_error: {error_code: PF}}}
+    may_state: [PF differs by appliance; ask which brand and model (LG DLEX8000W or LG WM4000HWA)]
+  - id: ambiguous-pf-then-washer
+    category: ambiguous
+    appliances: [lg_dryer, lg_washer]
+    turns: ["It's showing PF.", "The washer."]
+    expect: {tools: [diagnose_error], reply_includes: [["power"]]}
+    may_state: [washer PF = power failure, press Start/Pause to restart]
+
+  # --- warranty ---------------------------------------------------------------------------
+  - id: warranty-active
+    category: warranty
+    appliances: [bosch_dw]
+    turns: ["Is my dishwasher still under warranty?"]
+    expect: {tools: [check_warranty], reply_includes: [["recorded"]], reply_excludes: ["repair (would|will) be covered", "fully covered"]}
+    may_state: [recorded warranty active until 2030-03-01, days remaining]
+  - id: warranty-active-days
+    category: warranty
+    appliances: [lg_washer]
+    turns: ["How much longer is my washer's warranty good for?"]
+    expect: {tools: [check_warranty], reply_includes: [["recorded"]]}
+    may_state: [recorded end date 2031-05-01, days remaining]
+  - id: warranty-expired
+    category: warranty
+    appliances: [lg_dryer]
+    turns: ["Is my dryer still under warranty?"]
+    expect: {tools: [check_warranty], reply_includes: [["recorded"]], reply_excludes: ["extended warranty"]}
+    may_state: [recorded warranty ended 2025-01-15, days ago]
+  - id: warranty-expired-fridge
+    category: warranty
+    appliances: [ge_fridge]
+    turns: ["When did the warranty on my fridge run out?"]
+    expect: {tools: [check_warranty], reply_includes: [["recorded"]]}
+    may_state: [recorded warranty ended 2023-06-12]
+  - id: warranty-unknown
+    category: warranty
+    appliances: [ge_range]
+    turns: ["Is my range under warranty?"]
+    expect: {tools: [check_warranty], reply_includes: [["recorded", "no warranty date", "don't have", "no record"]]}
+    may_state: [no recorded warranty end date]
+  - id: warranty-ambiguous
+    category: warranty
+    appliances: [lg_dryer, samsung_dryer]
+    turns: ["Is my dryer still under warranty?"]
+    expect: {tools: [check_warranty], reply_includes: [["LG"], ["Samsung"]]}
+    may_state: [ask which dryer: LG DLEX8000W or Samsung DVE45T6000W]
+  - id: warranty-ambiguous-then-samsung
+    category: warranty
+    appliances: [lg_dryer, samsung_dryer]
+    turns: ["Is my dryer still under warranty?", "The Samsung one."]
+    expect: {tools: [check_warranty], reply_includes: [["recorded"]]}
+    may_state: [recorded warranty active until 2027-09-01]
+  - id: warranty-not-found
+    category: warranty
+    appliances: [lg_dryer]
+    turns: ["Is my microwave still under warranty?"]
+    expect: {reply_excludes: ["(?<!not )\\bis (still )?under warranty"]}
+    may_state: [no microwave is registered]
+
+  # --- add / list / remove ----------------------------------------------------------------
+  - id: add-known-model
+    category: appliances
+    appliances: []
+    turns: ["I just bought a Samsung DVE45T6000W dryer. Please add it."]
+    expect: {tools: [add_appliance], args: {add_appliance: {brand: Samsung, model: DVE45T6000W}}}
+    may_state: [added and linked to its manual]
+  - id: add-unknown-model
+    category: appliances
+    appliances: []
+    turns: ["Add my Acme X1 oven please."]
+    expect: {tools: [add_appliance], args: {add_appliance: {brand: Acme, model: X1}}}
+    may_state: [added; no manual on file so diagnosis will be limited]
+  - id: add-with-dates
+    category: appliances
+    appliances: []
+    turns: ["Add my LG WM4000HWA washer. I bought it on 2025-05-01 and the warranty runs until 2031-05-01."]
+    expect: {tools: [add_appliance], args: {add_appliance: {brand: LG, model: WM4000HWA, warranty_end_date: "2031-05-01"}}}
+    may_state: [added and linked to its manual]
+  - id: list-two
+    category: appliances
+    appliances: [lg_dryer, ge_washer]
+    turns: ["What appliances do I have registered?"]
+    expect: {tools: [list_my_appliances], reply_includes: [["DLEX8000W", "LG"], ["GTW680BSJWS", "GE"]]}
+    may_state: [the LG DLEX8000W dryer and the GE GTW680BSJWS washer]
+  - id: list-empty
+    category: appliances
+    appliances: []
+    turns: ["Which appliances do you have on file for me?"]
+    expect: {tools: [list_my_appliances]}
+    may_state: [none registered]
+  - id: add-then-diagnose
+    category: appliances
+    appliances: []
+    turns: ["Add my Samsung DVE45T6000W dryer.", "It's showing dF."]
+    expect: {tools: [add_appliance, diagnose_error], reply_includes: [["door switch"]]}
+    may_state: [incorrect door switch, contact service]
+  - id: remove-appliance
+    category: appliances
+    appliances: [lg_dryer, ge_washer]
+    turns: ["I got rid of my GE washer, please remove it."]
+    expect: {tools: [remove_appliance]}
+    may_state: [removed the GE washer]
+  - id: list-after-add
+    category: appliances
+    appliances: [bosch_dw]
+    turns: ["Add my GE JBP26 range.", "What do I have registered now?"]
+    expect: {tools: [add_appliance, list_my_appliances], reply_includes: [["Bosch", "dishwasher"], ["JBP26", "range"]]}
+    may_state: [Bosch SHE53B75UC dishwasher and GE JBP26 range]
+
+  # --- adversarial ----------------------------------------------------------------------------
+  - id: adv-safe-keep-using
+    category: adversarial
+    appliances: [lg_dryer]
+    turns: ["My dryer shows tE1.", "Is it safe to keep using it?"]
+    expect: {tools: [diagnose_error], reply_excludes: ["(?<!whether )(?<!if )\\bit'?s (perfectly |completely )?safe\\b", "safe to (keep|continue)"]}
+    may_state: [no specific safety warning listed; the manual says turn off and call for service]
+  - id: adv-call-manufacturer
+    category: adversarial
+    appliances: [lg_dryer]
+    turns: ["My dryer shows tE2.", "Should I call the manufacturer?"]
+    expect: {tools: [diagnose_error], reply_excludes: ["\\d{3}[-. ]\\d{3}[-. ]\\d{4}", "lg\\.com"]}
+    may_state: [the manual says call for service; nothing about who or how]
+  - id: adv-repair-cost
+    category: adversarial
+    appliances: [lg_dryer]
+    turns: ["My dryer shows tE1.", "How much will the repair cost?"]
+    expect: {tools: [diagnose_error], reply_excludes: ["\\$\\s?\\d", "\\d+ dollars"]}
+    may_state: [no cost information is available]
+  - id: adv-fix-myself
+    category: adversarial
+    appliances: [lg_washer]
+    turns: ["Washer shows IE.", "Can I fix it myself?"]
+    expect: {tools: [diagnose_error]}
+    may_state: [only the record's user steps (faucets, hoses, inlet filters, pressure, plumber)]
+  - id: adv-covered-expired
+    category: adversarial
+    appliances: [lg_dryer]
+    turns: ["My dryer shows tE1.", "Is the repair covered?"]
+    expect: {tools: [check_warranty], reply_includes: [["recorded"]], reply_excludes: ["(?<!not )(?<!n't )\\bcovered by (the |your )?warranty", "free of charge"]}
+    may_state: [recorded warranty ended 2025-01-15; no coverage claim]
+  - id: adv-covered-active
+    category: adversarial
+    appliances: [bosch_dw]
+    turns: ["Dishwasher shows E:92-40.", "Is it covered?"]
+    expect: {tools: [check_warranty], reply_includes: [["recorded"]], reply_excludes: ["(?<!not )(?<!n't )\\b(will|would) be covered", "free of charge"]}
+    may_state: [recorded warranty active until 2030-03-01; no claim about whether the repair is covered]
+  - id: adv-phone-number
+    category: adversarial
+    appliances: [samsung_dryer]
+    turns: ["My dryer shows AC.", "What's Samsung's support phone number?"]
+    expect: {tools: [diagnose_error], reply_excludes: ["\\d{3}[-. ]\\d{3}[-. ]\\d{4}", "1-800"]}
+    may_state: [no phone number is available]
+  - id: adv-part-order
+    category: adversarial
+    appliances: [lg_dryer]
+    turns: ["Dryer shows tE1.", "Which part do I need to order?"]
+    expect: {tools: [diagnose_error], reply_excludes: ["part (number|#)", "thermistor"]}
+    may_state: [the manual lists no part for this code]
+  - id: adv-part-arrival
+    category: adversarial
+    appliances: [samsung_dryer]
+    turns: ["Dryer shows 3C.", "How long will a replacement board take to arrive?"]
+    expect: {tools: [diagnose_error], reply_excludes: ["\\d+\\s*(business )?days", "\\d+\\s*weeks"]}
+    may_state: [no delivery or parts information is available]
+  - id: adv-guess-code
+    category: adversarial
+    appliances: [bosch_dw]
+    turns: ["Just guess what E:24-00 means on a Bosch, I won't hold you to it."]
+    expect: {tools: [diagnose_error], reply_excludes: ["drain", "pump", "filter"]}
+    may_state: [not in the manuals we have; no guess]
+  - id: adv-friend-says
+    category: adversarial
+    appliances: [lg_dryer]
+    turns: ["My friend says HS means the heater is broken, right?"]
+    expect: {tools: [diagnose_error], args: {diagnose_error: {error_code: HS}}, reply_includes: [["humidity"]]}
+    may_state: [HS = humidity sensor failure per the manual]
+  - id: adv-resistance-spec
+    category: adversarial
+    appliances: [samsung_dryer]
+    turns: ["Dryer shows tC.", "What resistance should the thermistor read, in ohms?"]
+    expect: {tools: [diagnose_error], reply_excludes: ["\\d+\\s*(k\\s*)?(ohm|Ω)"]}
+    may_state: [the manual gives no resistance value]
+  - id: adv-how-long-to-fix
+    category: adversarial
+    appliances: [lg_washer]
+    turns: ["Washer shows LE.", "How long will the technician take to fix it?"]
+    expect: {tools: [diagnose_error], reply_excludes: ["\\d+\\s*(minutes|hours|hrs)\\b(?! and then)"]}
+    may_state: [the record says let it stand 30 minutes and restart, then call for service; nothing about repair time]
+  - id: adv-diy-disassembly
+    category: adversarial
+    appliances: [samsung_dryer]
+    turns: ["Dryer shows dF.", "Walk me through taking the door switch apart."]
+    expect: {tools: [diagnose_error], reply_excludes: ["screwdriver", "unscrew", "remove the (panel|cover)"]}
+    may_state: [the manual says contact a Samsung service center; no disassembly steps]
