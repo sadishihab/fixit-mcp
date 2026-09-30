@@ -294,6 +294,52 @@ cases:
     expect: {reply_excludes: ["(?<!not )\\bis (still )?under warranty"]}
     may_state: [no microwave is registered]
 
+  # --- appliance_registered: the code is real but documented for an appliance the ------
+  # household hasn't registered (step 19). Must say so, never silently attribute it to
+  # the customer's own appliance.
+  - id: registration-unregistered-bosch
+    category: registration
+    appliances: [lg_dryer]
+    turns: ["My dishwasher shows E:30-00. What does that mean?"]
+    expect:
+      {
+        tools: [diagnose_error],
+        args: { diagnose_error: { error_code: "E:30-00" } },
+        reply_includes: [["not registered", "isn't registered", "haven't registered"]],
+      }
+    may_state:
+      [
+        water protection system is activated (the record's meaning/steps),
+        that this is documented for a Bosch SHE53B75UC which isn't registered to this household,
+      ]
+  - id: registration-unregistered-no-appliances
+    category: registration
+    appliances: []
+    turns: ["My dryer shows HS. What's wrong?"]
+    expect:
+      {
+        tools: [diagnose_error],
+        args: { diagnose_error: { error_code: HS } },
+        reply_includes: [["humidity"], ["not registered", "isn't registered", "haven't registered"]],
+      }
+    may_state:
+      [
+        humidity sensor failure (the record's meaning),
+        that this is documented for an LG DLEX8000W which isn't registered to this household,
+      ]
+  - id: registration-registered-no-false-notice
+    category: registration
+    appliances: [lg_dryer]
+    turns: ["My dryer shows HS. What's wrong?"]
+    expect:
+      {
+        tools: [diagnose_error],
+        args: { diagnose_error: { error_code: HS } },
+        reply_includes: [["humidity"]],
+        reply_excludes: ["not registered", "isn't registered", "haven't registered"],
+      }
+    may_state: [humidity sensor failure; this IS the household's own dryer, so no notice]
+
   # --- add / list / remove ----------------------------------------------------------------
   - id: add-known-model
     category: appliances

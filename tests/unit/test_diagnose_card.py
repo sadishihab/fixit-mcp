@@ -134,6 +134,33 @@ def test_found_result_renders_citation() -> None:
 
 
 @requires_node
+def test_found_result_shows_a_muted_notice_when_appliance_is_not_registered() -> None:
+    result = {**FOUND_RESULT, "appliance_registered": False}
+    html = _build_card_html(result)
+    assert 'class="registration-notice"' in html
+    assert "Documented for LG DLEX8000W" in html
+    assert "isn't registered to your household" in html
+    # Still shows the full diagnosis -- this isn't a state-card, it's a found card.
+    assert "Temperature sensor failure" in html
+    assert "Turn off the dryer." in html
+
+
+@requires_node
+def test_found_result_omits_the_notice_when_appliance_is_registered() -> None:
+    result = {**FOUND_RESULT, "appliance_registered": True}
+    html = _build_card_html(result)
+    assert "registration-notice" not in html
+
+
+@requires_node
+def test_found_result_omits_the_notice_when_appliance_registered_is_absent() -> None:
+    """No household_id was given at all -- appliance_registered is null (not
+    in FOUND_RESULT), same as today's behavior."""
+    html = _build_card_html(FOUND_RESULT)
+    assert "registration-notice" not in html
+
+
+@requires_node
 def test_found_result_without_safety_warnings_omits_the_block() -> None:
     result = {**FOUND_RESULT, "safety_warnings": []}
     html = _build_card_html(result)

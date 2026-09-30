@@ -114,6 +114,20 @@
     color: var(--muted);
     font-style: italic;
   }
+  /* found + appliance_registered === false: the code is real and documented,
+     but not for anything this household registered -- muted grey like the
+     not_found/ambiguous state-card (never red/amber; it's not an error,
+     just a fact the customer needs), but inline within the found card since
+     the diagnosis itself is still shown in full. */
+  .registration-notice {
+    margin: 0 0 12px;
+    padding: 8px 12px;
+    border: 1px dashed var(--state-border);
+    background: var(--state-bg);
+    border-radius: 8px;
+    color: var(--muted);
+    font-size: 13px;
+  }
   /* not_found / ambiguous_appliance: deliberately muted (grey), never
      red/amber, so it reads as "a different, non-diagnosis state" rather
      than an error -- see FRICTION_LOG.md. */
@@ -233,6 +247,13 @@
 
     var appliance = result.appliance;
     var applianceLine = appliance ? esc(appliance.brand) + " " + esc(appliance.model) : "";
+    // Documented for a real appliance, but not one this household registered
+    // -- say so plainly, right under the header, before any diagnosis content.
+    var notRegisteredHtml =
+      result.appliance_registered === false && appliance
+        ? '<div class="registration-notice">Documented for ' + esc(appliance.brand) + " " +
+          esc(appliance.model) + ", which isn't registered to your household.</div>"
+        : "";
     var difficultyHtml = result.difficulty
       ? '<span class="difficulty difficulty-' + esc(result.difficulty) + '">' +
         esc(result.difficulty.replace(/_/g, " ")) + "</span>"
@@ -259,6 +280,7 @@
           (applianceLine ? '<span class="appliance">' + applianceLine + "</span>" : "") +
           difficultyHtml +
         "</div>" +
+        notRegisteredHtml +
         (result.meaning ? '<p class="meaning">' + esc(result.meaning) + "</p>" : "") +
         (causesHtml ? "<h3>Likely causes</h3><ul>" + causesHtml + "</ul>" : "") +
         (stepsHtml ? "<h3>Repair steps</h3><ol>" + stepsHtml + "</ol>" : "") +

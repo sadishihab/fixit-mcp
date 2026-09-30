@@ -142,6 +142,88 @@ def test_diagnose_ambiguous_when_multiple_owned_appliances_match() -> None:
     assert result.meaning == ""
 
 
+def test_diagnose_marks_appliance_registered_true_when_household_owns_it() -> None:
+    record = make_record(manual_id="acme-widget")
+    index = make_index([record])
+    appliance = make_appliance("app-1", "Acme", "W100", "widget", "acme-widget")
+    repo = InMemoryApplianceRepository(seed={"house-1": [appliance]})
+
+    result = diagnose(index, repo, "E1", household_id="house-1")
+
+    assert result.status == "found"
+    assert result.appliance_registered is True
+    assert result.appliance.appliance_id == "app-1"
+
+
+def test_diagnose_marks_appliance_registered_false_when_household_owns_nothing_matching() -> None:
+    """The bug this step fixes: household_id given, the code is documented,
+    but only for an appliance the household never registered -- must say so,
+    not silently return found with appliance null."""
+    record = make_record(manual_id="acme-widget", brand="Acme", model="W100", appliance_type="widget")
+    index = make_index([record])
+    repo = InMemoryApplianceRepository(seed={"house-1": []})
+
+    result = diagnose(index, repo, "E1", household_id="house-1")
+
+    assert result.status == "found"
+    assert result.appliance_registered is False
+    assert result.appliance is not None
+    assert result.appliance.appliance_id == ""
+    assert result.appliance.brand == "Acme"
+    assert result.appliance.model == "W100"
+    assert result.appliance.appliance_type == "widget"
+    assert result.suggest_add_appliance is True
+    assert "isn't registered to this household" in result.message
+    assert "Acme W100" in result.message
+
+
+def test_diagnose_marks_appliance_registered_false_when_household_owns_a_different_appliance() -> None:
+    """Same as above, but the household DOES own something -- just not the
+    appliance this code is documented for. Still not registered for THIS code."""
+    record = make_record(manual_id="acme-widget", brand="Acme", model="W100", appliance_type="widget")
+    index = make_index([record])
+    other_appliance = make_appliance("app-9", "Other", "T1", "toaster", "other-thing")
+    repo = InMemoryApplianceRepository(seed={"house-1": [other_appliance]})
+
+    result = diagnose(index, repo, "E1", household_id="house-1")
+
+    assert result.status == "found"
+    assert result.appliance_registered is False
+    assert result.appliance.brand == "Acme"
+    assert result.suggest_add_appliance is True
+
+
+def test_diagnose_appliance_registered_is_absent_without_a_household() -> None:
+    index = make_index([make_record()])
+
+    result = diagnose(index, EMPTY_REPO, "E1")
+
+    assert result.status == "found"
+    assert result.appliance_registered is None
+    assert result.appliance is None
+
+
+def test_diagnose_appliance_registered_is_absent_for_ambiguous_appliance() -> None:
+    record_a = make_record(manual_id="acme-widget-a", brand="Acme", model="W100")
+    record_b = make_record(manual_id="acme-widget-b", brand="Acme", model="W200")
+    index = make_index([record_a, record_b])
+
+    result = diagnose(index, EMPTY_REPO, "E1")
+
+    assert result.status == "ambiguous_appliance"
+    assert result.appliance_registered is None
+
+
+def test_diagnose_appliance_registered_is_absent_for_not_found() -> None:
+    index = make_index([make_record(error_code="E12", code_normalized="E12")])
+    repo = InMemoryApplianceRepository(seed={"house-1": []})
+
+    result = diagnose(index, repo, "E13", household_id="house-1")
+
+    assert result.status == "not_found"
+    assert result.appliance_registered is None
+
+
 def test_diagnose_appliance_id_narrows_within_household() -> None:
     record_a = make_record(manual_id="acme-widget-a")
     record_b = make_record(manual_id="acme-widget-b", brand="Acme", model="W200")

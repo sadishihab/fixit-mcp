@@ -242,6 +242,19 @@ def test_system_prompt_forbids_glossing_a_codes_meaning_with_an_unstated_mechani
     assert "which happens when water isn't filling the washer properly" in prompt
 
 
+def test_system_prompt_requires_flagging_an_unregistered_appliance() -> None:
+    """Step 19: diagnose_error can return status 'found' with
+    appliance_registered=false -- the code is real, but documented only for an
+    appliance the household never registered. The reply must say so, not
+    silently attribute the diagnosis to the customer's own appliance."""
+    prompt = build_system_prompt("house-002")
+
+    assert "appliance_registered set to false" in prompt
+    assert "only for an appliance this household hasn't registered" in prompt
+    assert "say so plainly" in prompt
+    assert "never assume or imply it's the customer's own appliance" in prompt
+
+
 def test_system_prompt_restricts_not_found_replies_to_what_the_result_supports() -> None:
     """Regression: step 6e's live verification caught a not_found reply
     saying 'it's not documented for your LG dryer' and suggesting the

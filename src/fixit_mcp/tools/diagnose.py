@@ -37,7 +37,12 @@ DIAGNOSE_ERROR_DESCRIPTION = (
     "our index, the response says so plainly and never invents a diagnosis; "
     "it may suggest the closest known codes instead. If household_id is given "
     "but no registered appliance matches, the response flags that the "
-    "appliance may not be registered yet and suggests calling add_appliance."
+    "appliance may not be registered yet and suggests calling add_appliance. "
+    "If household_id is given and the code is documented, but only for an "
+    "appliance the household hasn't registered, the response still returns "
+    "the diagnosis (status found) but sets appliance_registered to false and "
+    "names which appliance it's actually documented for -- always relay that "
+    "the appliance isn't registered to this household, never assume it's theirs."
 )
 
 
@@ -76,6 +81,17 @@ class DiagnoseErrorResult(BaseModel):
 
     # Populated when status == "found".
     appliance: ApplianceChoice | None = None
+    appliance_registered: bool | None = Field(
+        default=None,
+        description=(
+            "Only meaningful when household_id was given: True if the documented appliance is one "
+            "of the household's registered appliances, False if the code is documented for an "
+            "appliance the household hasn't registered (appliance is then that documented "
+            "appliance, with an empty appliance_id -- suggest_add_appliance is also set). "
+            "Absent (null) when no household_id was given at all, since registration status is "
+            "meaningless without a household to check it against."
+        ),
+    )
     meaning: str = ""
     likely_causes: list[str] = Field(default_factory=list)
     repair_steps: list[str] = Field(default_factory=list)
@@ -118,15 +134,31 @@ def _citation_for(record: ErrorCodeRecord) -> Citation:
     )
 
 
-def _found_result(record: ErrorCodeRecord, appliance: ApplianceChoice | None) -> DiagnoseErrorResult:
+def _found_result(
+    record: ErrorCodeRecord,
+    appliance: ApplianceChoice | None,
+    appliance_registered: bool | None = None,
+    suggest_add_appliance: bool = False,
+) -> DiagnoseErrorResult:
+    base_message = (
+        f"{record.error_code}: {record.meaning}" if record.meaning else f"Found {record.error_code}."
+    )
+    if appliance_registered is False and appliance is not None:
+        message = (
+            f"{base_message} This is documented for {appliance.brand} {appliance.model} "
+            f"({appliance.appliance_type}), which isn't registered to this household. "
+            "Consider calling add_appliance if this is the customer's appliance."
+        )
+    else:
+        message = base_message
     return DiagnoseErrorResult(
         status="found",
-        message=(
-            f"{record.error_code}: {record.meaning}" if record.meaning else f"Found {record.error_code}."
-        ),
+        message=message,
         error_code=record.error_code,
         code_normalized=record.code_normalized,
         appliance=appliance,
+        appliance_registered=appliance_registered,
+        suggest_add_appliance=suggest_add_appliance,
         meaning=record.meaning,
         likely_causes=record.likely_causes,
         repair_steps=record.repair_steps,
@@ -183,7 +215,7 @@ def diagnose(
             ]
             if len(matches) == 1:
                 appliance, record = matches[0]
-                return _found_result(record, _to_choice(appliance))
+                return _found_result(record, _to_choice(appliance), appliance_registered=True)
             if len(matches) > 1:
                 return DiagnoseErrorResult(
                     status="ambiguous_appliance",
@@ -206,7 +238,22 @@ def diagnose(
             filtered = [r for r in filtered if r.model.lower() == model.lower()]
 
         if len(filtered) == 1:
-            return _found_result(filtered[0], appliance=None)
+            record = filtered[0]
+            if household_id is not None:
+                # The code is documented, but not for anything this household
+                # registered -- never silently attribute it to the customer's
+                # appliance. Report it, with which appliance it's actually
+                # documented for, rather than a bare "found" with no owner.
+                documented = ApplianceChoice(
+                    appliance_id="",
+                    brand=record.brand,
+                    model=record.model,
+                    appliance_type=record.appliance_type,
+                )
+                return _found_result(
+                    record, documented, appliance_registered=False, suggest_add_appliance=True
+                )
+            return _found_result(record, appliance=None)
         if len(filtered) > 1:
             return DiagnoseErrorResult(
                 status="ambiguous_appliance",
