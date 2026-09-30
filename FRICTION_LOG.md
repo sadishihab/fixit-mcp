@@ -2604,3 +2604,16 @@ full detail behind each number.
   - Access is therefore not available to hackathon participants at all, regardless of country: this isn't a non-US-specific gap, it's a program-wide one for this hackathon.
 - **Severity**: High -- every tooling path documented so far (account linking's `alexa-ai deploy`, and the Local Inspector) terminates at the same "select partners only" gate, and the organizers have now confirmed that gate isn't crossable for this submission by any participant.
 - **Actionable suggestion for Amazon**: for a hackathon that names Alexa+ MCP add-ons as a track, either make a public local inspector or mock client available to participants (it appears to be a pure local dev tool -- loopback-only proxy, no cloud calls documented -- so this seems feasible without opening real Alexa+ account linking), or state clearly, up front in the hackathon rules and the docs home page, which Alexa+ tools (if any) work without partner approval.
+
+### 2026-09-30 — Claude on Bedrock is billed through AWS Marketplace, not covered by the hackathon credit
+
+- **Tool/SDK**: Amazon Bedrock (Anthropic Claude models), AWS Billing, the hackathon's AWS credit.
+- **Task attempted**: Run this project's Bedrock-based work (offline error-code extraction, the demo backend, the grounding eval's judge) on the AWS credit issued for the hackathon.
+- **Findings**:
+  - **Documented**: the hackathon credit form says the credits work for most AWS services required for the hackathon.
+  - **Documented**: the credit's own list of eligible services (Billing console, under Credits) includes Amazon Bedrock, Amazon Bedrock AgentCore and AmazonBedrockFoundationModels, and contains no AWS Marketplace items and no Anthropic or Claude entry.
+  - **Observed**: the September bill shows the AWS, Inc. total at zero with credits applied, and a separate AWS Marketplace line for "Claude Sonnet 4.5 (Amazon Bedrock Edition)", sold by Anthropic, PBC, charged with tax to the account's payment method. The amount is small so far (a few dollars, with billing lag).
+  - **Inferred**: taken together, Claude models on Bedrock appear to fall outside the credit: Bedrock itself is eligible, but the Claude usage is billed as a separate Marketplace item, which the eligible list doesn't include. So a Bedrock-based project using Claude appears to pay for those model calls itself. What would confirm it: the credit's used amount staying flat while the Marketplace charge grows.
+- **Severity**: Medium -- the cost here is small, but it lands on a personal payment method with no warning, and a heavier project (large ingestion runs, repeated evals) could run up a real bill while believing it's covered.
+- **Workaround**: none beyond watching the bill; keep estimate-first and cost guards on every Bedrock script (already done for `add_manual`, extraction and `make eval`).
+- **Actionable suggestion for Amazon**: state on the credit form and the hackathon page which services the credit does not cover, especially third-party models on Bedrock sold through AWS Marketplace, or include them in the credit. And since Bedrock itself is on the eligible list, list which Bedrock models the credit covers.
