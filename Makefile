@@ -2,6 +2,7 @@
 	add-manual validate-manifest \
 	docker-build docker-run docker-smoke docker-run-agentcore seed-agentcore \
 	iam-policies docker-push deploy-runtime runtime-smoke runtime-latency teardown-runtime teardown-runtime-all \
+	observability observability-teardown \
 	demo demo-cleanup eval quickstart try-it
 
 run:
@@ -172,6 +173,18 @@ runtime-latency:
 # charges). Keeps the ECR image (~$0.01/month) and AgentCore Memory data.
 teardown-runtime:
 	uv run python scripts/deploy_runtime.py --delete
+
+# CloudWatch observability for the deployed runtime (step 23c): metric filters,
+# 90-day log retention, dashboard FixIt, alarms fixit-errors/fixit-tool-latency
+# emailing SNS topic fixit-alerts. Needs FixItObservability (deploy/iam/),
+# FIXIT_AGENTCORE_MEMORY_ID and FIXIT_ALERT_EMAIL. Idempotent. DRY_RUN=1 prints
+# the plan and makes no AWS call.
+observability:
+	uv run python scripts/observability.py $(if $(DRY_RUN),--dry-run,)
+
+# Deletes the alarms, dashboard, metric filters and topic; keeps the retention.
+observability-teardown:
+	uv run python scripts/observability.py --teardown $(if $(DRY_RUN),--dry-run,)
 
 # Same, plus the ECR repository and every image in it. Still keeps the
 # AgentCore Memory resource (household data) and the IAM roles/policies.

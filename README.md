@@ -299,6 +299,38 @@ make runtime-smoke   RUNTIME_ARN=<arn>   # scripts/smoke_test.py, SigV4-signed
 make runtime-latency RUNTIME_ARN=<arn>   # cold vs warm latency, with the Runtime overhead split out
 ```
 
+### Monitoring the deployed runtime (CloudWatch)
+
+`make observability` (`scripts/observability.py`, step 23c) sets up a small,
+idempotent CloudWatch view of the deployed server:
+
+- four metric filters on the runtime's log group, built from the server's own
+  JSON log lines, publishing to namespace `FixIt`: `ToolLatency` (per tool),
+  `ToolLatencyAll`, `ToolCallFailed` and `MemoryCallFailed`;
+- 90-day retention on that log group (it never expired before);
+- dashboard `FixIt`: runtime invocations, errors and latency, per-tool handler
+  latency, failed tool and Memory calls, and AgentCore Memory latency and errors;
+- alarms `fixit-errors` (runtime `SystemErrors` + failed tool calls + failed
+  Memory calls, at least 1 in 5 minutes) and `fixit-tool-latency` (handler p95
+  over 300 ms in 2 of 3 five-minute periods), both emailing SNS topic
+  `fixit-alerts`.
+
+```bash
+make observability DRY_RUN=1                 # print the plan; no AWS call
+export FIXIT_AGENTCORE_MEMORY_ID=<MEMORY_ID>
+export FIXIT_ALERT_EMAIL=<your address>      # never committed
+make observability                           # create or update; confirm the SNS email
+make observability-teardown                  # delete it all (keeps the 90-day retention)
+```
+
+It needs the `FixItObservability` customer managed policy
+(`deploy/iam/observability-policy.json`). It should cost about $0 a month, within
+CloudWatch's free tier (8 custom metrics, 1 dashboard, 2 alarms).
+**Limitation:** this is a server-side view. A `504 Gateway Time-out` from
+AgentCore's front door for a request that never reached the container leaves no
+log line of ours and isn't documented as a runtime `SystemError`, so the
+dashboard may not show it (see `FRICTION_LOG.md`, step 23c).
+
 > **State persistence caveat (default `sqlite` backend).** The SQLite household store lives at
 > `/app/data/state/appliances.db` inside the container. Locally,
 > `make docker-run` mounts a named volume there so data survives `docker rm`.
@@ -395,6 +427,9 @@ Test suite:
   full run against the dev server.
 - `tests/integration/test_smoke_script.py` — keeps `scripts/smoke_test.py`
   (the container/deployment smoke checks) passing against the dev server.
+- `tests/unit/test_observability.py` — `scripts/observability.py`'s plan
+  (names inside the IAM policy's scoping, dimensions, alarms, dashboard),
+  idempotent apply and teardown, and a dry run that makes no AWS call, all with fakes.
 - `tests/unit/test_dockerfile.py` — guards the Dockerfile's contract
   (startup data files copied in, editable install, non-root, port 8000).
 - `tests/integration/test_container.py` — opt-in (`FIXIT_DOCKER_TESTS=1`):

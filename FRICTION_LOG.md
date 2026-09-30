@@ -2617,3 +2617,16 @@ full detail behind each number.
 - **Severity**: Medium -- the cost here is small, but it lands on a personal payment method with no warning, and a heavier project (large ingestion runs, repeated evals) could run up a real bill while believing it's covered.
 - **Workaround**: none beyond watching the bill; keep estimate-first and cost guards on every Bedrock script (already done for `add_manual`, extraction and `make eval`).
 - **Actionable suggestion for Amazon**: state on the credit form and the hackathon page which services the credit does not cover, especially third-party models on Bedrock sold through AWS Marketplace, or include them in the credit. And since Bedrock itself is on the eligible list, list which Bedrock models the credit covers.
+
+### 2026-09-30 — step 23c: the server-side dashboard can't see a 504 that never reached the container
+
+- **Tool/SDK**: AgentCore Runtime, CloudWatch (`AWS/Bedrock-AgentCore` metrics, metric filters), `scripts/observability.py`.
+- **Task attempted**: Put the 504 Gateway Time-outs we've seen (step 4c, and the 2026-09-30 cleanup) on the new `FixIt` dashboard and in the `fixit-errors` alarm.
+- **Findings**:
+  - **Observed** (step 4c): for that 504, the container log shows the request **never arrived**, so no `tool_call_*` line of ours exists for it, and no metric filter can count it. (The 2026-09-30 cleanup 504 wasn't checked against the container log.)
+  - **Documented**: the runtime's error metrics list only `InvocationError.Internal (500)` as a system error, 4xx codes as user errors, and 429/402 as throttles. A 504 is not listed.
+  - **Observed** (step 23c `list-metrics`): the runtime publishes `SystemErrors`, `UserErrors`, `Errors`, `Throttles`, `Latency`, `Duration`, `Invocations` and `Sessions` with dimensions `Resource`, `Operation=InvokeAgentRuntime`, `Name=fixit_mcp::DEFAULT` (plus a `ComputeType=MicroVM` variant). The Memory resource shows only `Invocations`, `Latency` and `CreationCount`; its error metrics don't appear, most likely because it has never had an error (inferred: CloudWatch lists only metrics with recent data).
+  - **Inferred**: whether a front-door 504 is counted in `SystemErrors` or `Errors` is unknown. Until one happens while the dashboard exists, the dashboard and the alarm may simply miss it.
+- **Severity**: Low. Rare so far (two occurrences), and the step-13 client timeouts already turn one into a logged failure on the caller's side.
+- **Workaround**: the dashboard's text panel and the `fixit-errors` alarm description state the gap. The only certain way to see a 504 is from the client, e.g. a scheduled SigV4 canary; not built (cost and scope).
+- **Actionable suggestion for Amazon**: document how AgentCore Runtime's front door reports its own gateway timeouts, both which metric counts a 504 and whether the invocation span records it.

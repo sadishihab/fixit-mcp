@@ -302,6 +302,24 @@ Alexa+ MCP Toolkit and helps customers with home appliances:
   Measured: warm Runtime overhead ~125–155ms p50. Cold new sessions (1.3–8s
   initialize, ~2s first call) are the open latency risk.
 
+- **Observability** (step 23c, `scripts/observability.py`, `make observability`/
+  `observability-teardown`, `DRY_RUN=1` makes no AWS call). Four metric filters
+  on the runtime log group turn our own `tool_call_completed`/`tool_call_failed`/
+  `agentcore_memory_call_failed` JSON lines into namespace `FixIt` metrics
+  (`ToolLatency` per `Tool`, `ToolLatencyAll`, `ToolCallFailed`, `MemoryCallFailed`);
+  90-day log retention; dashboard `FixIt`; alarms `fixit-errors` and
+  `fixit-tool-latency` (handler p95 > 300 ms, 2 of 3) emailing SNS topic
+  `fixit-alerts` (address from `FIXIT_ALERT_EMAIL`, never committed). Every
+  name starts with fixit/FixIt, matching the `FixItObservability` customer
+  managed policy (`deploy/iam/observability-policy.json`). AgentCore metric
+  dimensions (`Resource`, `Operation=InvokeAgentRuntime`, `Name=fixit_mcp::DEFAULT`
+  for the runtime; `Resource`, `Operation` for Memory) come from a real
+  list-metrics, never guessed; ids are resolved at run time, never written to
+  a file. Idempotent: read, compare, write only on drift. Renaming a log event
+  breaks its filter; `tests/unit/test_observability.py` checks every filter's
+  event name is still logged by `src/`. Known gap: a front-door 504 that never
+  reaches the container is invisible to it (`FRICTION_LOG.md`, step 23c).
+
 - **`check_warranty` tool** (step 8a, `fixit_mcp.tools.warranty`). Answers
   "is it still under warranty?" from a deterministic server-side date
   comparison only -- the comparison itself always happens in code, never
