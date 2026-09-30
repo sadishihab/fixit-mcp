@@ -2590,3 +2590,16 @@ full detail behind each number.
 
 - **Fix**: the system prompt now says explicitly to state a code's meaning and repair steps exactly as the result gives them, and never to gloss a code with a mechanism, cause, or condition the result didn't state -- with the actual offending clause ("which happens when water isn't filling the washer properly") named in the instruction itself, since the earlier general "never add explanation" wording didn't stop this specific pattern.
 - **Result**: re-ran found-lg-washer-ie and 5 neighbours (other LG washer codes, one LG dryer code) -- all 6 pass, grounded. The IE reply now states IE's likely_causes and repair_steps in full rather than a two-sentence gloss; other replies unaffected except also dropping soft paraphrase words.
+
+### 2026-09-30 — Alexa+ tooling access: docs point every path to a select-partners gate, non-US status unconfirmed
+
+- **Tool/SDK**: Alexa+ MCP Toolkit docs (`add-ons/home.html`, `add-ons/mcp-toolkit-local-inspector.html`, `add-ons/mcp-toolkit-quickstart.html`), the public npm registry, step 18a (Local Inspector investigation).
+- **Task attempted**: Try the Local Inspector CLI against our local server, to see it render `diagnose_error`'s card and validate our tool definitions before any real Alexa+ integration.
+- **Findings**:
+  - **Documented**: the Alexa+ docs home states plainly: "At this time, Category SDK and MCP Toolkit are available to select partners only."
+  - **Documented**: the Local Inspector page names the CLI as `@alexa-ai/addon-local-inspector` and its install step is "Log in to the Developer Console and follow the steps in the Getting Started guide" -- not a plain `npm install`.
+  - **Observed**: `npm view @alexa-ai/addon-local-inspector` returns `404 Not Found` on the public npm registry. Four other plausible package names (`addon-local-inspector`, `@amazon-alexa/addon-local-inspector`, `@alexa/addon-local-inspector`, `@aws-alexa/addon-local-inspector`) also 404.
+  - **Documented**: the Quickstart's `addon.json` example shows `"storeListing": {"distributionCountries": ["US"]}`.
+  - **Not established**: we did not run `alexa-ai configure` or create an Alexa developer account (excluded from step 18a's scope), so we cannot say whether an *approved* non-US developer could reach the Developer Console, complete `alexa-ai configure`, or install the inspector -- only that the public, unauthenticated path is closed and the one example manifest we found lists US-only distribution.
+- **Severity**: High for a non-US builder specifically -- every tooling path documented so far (account linking's `alexa-ai deploy`, and now the Local Inspector) terminates at the same "select partners only" gate, and nothing in the docs states whether non-US applicants are eligible for that partner program at all.
+- **Actionable suggestion for Amazon**: either publish the Local Inspector CLI on the public npm registry (it appears to be a pure local dev tool -- loopback-only proxy, no cloud calls documented) so builders can validate MCP Apps cards before requesting partner access, or state explicitly, on the docs home page, which tools (if any) work without approval, and whether developers outside the US can apply to or be granted the partner program.
