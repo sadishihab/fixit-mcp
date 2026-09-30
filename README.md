@@ -6,6 +6,43 @@
 A self-hosted MCP server for diagnosing appliance problems, built for the
 **Build, Ship, Shape: Amazon Developer Hackathon** (Alexa+ track).
 
+## Try it in 5 minutes (no AWS account)
+
+You need Python 3.12 and [`uv`](https://docs.astral.sh/uv/). Nothing else, and no
+AWS credentials: the local server keeps households in SQLite and reads the
+committed error-code index.
+
+```bash
+git clone https://github.com/sadishihab/fixit-mcp.git && cd fixit-mcp
+uv sync        # install dependencies
+make run       # start the server on http://localhost:8000/mcp; leave it running
+make try-it    # in a second terminal
+```
+
+(`make quickstart` prints these commands.) `make try-it` starts nothing itself.
+It connects to the running server over MCP, lists the five tools, and makes
+four read-only calls for the seeded demo household `house-002`, which has a GE
+washer and an LG dryer:
+
+- `diagnose_error` for `tE1`: the LG dryer's code, with its meaning, repair
+  steps and a citation to the manual page.
+- `check_warranty` for the dryer: the recorded end date and days since it
+  expired. This is a date comparison, not a coverage claim.
+- `diagnose_error` for `IE`: the code is documented for an LG washer the
+  household hasn't registered. The answer says so and suggests
+  `add_appliance`.
+- `diagnose_error` for `ZZ99`: a code no manual documents. The result is
+  `not_found`, with no invented meaning.
+
+With Node.js you can also browse the tools interactively in the MCP Inspector
+(`make inspector`, see [Inspecting the server](#inspecting-the-server)).
+
+**What needs AWS:** the simulated Alexa+ demo UI (`make demo`) and the grounding
+eval (`make eval`), both of which call Claude on Amazon Bedrock; extracting codes
+from new manuals with `FIXIT_EXTRACTOR=bedrock` (the default `stub` extractor
+needs no AWS, but finds codes only, not their meanings); the `agentcore`
+household backend; and building, pushing and deploying to AgentCore Runtime.
+
 ## Overview
 
 FixIt is a self-hosted MCP server (spec 2025-11-25, Streamable HTTP) for home
@@ -353,6 +390,9 @@ Test suite:
   checks the real manifest.
 - `tests/unit/test_run_eval.py` — the grounding eval runner (case loading, seeding
   and cleanup, deterministic checks, judge parsing and retry, cost, summary) with fakes.
+- `tests/unit/test_try_it.py` / `tests/integration/test_try_it_script.py` —
+  the no-AWS walkthrough (`make try-it`): its formatting with fakes, and the
+  full run against the dev server.
 - `tests/integration/test_smoke_script.py` — keeps `scripts/smoke_test.py`
   (the container/deployment smoke checks) passing against the dev server.
 - `tests/unit/test_dockerfile.py` — guards the Dockerfile's contract

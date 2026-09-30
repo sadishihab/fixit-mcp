@@ -2,10 +2,22 @@
 	add-manual validate-manifest \
 	docker-build docker-run docker-smoke docker-run-agentcore seed-agentcore \
 	iam-policies docker-push deploy-runtime runtime-smoke runtime-latency teardown-runtime teardown-runtime-all \
-	demo demo-cleanup eval
+	demo demo-cleanup eval quickstart try-it
 
 run:
 	uv run python -m fixit_mcp
+
+# The no-AWS path (README's "Try it in 5 minutes"): prints the three commands.
+quickstart:
+	@echo "FixIt in three commands (no AWS account needed):"
+	@echo "  uv sync        # install dependencies"
+	@echo "  make run       # start the server on http://localhost:8000/mcp (leave it running)"
+	@echo "  make try-it    # in a second terminal: a walkthrough of the tools"
+
+# Starts nothing: connects to a server already running (make run) and prints a
+# readable walkthrough of the tools (scripts/try_it.py). No AWS calls.
+try-it:
+	uv run python scripts/try_it.py
 
 # --group demo so demo/'s own tests (which import fastapi) collect --
 # demo/ is its own uv dependency group, never installed in the deployed
