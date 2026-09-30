@@ -18,9 +18,13 @@ answers "is it still under warranty?" with a deterministic date comparison; it
 returns an MCP Apps visual card for diagnoses; and it runs on Amazon Bedrock
 AgentCore Runtime.
 
-Not built: OAuth account linking, so the deployed server accepts IAM (SigV4)
-callers only and the real Alexa+ client cannot call it yet; parts ordering;
-maintenance scheduling. The demo client is a simulated Alexa+, not the real one.
+Not built: OAuth account linking. The deployed server accepts only AWS-signed
+(IAM SigV4) requests today, so the real Alexa+ client can't call it yet — also
+because the Alexa+ developer tools (account linking, the local inspector,
+add-on submission) are not available to hackathon participants; see
+`FRICTION_LOG.md`'s Alexa+ tooling access entry. Also not built: parts
+ordering; maintenance scheduling. The demo client (`make demo`) is a simulated
+Alexa+, not the real one, for the same reason.
 See [`docs/alexa-plus-requirements.md`](docs/alexa-plus-requirements.md) for the
 full requirements checklist and [`CLAUDE.md`](CLAUDE.md) for the architecture.
 
@@ -43,15 +47,19 @@ full requirements checklist and [`CLAUDE.md`](CLAUDE.md) for the architecture.
 - Offline ingestion of manuals into a committed error-code index, and a
   one-command way to add a manual (`make add-manual`).
 - A container image and a deployment to AgentCore Runtime with household data
-  in AgentCore Memory (IAM auth only).
+  in AgentCore Memory. **The deployed server accepts only AWS-signed (IAM
+  SigV4) requests today** — it has no anonymous or OAuth inbound auth.
 
 **Simulated**
-- The **Alexa+ client**. There is no real Alexa+ connection yet; the demo
-  (`make demo`) is a small local backend that plays Alexa+'s role: an MCP
-  client driving an LLM tool-use loop. It is not the real client.
+- The **Alexa+ client**. The demo (`make demo`) is a small local backend that
+  plays Alexa+'s role: an MCP client driving an LLM tool-use loop. It is not
+  the real client, because the Alexa+ developer tools (account linking, the
+  local inspector, add-on submission) are not available to hackathon
+  participants — see `FRICTION_LOG.md`'s Alexa+ tooling access entry.
 
 **Roadmap**
-- OAuth account linking, so real Alexa+ can reach the deployed server.
+- OAuth account linking, so real Alexa+ can reach the deployed server — if
+  Alexa+ tooling becomes available.
 - Parts ordering.
 - Maintenance scheduling.
 - More manuals (see [`CONTRIBUTING.md`](CONTRIBUTING.md) and
