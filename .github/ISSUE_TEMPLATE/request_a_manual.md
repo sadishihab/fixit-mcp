@@ -1,7 +1,7 @@
 ---
 name: Request a manual
 about: Ask for an appliance manual to be added to the knowledge base
-labels: manual
+labels: new manual
 ---
 
 **Brand**

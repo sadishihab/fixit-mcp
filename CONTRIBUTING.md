@@ -135,6 +135,16 @@ make lint && make format
 The `add_manual` tests use synthetic PDFs generated inside the tests and mocked
 HTTP: no real manual, no network, no AWS.
 
+## Issue labels
+
+| Label | Use it for |
+|---|---|
+| `good first issue` | Small and well-scoped: a newcomer can finish it in an afternoon. See [`docs/good-first-issues/`](docs/good-first-issues/). |
+| `help wanted` | A maintainer would welcome a contribution but has no time to do it soon. |
+| `new manual` | Adding a manufacturer manual, or requesting one (the "Request a manual" template applies it). |
+| `parser` | Manual parsing: headings, tables, text repair, chunking (`fixit_mcp.ingestion`). |
+| `docs` | README, CONTRIBUTING, and other documentation. |
+
 ## Reporting a manual that parses badly
 
 Open an issue with: the manual id, its `source_url`, the page(s) where the

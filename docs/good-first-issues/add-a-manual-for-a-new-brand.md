@@ -2,7 +2,9 @@
 
 ## Description
 
-The manifest covers GE, Bosch and LG. Pick a brand that is missing (for example Samsung, Frigidaire, Miele, Electrolux) and add one of its appliance manuals with `make add-manual`. Avoid brands whose CDN blocks scripts (Whirlpool answers every non-browser request with a 403; see FRICTION_LOG.md).
+The manifest covers GE, Bosch, LG and Samsung. Pick a brand that is missing (for example Frigidaire, Miele, Electrolux) and add one of its appliance manuals with `make add-manual`. Avoid brands whose CDN blocks scripts (Whirlpool answers every non-browser request with a 403; see FRICTION_LOG.md).
+
+The default `stub` extractor finds code names only, with no meanings or steps. If you have no AWS access, commit the stub records and say so in the PR; a maintainer can re-extract with Bedrock.
 
 ## Acceptance criteria
 
