@@ -212,6 +212,23 @@ async def test_reply_includes_and_excludes() -> None:
     assert ev.deterministic_failures(c, result) == []
 
 
+async def test_a_clarifying_question_waives_tool_expectations_only_when_the_case_allows_it() -> None:
+    c = case(expect={"tools": ["diagnose_error"], "reply_includes": [["humidity"]],
+                     "reply_excludes": ["^\\W*yes\\b"], "allow_clarifying_question": True})  # fmt: skip
+    asked, _ = await run(c, Script(text("Which appliance is showing HS?")))
+    assert ev.deterministic_failures(c, asked) == []
+
+    agreed, _ = await run(c, Script(text("Yes, which appliance is it?")))
+    assert any("forbidden pattern" in f for f in ev.deterministic_failures(c, agreed))
+
+    statement, _ = await run(c, Script(text("HS is a heater fault.")))  # no tool, no question
+    assert any("was not called" in f for f in ev.deterministic_failures(c, statement))
+
+    strict = case(expect={"tools": ["diagnose_error"]})
+    asked, _ = await run(strict, Script(text("Which appliance?")))
+    assert any("was not called" in f for f in ev.deterministic_failures(strict, asked))
+
+
 def test_the_safety_pattern_catches_a_safety_claim_but_not_a_refusal_to_make_one() -> None:
     pattern = r"(?<!whether )(?<!if )\bit'?s (perfectly |completely )?safe\b"
     assert re.search(pattern, "Yes, it's safe to use.", re.I)
@@ -221,12 +238,14 @@ def test_the_safety_pattern_catches_a_safety_claim_but_not_a_refusal_to_make_one
 # --- the judge ---------------------
 
 
-async def test_the_judge_sees_only_the_tool_results_and_the_reply() -> None:
+async def test_the_judge_sees_the_customers_messages_the_tool_results_and_the_reply() -> None:
     c = case(turns=["My dryer shows tE1, and my name is Secret Sam."])
     result, _ = await run(c, Script(tool_use(), text("Temperature sensor failure.")))
     prompt = ev.judge_user_prompt(result)
     assert "Temperature sensor failure" in prompt and '"diagnose_error"' in prompt
-    assert "Secret Sam" not in prompt  # the user's message is not given to the judge
+    assert "CUSTOMER'S MESSAGES (context only, not evidence)" in prompt
+    assert "1. My dryer shows tE1, and my name is Secret Sam." in prompt
+    assert "never evidence" in ev.JUDGE_SYSTEM
 
 
 def test_the_judge_output_is_parsed_including_a_fenced_block() -> None:

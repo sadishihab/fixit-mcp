@@ -13,6 +13,7 @@ from typing import Literal
 from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel, Field
 
+from fixit_mcp.domain.appliance_types import appliance_types_match
 from fixit_mcp.domain.models import Appliance
 from fixit_mcp.logging import log_tool_latency
 from fixit_mcp.repository.base import ApplianceRepository
@@ -91,7 +92,7 @@ def _resolve_appliances(
         return [a for a in owned if a.appliance_id == appliance_id]
     matches = owned
     if appliance_type is not None:
-        matches = [a for a in matches if a.appliance_type.lower() == appliance_type.lower()]
+        matches = [a for a in matches if appliance_types_match(a.appliance_type, appliance_type)]
     if brand is not None:
         matches = [a for a in matches if a.brand.lower() == brand.lower()]
     if model is not None:

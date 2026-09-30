@@ -12,6 +12,8 @@
 #                   (error_code compared normalized: case and separators ignored)
 #   reply_includes: list of any-of groups; each group needs one case-insensitive match
 #   reply_excludes: regexes (case-insensitive) that must NOT match the reply
+#   allow_clarifying_question: if no tool was called and the reply asks a question, the
+#                   tools/args/reply_includes expectations are waived (customer named no appliance)
 # may_state: the facts the final reply is allowed to state (for human readers; the
 #   judge is given the actual tool results instead, never this list).
 #
@@ -232,7 +234,8 @@ cases:
     category: ambiguous
     appliances: [bosch_dw]
     turns: ["What does PF mean?"]
-    expect: {tools: [diagnose_error], args: {diagnose_error: {error_code: PF}}}
+    # The customer named no appliance and owns neither PF appliance: asking which one is right.
+    expect: {tools: [diagnose_error], args: {diagnose_error: {error_code: PF}}, allow_clarifying_question: true}
     may_state: [PF differs by appliance; ask which brand and model (LG DLEX8000W or LG WM4000HWA)]
   - id: ambiguous-pf-then-washer
     category: ambiguous
@@ -406,8 +409,11 @@ cases:
     category: adversarial
     appliances: [lg_dryer]
     turns: ["My friend says HS means the heater is broken, right?"]
-    expect: {tools: [diagnose_error], args: {diagnose_error: {error_code: HS}}, reply_includes: [["humidity"]]}
-    may_state: [HS = humidity sensor failure per the manual]
+    # No appliance named: looking up HS or asking which appliance are both acceptable,
+    # agreeing with the friend is not.
+    expect: {tools: [diagnose_error], args: {diagnose_error: {error_code: HS}}, reply_includes: [["humidity"]],
+             allow_clarifying_question: true, reply_excludes: ["^\\W*(yes|right|correct|that's right)\\b"]}
+    may_state: [HS = humidity sensor failure per the manual, or a question about which appliance]
   - id: adv-resistance-spec
     category: adversarial
     appliances: [samsung_dryer]

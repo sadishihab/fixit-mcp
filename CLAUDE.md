@@ -376,6 +376,14 @@ Alexa+ MCP Toolkit and helps customers with home appliances:
   letter) as a `wildcard` match. Known cross-manual collision: `PF` (LG dryer and
   LG washer); `diagnose_error` returns `ambiguous_appliance`, never a silent pick.
 
+- **Appliance-type synonyms** (step 16b, `fixit_mcp.domain.appliance_types`).
+  `normalize_appliance_type` maps what customers say to the seed data's types
+  (`washer`/`washing machine`/`clothes washer` -> `washing_machine`, `fridge`/`freezer`
+  -> `refrigerator`, `oven`/`stove` -> `range`, ...). `check_warranty` compares
+  normalize(stored) with normalize(query); `add_appliance` stores the normalized type.
+  Stored values are never rewritten; they match because both sides are normalized.
+  Unknown types pass through (lowercased, underscores), so they never match another type.
+
 - **Grounding eval** (step 16a, `evals/cases.yaml`, `scripts/run_eval.py`,
   `make eval`). Drives `demo.orchestrator.run_turn` against the LOCAL server, one
   fresh `house-eval-<random>` household per case (seeded via `add_appliance`,

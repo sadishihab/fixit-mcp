@@ -10,6 +10,7 @@ from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel, Field
 
 from fixit_mcp.catalog.manifest import ManualCatalog
+from fixit_mcp.domain.appliance_types import normalize_appliance_type
 from fixit_mcp.domain.models import Appliance, ApplianceList
 from fixit_mcp.logging import log_tool_latency
 from fixit_mcp.repository.base import ApplianceRepository
@@ -73,7 +74,7 @@ def add_appliance(
         appliance_id=f"app-{uuid.uuid4().hex[:12]}",
         brand=brand,
         model=model,
-        appliance_type=appliance_type,
+        appliance_type=normalize_appliance_type(appliance_type),
         purchase_date=purchase_date,
         warranty_end_date=warranty_end_date,
         manual_id=manual_entry.manual_id if manual_entry else "",

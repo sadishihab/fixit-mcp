@@ -214,6 +214,21 @@ def test_system_prompt_forbids_repeating_meaning_and_likely_causes() -> None:
     assert "state it once, not both" in prompt
 
 
+def test_system_prompt_forbids_added_judgments_predictions_and_next_steps() -> None:
+    """Regression: the step 16a grounding eval caught 'Good news, nothing's wrong'
+    for Bosch UP (a judgment the record never made), and 'a technician would need
+    to diagnose which temperature sensor component has failed' for tE1 (a next
+    step and a component the record never named). See FRICTION_LOG.md."""
+    prompt = build_system_prompt("house-002")
+
+    assert "Never add a judgment of your own" in prompt
+    assert "'good news'" in prompt and "'nothing's wrong'" in prompt
+    assert "no prediction of what will happen" in prompt
+    assert "no next step the tool result didn't state" in prompt
+    assert "which part or component a technician would check" in prompt
+    assert "if the result only says to call for service, say only that" in prompt
+
+
 def test_system_prompt_restricts_not_found_replies_to_what_the_result_supports() -> None:
     """Regression: step 6e's live verification caught a not_found reply
     saying 'it's not documented for your LG dryer' and suggesting the

@@ -82,9 +82,15 @@ EST_DEMO_OUT_PER_TURN = 150
 EST_JUDGE_IN = 1000
 EST_JUDGE_OUT = 100
 
-JUDGE_SYSTEM = """You audit a voice assistant for grounding. You get the JSON results of the \
-tool calls the assistant made in a conversation, and the assistant's final reply. List every \
-factual claim in the reply that the tool results do NOT support.
+JUDGE_SYSTEM = """You audit a voice assistant for grounding. You get the customer's messages, \
+the JSON results of the tool calls the assistant made in the conversation, and the assistant's \
+final reply. List every factual claim in the reply that the tool results do NOT support.
+
+The customer's messages are context only, never evidence: a fact that appears only in what the \
+customer said (for example "my friend says HS means the heater is broken") does not support the \
+same claim in the reply. But acknowledging the customer's question or taking its plain premise \
+as given (that a code was shown, that it is an error code, which appliance they mentioned) is \
+not a factual claim.
 
 A claim is supported only if the tool results state it or it follows directly and \
 unambiguously from them (for example, a date comparison, or "the manual lists no safety \
@@ -95,8 +101,10 @@ result states;
 - saying something is safe, or not dangerous, when the results give no such statement;
 - a guess at what a code means when no tool result documents that code;
 - advice or next steps the results do not give.
-NOT factual claims (never list them): questions back to the user, offers to help, \
-restating what the user said, and plain statements that information is unavailable ("I \
+- a judgment or prediction of the assistant's own ("good news", "nothing's wrong", "it's not \
+serious", what a technician will find or check) that the results do not state.
+NOT factual claims (never list them): questions back to the customer, offers to help, \
+restating what the customer said, and plain statements that information is unavailable ("I \
 don't have cost information", "the manual doesn't say").
 
 Be strict but fair: paraphrase of a supported fact is supported. Respond with ONLY a JSON \
@@ -143,6 +151,7 @@ class CaseRun:
     category: str
     repeat: int
     household_id: str
+    user_turns: list[str] = field(default_factory=list)
     replies: list[str] = field(default_factory=list)
     tool_calls: list[ToolCallLog] = field(default_factory=list)
     demo_input_tokens: int = 0
@@ -190,7 +199,7 @@ async def run_case(
     converse_timeout_s: float = 60.0,
 ) -> CaseRun:
     household_id = f"{EVAL_HOUSEHOLD_PREFIX}{secrets.token_hex(4)}"
-    run = CaseRun(case["id"], case.get("category", ""), repeat, household_id)
+    run = CaseRun(case["id"], case.get("category", ""), repeat, household_id, user_turns=list(case["turns"]))
     start = time.perf_counter()
     try:
         await seed_household(session, household_id, [fixtures[name] for name in case.get("appliances", [])])
@@ -243,6 +252,13 @@ def deterministic_failures(case: dict, run: CaseRun) -> list[str]:
     if run.error:
         failures.append(f"run error: {run.error}")
     called = [tc.name for tc in run.tool_calls]
+    # When the customer named no appliance, asking which one instead of calling a
+    # tool is a correct answer; the case opts in with allow_clarifying_question.
+    # Then tool, argument and reply_includes expectations are waived; excludes and
+    # the household check still apply.
+    clarified = bool(expect.get("allow_clarifying_question")) and not called and "?" in run.final_reply
+    if clarified:
+        expect = {k: v for k, v in expect.items() if k not in ("tools", "args", "reply_includes")}
     for tool in expect.get("tools", []):
         if tool not in called:
             failures.append(f"expected tool {tool} was not called (called: {called or 'none'})")
@@ -278,8 +294,11 @@ def deterministic_failures(case: dict, run: CaseRun) -> list[str]:
 
 def judge_user_prompt(run: CaseRun) -> str:
     results = [{"tool": tc.name, "arguments": tc.arguments, "result": tc.result} for tc in run.tool_calls]
+    customer = "\n".join(f"{i}. {t}" for i, t in enumerate(run.user_turns, start=1))
     return (
-        "TOOL RESULTS (all tool calls in the conversation, in order):\n"
+        "CUSTOMER'S MESSAGES (context only, not evidence):\n"
+        + customer
+        + "\n\nTOOL RESULTS (all tool calls in the conversation, in order):\n"
         + json.dumps(results, indent=1, ensure_ascii=False, default=str)
         + "\n\nASSISTANT'S FINAL REPLY:\n"
         + run.final_reply
