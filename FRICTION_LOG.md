@@ -2591,7 +2591,7 @@ full detail behind each number.
 - **Fix**: the system prompt now says explicitly to state a code's meaning and repair steps exactly as the result gives them, and never to gloss a code with a mechanism, cause, or condition the result didn't state -- with the actual offending clause ("which happens when water isn't filling the washer properly") named in the instruction itself, since the earlier general "never add explanation" wording didn't stop this specific pattern.
 - **Result**: re-ran found-lg-washer-ie and 5 neighbours (other LG washer codes, one LG dryer code) -- all 6 pass, grounded. The IE reply now states IE's likely_causes and repair_steps in full rather than a two-sentence gloss; other replies unaffected except also dropping soft paraphrase words.
 
-### 2026-09-30 — Alexa+ tooling access: docs point every path to a select-partners gate, non-US status unconfirmed
+### 2026-09-30 — Alexa+ tooling access: docs point every path to a select-partners gate, and organizers confirmed it's closed for this hackathon
 
 - **Tool/SDK**: Alexa+ MCP Toolkit docs (`add-ons/home.html`, `add-ons/mcp-toolkit-local-inspector.html`, `add-ons/mcp-toolkit-quickstart.html`), the public npm registry, step 18a (Local Inspector investigation).
 - **Task attempted**: Try the Local Inspector CLI against our local server, to see it render `diagnose_error`'s card and validate our tool definitions before any real Alexa+ integration.

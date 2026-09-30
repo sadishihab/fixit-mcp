@@ -234,7 +234,9 @@ step 4c):
    image's **digest**.
 
 The runtime runs with the `agentcore` backend and **IAM (SigV4) inbound
-auth**. Alexa+ can't call it until OAuth/JWT is added.
+auth**. Alexa+ can't call it — that needs OAuth/JWT, which isn't applicable
+to this submission since the Alexa+ developer tools aren't available to
+hackathon participants (see `FRICTION_LOG.md`'s Alexa+ tooling access entry).
 
 > ## 🛑 Stop paying for it: `make teardown-runtime`
 >
@@ -270,9 +272,11 @@ make runtime-latency RUNTIME_ARN=<arn>   # cold vs warm latency, with the Runtim
 
 ## Simulated Alexa+ demo
 
-There's no real Alexa+ integration yet (see the OAuth row in
-[`docs/alexa-plus-requirements.md`](docs/alexa-plus-requirements.md)). In
-the meantime, [`demo/`](demo/README.md) is a local FastAPI backend that
+There's no real Alexa+ integration — the Alexa+ developer tools aren't
+available to hackathon participants (see the OAuth row in
+[`docs/alexa-plus-requirements.md`](docs/alexa-plus-requirements.md) and
+`FRICTION_LOG.md`'s Alexa+ tooling access entry). Instead,
+[`demo/`](demo/README.md) is a local FastAPI backend that
 plays Alexa+'s role -- a real MCP client driving a tool-use LLM loop
 against this server, including the MCP Apps card -- so the tool-calling
 behavior can be exercised and demoed. It has a small single-page web UI, and every
