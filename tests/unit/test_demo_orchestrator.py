@@ -229,6 +229,19 @@ def test_system_prompt_forbids_added_judgments_predictions_and_next_steps() -> N
     assert "if the result only says to call for service, say only that" in prompt
 
 
+def test_system_prompt_forbids_glossing_a_codes_meaning_with_an_unstated_mechanism() -> None:
+    """Regression: the step 16a/16b grounding eval's found-lg-washer-ie case caught
+    'The IE code means inlet error, which happens when water isn't filling the washer
+    properly' -- the clause after 'which happens' is an explanation the record's
+    meaning ('INLET ERROR') never gave. See FRICTION_LOG.md."""
+    prompt = build_system_prompt("house-002")
+
+    assert "State a code's meaning and its repair steps exactly as the result gives them" in prompt
+    assert "never" in prompt and "gloss, expand, or explain a code" in prompt
+    assert "mechanism, cause, or condition the result" in prompt
+    assert "which happens when water isn't filling the washer properly" in prompt
+
+
 def test_system_prompt_restricts_not_found_replies_to_what_the_result_supports() -> None:
     """Regression: step 6e's live verification caught a not_found reply
     saying 'it's not documented for your LG dryer' and suggesting the
