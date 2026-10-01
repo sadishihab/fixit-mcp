@@ -776,3 +776,21 @@ def test_conversation_store_keeps_history_per_session_id() -> None:
 
     assert store.get("session-a") == [{"role": "user", "content": [{"text": "hi"}]}]
     assert store.get("session-b") == []
+
+
+def test_system_prompt_restricts_symptom_replies_to_what_the_entries_say() -> None:
+    """Step 25b: diagnose_symptom returns the manual's own rows; the prompt must keep the reply to
+    them, route 'is it dangerous / should I call someone' to the entry, and never add a cause."""
+    prompt = build_system_prompt("house-001")
+
+    assert "diagnose_symptom" in prompt
+    assert "never add a cause, a step, a part, a safety judgment" in prompt
+    assert "never say it is safe" in prompt
+    assert "name no cause" in prompt
+    assert "response_label is 'Reason'" in prompt
+
+
+def test_diagnose_symptom_is_idempotent_so_a_lost_response_may_be_retried() -> None:
+    from demo.orchestrator import _IDEMPOTENT_TOOLS
+
+    assert "diagnose_symptom" in _IDEMPOTENT_TOOLS

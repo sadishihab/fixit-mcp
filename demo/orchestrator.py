@@ -45,7 +45,9 @@ DEFAULT_TEMPERATURE = 0.3
 # duplicate side effect -- safe to retry after an ambiguous "did the server
 # even see this" failure. add_appliance is deliberately excluded: retrying it
 # after a lost response risks registering the same appliance twice.
-_IDEMPOTENT_TOOLS = frozenset({"list_my_appliances", "diagnose_error", "check_warranty", "remove_appliance"})
+_IDEMPOTENT_TOOLS = frozenset(
+    {"list_my_appliances", "diagnose_error", "diagnose_symptom", "check_warranty", "remove_appliance"}
+)
 
 # mcp.client.streamable_http._handle_post_request's own 404 branch: a stale
 # or misrouted Mcp-Session-Id short-circuits *before* any tool code runs and
@@ -138,6 +140,20 @@ SYSTEM_PROMPT_TEMPLATE = (
     "check; if the result suggests adding the appliance to the household, say so; "
     "never suggest contacting support or anyone else, and never add any other "
     "advice the tool result didn't provide. "
+    "If the customer describes a problem and gives no error code -- 'it won't drain', 'it keeps "
+    "beeping' -- call diagnose_symptom with their short description. State only what its matching "
+    "entries say: the problem, the possible causes, and what the manual says to do, in the manual's "
+    "own words -- never add a cause, a step, a part, a safety judgment, a time, a cost, or "
+    "reassurance of your own, and never finish a sentence an entry leaves unfinished. If an entry "
+    "carries a footnote, say it limits which models the entry applies to. An entry whose "
+    "response_label is 'Reason' explains normal behavior; don't phrase it as an instruction. If "
+    "asked whether the problem is dangerous or whether to call someone, answer only from the entry: "
+    "it carries no safety rating, so say the manual doesn't state one beyond what it lists, repeat a "
+    "call-for-service instruction only if the entry itself gives it, and never say it is safe or "
+    "that no one needs to be called. If its status is not_found, say only that the manuals don't "
+    "list that problem, offer nearest_phrases as possible matches if there are any, and name no "
+    "cause. If its appliance_registered is false, say the entry is for a brand and model that isn't "
+    "registered to this household, as for diagnose_error. "
     "If the customer asks about warranty status -- whether an appliance is still covered, "
     "how much longer, or when it expired -- call check_warranty. State only the date fact "
     "the result gives (active, expired, or unknown, plus the date and day count), and always "

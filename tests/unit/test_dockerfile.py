@@ -10,6 +10,7 @@ from pathlib import Path
 from fixit_mcp.catalog.manifest import DEFAULT_MANIFEST_PATH
 from fixit_mcp.config import DEFAULT_SQLITE_PATH, REPO_ROOT, Settings
 from fixit_mcp.retrieval.codes import DEFAULT_INDEX_PATH
+from fixit_mcp.retrieval.symptoms import DEFAULT_SYMPTOMS_PATH
 
 DOCKERFILE = (REPO_ROOT / "Dockerfile").read_text()
 DOCKERIGNORE = [
@@ -39,7 +40,7 @@ def test_every_data_file_loaded_at_startup_is_copied_into_the_image() -> None:
     """load_manual_catalog() silently returns an empty catalog if its file is
     missing, so a new startup data file that isn't COPYed in would not fail
     loudly inside the container -- keep this list in sync with create_server()."""
-    for path in (DEFAULT_INDEX_PATH, DEFAULT_MANIFEST_PATH):
+    for path in (DEFAULT_INDEX_PATH, DEFAULT_SYMPTOMS_PATH, DEFAULT_MANIFEST_PATH):
         relative = _relative(path)
         assert f"COPY --chown=fixit:fixit {relative} ./{relative}" in DOCKERFILE, relative
         assert not _is_dockerignored(relative), f"{relative} is excluded by .dockerignore"

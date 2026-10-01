@@ -11,8 +11,8 @@
 .env.*
 !.env.example
 
-# Derived/local data -- only data/index/error_codes.json and
-# data/manuals/manifest.yaml are needed in the image.
+# Derived/local data -- only data/index/error_codes.json, data/index/symptoms.json
+# and data/manuals/manifest.yaml are needed in the image.
 data/manuals/pdf/
 data/manuals/parsed/
 data/index/.extract_cache/

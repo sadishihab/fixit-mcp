@@ -4,8 +4,8 @@
 Checks: every entry has the required non-empty fields, ids are unique,
 brand+model pairs are unique, source_url is http(s), source_note is present,
 every seeded appliance's manual_id resolves to an entry with the same
-brand+model, and every record in data/index/error_codes.json points at a
-manifest entry. No network.
+brand+model, and every record in data/index/error_codes.json and
+data/index/symptoms.json points at a manifest entry. No network.
 
 Usage:
     uv run python scripts/validate_manifest.py
@@ -25,11 +25,14 @@ from fixit_mcp.repository.in_memory import DEFAULT_SEED
 REPO_ROOT = Path(__file__).resolve().parent.parent
 MANIFEST_PATH = REPO_ROOT / "data" / "manuals" / "manifest.yaml"
 INDEX_PATH = REPO_ROOT / "data" / "index" / "error_codes.json"
+SYMPTOMS_PATH = REPO_ROOT / "data" / "index" / "symptoms.json"
 
 REQUIRED_FIELDS = ("id", "brand", "model", "appliance_type", "source_url", "source_note")
 
 
-def validate(entries: object, seed: dict, index_records: list[dict]) -> list[str]:
+def validate(
+    entries: object, seed: dict, index_records: list[dict], symptom_records: list[dict] | None = None
+) -> list[str]:
     """Return a list of human-readable problems; empty means valid."""
     if not isinstance(entries, list):
         return ["manifest must be a YAML list of entries"]
@@ -78,6 +81,8 @@ def validate(entries: object, seed: dict, index_records: list[dict]) -> list[str
 
     for manual_id in sorted({r.get("manual_id") for r in index_records} - set(by_id)):
         problems.append(f"error_codes.json has records for manual_id {manual_id!r}, not in the manifest")
+    for manual_id in sorted({r.get("manual_id") for r in symptom_records or []} - set(by_id)):
+        problems.append(f"symptoms.json has records for manual_id {manual_id!r}, not in the manifest")
 
     return problems
 
@@ -85,7 +90,8 @@ def validate(entries: object, seed: dict, index_records: list[dict]) -> list[str
 def main() -> int:
     entries = yaml.safe_load(MANIFEST_PATH.read_text())
     index_records = json.loads(INDEX_PATH.read_text()) if INDEX_PATH.exists() else []
-    problems = validate(entries, DEFAULT_SEED, index_records)
+    symptom_records = json.loads(SYMPTOMS_PATH.read_text()) if SYMPTOMS_PATH.exists() else []
+    problems = validate(entries, DEFAULT_SEED, index_records, symptom_records)
     if problems:
         print(f"{MANIFEST_PATH.relative_to(REPO_ROOT)}: {len(problems)} problem(s)")
         for p in problems:

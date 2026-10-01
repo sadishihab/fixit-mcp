@@ -93,3 +93,24 @@ async def test_diagnose_error_p95_latency_under_budget_with_index_loaded(server_
 
             p95_ms = _p95(latencies_ms)
             assert p95_ms < P95_BUDGET_MS, f"p95 latency {p95_ms:.2f}ms exceeded {P95_BUDGET_MS}ms budget"
+
+
+async def test_diagnose_symptom_p95_latency_under_budget_with_index_loaded(server_url: str) -> None:
+    """The matcher scans every symptom on each call; with the committed index loaded once at startup
+    the per-request cost is in-memory set arithmetic. Times the found path and the not_found path."""
+    async with streamable_http_client(server_url) as (read_stream, write_stream, _):
+        async with ClientSession(read_stream, write_stream) as session:
+            await session.initialize()
+
+            for symptom in ("the refrigerator keeps beeping and water is leaking", "my television is blurry"):
+                latencies_ms: list[float] = []
+                for _ in range(CALL_COUNT):
+                    start = time.perf_counter()
+                    result = await session.call_tool(
+                        "diagnose_symptom", {"household_id": "house-001", "symptom": symptom}
+                    )
+                    latencies_ms.append((time.perf_counter() - start) * 1000)
+                    assert result.isError is False
+
+                p95_ms = _p95(latencies_ms)
+                assert p95_ms < P95_BUDGET_MS, f"p95 latency {p95_ms:.2f}ms exceeded {P95_BUDGET_MS}ms budget"

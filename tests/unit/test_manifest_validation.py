@@ -43,7 +43,15 @@ def seed_for(manual_id: str, brand: str = "Acme", model: str = "X1") -> dict:
 def test_the_real_manifest_is_valid() -> None:
     entries = yaml.safe_load(vm.MANIFEST_PATH.read_text())
     records = json.loads(vm.INDEX_PATH.read_text())
-    assert vm.validate(entries, DEFAULT_SEED, records) == []
+    symptoms = json.loads(vm.SYMPTOMS_PATH.read_text())
+    assert vm.validate(entries, DEFAULT_SEED, records, symptoms) == []
+
+
+def test_a_symptom_record_for_an_unknown_manual_is_flagged() -> None:
+    problems = vm.validate([entry()], {}, [], [{"manual_id": "a-1"}, {"manual_id": "ghost"}])
+
+    assert any("symptoms.json" in p and "ghost" in p for p in problems)
+    assert not any("a-1" in p for p in problems)
 
 
 def test_valid_minimal_manifest_has_no_problems() -> None:

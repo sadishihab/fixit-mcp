@@ -64,9 +64,10 @@ WORKDIR /app
 
 COPY --from=builder --chown=fixit:fixit /app/.venv ./.venv
 COPY --from=builder --chown=fixit:fixit /app/src ./src
-# Only the two committed data files the running server reads at startup --
+# Only the committed data files the running server reads at startup --
 # not manual PDFs, parsed chunks, the extraction cache, or local state.
 COPY --chown=fixit:fixit data/index/error_codes.json ./data/index/error_codes.json
+COPY --chown=fixit:fixit data/index/symptoms.json ./data/index/symptoms.json
 COPY --chown=fixit:fixit data/manuals/manifest.yaml ./data/manuals/manifest.yaml
 
 # The SQLite store's directory must exist and be owned by the app user so a

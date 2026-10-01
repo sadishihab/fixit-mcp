@@ -46,6 +46,7 @@ EXPECTED_TOOLS = {
     "add_appliance",
     "remove_appliance",
     "diagnose_error",
+    "diagnose_symptom",
     "check_warranty",
 }
 DIAGNOSE_CARD_URI = "ui://fixit-mcp/diagnose-error-card"
@@ -147,6 +148,33 @@ async def check_diagnose_error(url: str, auth: httpx.Auth | None = None) -> str:
 
     await _with_session(url, body, auth)
     return "diagnose_error(tE1, house-002) finds the LG dryer code (error-code index loaded)"
+
+
+async def check_diagnose_symptom(url: str, auth: httpx.Auth | None = None) -> str:
+    async def body(session: ClientSession) -> None:
+        await session.initialize()
+        found = await session.call_tool(
+            "diagnose_symptom", {"household_id": "house-001", "symptom": "the refrigerator keeps beeping"}
+        )
+        _check(found.isError is False, f"diagnose_symptom errored: {found}")
+        content = found.structuredContent
+        _check(content["status"] == "found", f"expected found, got {content['status']!r}")
+        _check(content["appliance_registered"] is True, f"expected a registered appliance: {content}")
+        _check(content["appliance"]["brand"] == "GE", f"wrong appliance: {content['appliance']}")
+        _check(len(content["matches"]) >= 1, "no matches returned")
+        _check(content["matches"][0]["citation"]["page"] > 0, "match has no page citation")
+        missing = await session.call_tool(
+            "diagnose_symptom",
+            {"household_id": "house-001", "symptom": "my television shows a blurry picture"},
+        )
+        _check(missing.structuredContent["status"] == "not_found", f"expected not_found: {missing}")
+        _check(not missing.structuredContent["matches"], "not_found must carry no matches")
+
+    await _with_session(url, body, auth)
+    return (
+        "diagnose_symptom(house-001, 'refrigerator keeps beeping') finds a cited manual entry; "
+        "an off-topic description is not_found (symptom index loaded)"
+    )
 
 
 async def check_warranty(url: str, auth: httpx.Auth | None = None) -> str:
@@ -303,6 +331,7 @@ CHECKS: list[Callable[..., Awaitable[str]]] = [
     check_tools_listed,
     check_list_my_appliances,
     check_diagnose_error,
+    check_diagnose_symptom,
     check_warranty,
     check_diagnose_card,
     check_add_links_manual,
