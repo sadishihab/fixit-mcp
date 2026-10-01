@@ -20,7 +20,7 @@ make try-it    # in a second terminal
 ```
 
 (`make quickstart` prints these commands.) `make try-it` starts nothing itself.
-It connects to the running server over MCP, lists the five tools, and makes
+It connects to the running server over MCP, lists the six tools, and makes
 four read-only calls for the seeded demo household `house-002`, which has a GE
 washer and an LG dryer:
 
@@ -73,16 +73,20 @@ full requirements checklist and [`CLAUDE.md`](CLAUDE.md) for the architecture.
 | `add_appliance` | Registers a new appliance for a household, linking it to a manual on file when one matches. |
 | `remove_appliance` | Removes an appliance from a household's registry. |
 | `diagnose_error` | Looks up an appliance error code's meaning, causes, repair steps, parts, and safety warnings, cited to the source manual; has an MCP Apps visual card. |
+| `diagnose_symptom` | Finds a problem the customer describes in their own words (no error code) in the troubleshooting tables of their appliances' manuals and returns the manual's own rows — the problem, possible causes, what it says to do — cited to a page. Keyword matching only, no model call; says `not_found` rather than guess. Covers the GE refrigerator and washer so far. |
 | `check_warranty` | Reports whether a registered appliance's recorded warranty is active or expired, from a deterministic server-side date comparison — never a coverage claim. |
 
 ## Project status
 
 **Works today**
-- The MCP server (spec 2025-11-25, also negotiates 2025-03-26) with five tools:
+- The MCP server (spec 2025-11-25, also negotiates 2025-03-26) with six tools:
   appliance registry, error-code diagnosis from real manuals (with a visual
-  card), and a recorded-date warranty check.
+  card), symptom lookup from the manuals' troubleshooting tables, and a
+  recorded-date warranty check.
 - Offline ingestion of manuals into a committed error-code index, and a
-  one-command way to add a manual (`make add-manual`).
+  one-command way to add a manual (`make add-manual`). Troubleshooting-table
+  rows for the GE refrigerator and washer go into a second committed index
+  (`make extract-symptoms`, Amazon Nova only).
 - A container image and a deployment to AgentCore Runtime with household data
   in AgentCore Memory. **The deployed server accepts only AWS-signed (IAM
   SigV4) requests today** — it has no anonymous or OAuth inbound auth.
@@ -114,11 +118,13 @@ Alexa+ (real client: not connected yet; the demo simulates it)
    v
 FixIt MCP server  (AgentCore Runtime; `make run` locally)
    |-- error-code index: data/index/error_codes.json, loaded once at startup
+   |-- symptom index: data/index/symptoms.json, loaded once at startup
    `-- household appliances: AgentCore Memory (`agentcore` backend), SQLite
        or in-memory for local dev
 
 Offline, never in a request: manual PDFs -> parser -> Bedrock extraction ->
-committed error-code index (`make add-manual`)
+committed error-code index (`make add-manual`); manual PDFs -> table reader ->
+Nova extraction + audit -> committed symptom index (`make extract-symptoms`)
 ```
 
 The runtime server is a thin, fast lookup layer with **no LLM calls in tool
@@ -380,8 +386,8 @@ rebuild and runtime update.
 
 ## Data and sources
 
-The error-code records in `data/index/error_codes.json` are factual, cited
-extractions from manufacturers' publicly downloadable manuals: each record names
+The error-code records in `data/index/error_codes.json` and the symptom rows in
+`data/index/symptoms.json` are factual, cited extractions from manufacturers' publicly downloadable manuals: each record names
 its manual and page. Every source is linked in
 [`data/manuals/manifest.yaml`](data/manuals/manifest.yaml), with a note on where
 the URL came from. The manual PDFs themselves are not stored in this repository,
@@ -395,8 +401,9 @@ ask, and the maintainer will remove them.
 
 The server never generates language; the assistant does, from the structured tool
 results. To check that the assistant says only what those results say, `make eval`
-runs about 60 scripted conversations (found and unknown codes, safety questions,
-warranty questions, and adversarial follow-ups like "how much will the repair cost?")
+runs about 70 scripted conversations (found and unknown codes, described problems,
+safety questions, warranty questions, and adversarial follow-ups like "how much will
+the repair cost?" or "is it dangerous?")
 through the demo against the local server. Each reply is checked deterministically
 (right tool, right arguments, required or forbidden phrases) and by a second model
 acting as judge, which lists any claim the tool results do not support. The judge
@@ -426,6 +433,15 @@ Test suite:
   the add-a-manual script (duplicates, wrong-content PDFs, dry run, idempotent
   merge; synthetic PDFs, mocked HTTP) and the manifest validator, which also
   checks the real manifest.
+- `tests/unit/test_symptom_ingestion.py` — the symptom table reader (a synthetic
+  ruled-table PDF), span-level font repair, the verbatim audit gate, the Nova
+  extractor's retry and spending cap with a fake Bedrock client, and the record builder.
+- `tests/unit/test_retrieval_symptoms.py` / `tests/unit/test_symptom_tool.py` /
+  `tests/integration/test_diagnose_symptom.py` — the symptom index loader, the
+  matcher (paraphrases that must match, off-topic descriptions that must not, a
+  description matching two manuals), `diagnose_symptom`'s resolution (found,
+  ambiguous_appliance, unregistered appliance, not_found) and its real
+  Streamable HTTP wiring, on invented data only.
 - `tests/unit/test_run_eval.py` — the grounding eval runner (case loading, seeding
   and cleanup, deterministic checks, judge parsing and retry, cost, summary) with fakes.
 - `tests/unit/test_try_it.py` / `tests/integration/test_try_it_script.py` —

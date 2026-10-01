@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`diagnose_symptom`, a sixth tool**: finds a problem described in the customer's own words (no error code) in the troubleshooting tables of their appliances' manuals and returns the manual's own rows (problem, possible causes, what to do), cited to a page. Deterministic keyword matching with a minimum score and two matched words, no model call; `ambiguous_appliance`, the `appliance_registered` notice and `not_found` (with the manual's nearest phrases) work as in `diagnose_error`. Covers the GE refrigerator (42 rows) and washer (72 rows).
+- `make extract-symptoms`: reads a manual's Problem / Possible Causes / What To Do tables from the PDF geometry, extracts them with Amazon Nova Pro (never Claude) under a spending cap, and writes `data/index/symptoms.json` only for rows that pass an audit (expected row count, each row's strings joined equal the source cell, footnote links, mid-sentence flag, bounded retry).
+- Six grounding-eval cases for `diagnose_symptom`.
 - Optional Amazon Polly voice for the simulated Alexa+ demo (`FIXIT_DEMO_POLLY=1`, off by default): `POST /speak` with generative-engine voice Matthew, an audio cache keyed by text, a 500-character request cap, a 50,000-character per-run spend guard, and the browser voice as the fallback. Needs `polly:SynthesizeSpeech` (`deploy/iam/polly-policy.json`). Demo-only; the server makes no Polly calls.
 
 ## [0.1.0] - 2026-10-01

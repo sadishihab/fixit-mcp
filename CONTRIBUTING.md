@@ -56,6 +56,24 @@ A new manual only reaches the deployed server after an image rebuild and a
 runtime update (`make docker-build docker-push deploy-runtime`); the index is
 baked into the image.
 
+## Symptom tables (the GE refrigerator and washer so far)
+
+A manual's "Problem / Possible Causes / What To Do" tables are extracted
+separately, into `data/index/symptoms.json`, for the `diagnose_symptom` tool:
+
+```bash
+make extract-symptoms DRY_RUN=1      # read the tables, print row counts and the cost estimate, call nothing
+make extract-symptoms                # asks before spending; Amazon Nova Pro only, never Claude
+make extract-symptoms MANUAL=<id> YES=1 MAX_COST=0.5
+```
+
+It reads each table from the PDF geometry and refuses to write a manual's rows unless
+every table passes the audit (expected row count; each row's text, joined, equal to its
+source cell). Open the rendered pages and spot-check a few rows before committing. Only
+manuals whose tables are ruled and have the three columns are supported; the default
+manuals are listed in `scripts/extract_symptoms.py`. The index is baked into the image like
+the error-code index.
+
 ## What makes a good source
 
 - A **freely downloadable, official** PDF from the manufacturer: a public

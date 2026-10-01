@@ -1,8 +1,22 @@
 # Symptom tool: plan and Nova extraction test (step 25a)
 
-Status: **plan only.** Nothing here is built, deployed, or in the index. The
-experiment ran in a scratch directory; `data/index/error_codes.json` and the
-manifest are untouched. Spend: $0.043 of a $1.00 cap, Nova models only.
+Status: **built in step 25b** for the GE refrigerator and washer (not deployed);
+sections 1-5 below are the step 25a plan and test, kept as written. What 25b
+changed or added relative to the plan:
+
+- `SymptomRecord` also has `symptom_label` (the manual's own first-column header, so
+  the Sounds table's rows match on "sound") and `text_incomplete` (the mid-sentence flag).
+- The tool also takes an optional `appliance_id`, like `diagnose_error`, and uses the
+  appliance type the customer's own words name when no `appliance_type` is passed.
+- Thresholds: score >= 0.5 and two matched words, with one query word the manuals do not
+  contain at all not counted against the customer (found by dry-checking the eval phrases).
+- The audit compares strings case- and quote-sensitively; the reader joins lines broken
+  after a real hyphen or en dash. No manifest field was added: the default manuals are a
+  constant in `scripts/extract_symptoms.py`.
+- Real extraction: 114 rows (42 + 72), every table accepted, about $0.10 in total.
+
+Original 25a status: plan only; the experiment ran in a scratch directory.
+Spend then: $0.043 of a $1.00 cap, Nova models only.
 
 ## 1. What the three manuals contain
 

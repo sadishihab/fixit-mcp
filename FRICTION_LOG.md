@@ -2646,3 +2646,17 @@ full detail behind each number.
 - **Severity**: Medium. Nothing shipped; each would have silently dropped or garbled rows if the extraction had been run on the plain text and trusted.
 - **Workaround**: in the scratch test only: geometry-based row reader, per-span repair, and a row-count plus verbatim-join audit that would have caught all of the above.
 - **Actionable suggestion**: any extraction run on a page whose table geometry is known should check the expected row count and retry on a mismatch, never accept `[]` as "nothing here".
+
+### 2026-10-01 — step 25b: the verbatim audit refused real source-text artifacts, and a dry check found a matcher gap
+
+- **Tool/SDK**: PyMuPDF (span extraction), Amazon Nova Pro via Bedrock `converse`, `scripts/extract_symptoms.py`, the new keyword matcher.
+- **Task attempted**: Run the symptom extraction for the GE refrigerator (42 table rows) and washer (72) behind an audit that requires each row's strings, joined, to equal its source cell.
+- **Findings**:
+  - **Observed**: the first fridge run rejected one table on two source-text artifacts, not model errors. (1) A line broken after a real hyphen leaves a space in the joined cell text (`non- stick`, `re- assembled`); Nova joined the word correctly, so a strict audit refused the better answer. Fixed by joining after a hyphen or an en dash in a range (`48°C–` + `60°C`) without a space; found a second time on the washer. (2) The `I` of `IMPORTANT` is a lone one-character span `,` in the corrupted font with no control character, so span-level repair cannot see it; it read `,MPORTANT`. Fixed with one reviewed, per-manual text fix checked against the rendered page.
+  - **Observed**: on the first attempt, Nova Pro dropped the `*`/`**` markers and the `*` prefix of footnotes on 2 of 3 fridge tables (the 25a prompt v2 had passed the same page first time). The audit rejected both and the retry hint fixed them. Run-to-run variability, so the retry loop is load-bearing, not decoration.
+  - **Observed**: one washer table needed one retry (the en-dash artifact above). Total real spend for both manuals: about $0.10 (assumed list prices), 18 Nova calls.
+  - **Observed** (matcher, dry-checking the new eval phrases against the real index before any model call): "my washer is making way too many suds" returned `not_found`. The filler word "way" appears in no manual, so it could never match, but it counted against the rule "at least two matched words". Fixed by not counting one such word; two or more unknown words keep the full rule.
+  - **Inferred**: a rule that pairs a minimum matched-word count with a score threshold needs each of the two to cover the other's blind spot. The count alone punishes filler; the score alone lets one common word match.
+- **Severity**: Medium. Nothing shipped wrong: the gate refused each artifact, and the dry check ran before the eval.
+- **Workaround**: deterministic join rule, one reviewed text fix, the unknown-word allowance; all covered by tests on invented strings.
+- **Actionable suggestion**: for any "model must copy verbatim" gate, run it on real pages before trusting the strictness: some of what looks like model error is the source's own typesetting.

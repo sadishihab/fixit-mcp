@@ -349,6 +349,57 @@ Alexa+ MCP Toolkit and helps customers with home appliances:
   forward into the model's own reply, the same class of leak
   `FRICTION_LOG.md`'s step 6b/6e entries caught for other tools.
 
+- **Symptom tool** (step 25b). `diagnose_symptom` answers a problem the
+  customer describes with no error code, from the manuals' "Problem / Possible
+  Causes / What To Do" tables. Two halves, like the error-code path.
+  *Offline* (`fixit_mcp.ingestion.symptom_tables`/`symptom_extraction`,
+  `scripts/extract_symptoms.py`, `make extract-symptoms`, `DRY_RUN=1` calls
+  nothing): rows come from PyMuPDF `find_tables()` geometry (the parser reads a
+  3-column table as 2 columns and loses row alignment, `FRICTION_LOG.md` steps
+  25a/25b), cell text from span-level extraction clipped to each cell, the GE
+  fridge's corrupted spans repaired per span with the offset the parser already
+  established (never searched; a span is corrupted iff it holds a C0 control
+  character), line wraps after a real hyphen or en dash joined without a space,
+  and `REVIEWED_TEXT_FIXES` (in the script, checked against the rendered page)
+  for the one lone corrupted character no rule can see. **Nova only, never
+  Claude** (`assert_nova_model` refuses anything else; the IAM user denies
+  Claude and it is Marketplace-billed): Nova Pro, the v2 prompt, a hard
+  `--max-cost` cap (default $1.00) with an estimate printed per manual and a
+  `yes` prompt (`--yes` skips). Nothing the model returns is trusted until
+  `audit_rows` passes: expected row count from the geometry, each row's strings
+  joined must equal the source cell (whitespace collapsed, nothing else, so a
+  curly quote or a dropped line fails), footnote links derived from the markers
+  in the row's own text, empty or short or unparseable answers retried up to 3
+  times with the problems named. A manual's rows are written to the committed
+  `data/index/symptoms.json` only if every one of its tables passed; other
+  manuals' rows are left alone. Accepted answers are cached in
+  `data/index/.extract_cache/symptoms/` keyed by model, prompt and table text
+  and **re-audited on every read**. The default manuals are the GE refrigerator
+  (42 rows) and washer (72 rows, incl. the "Sounds" table, whose third column is
+  headed "Reason", an explanation not an instruction); the GE range's table is
+  unruled and needs its own reader. `SymptomRecord` (neutral layer) has no
+  meaning/difficulty/parts/safety field and no model confidence: grounding is
+  verified, not self-reported. Rows that end mid-sentence (a brand logo in the
+  PDF is an image) carry `text_incomplete`. *Runtime*
+  (`fixit_mcp.retrieval.symptoms`, `fixit_mcp.tools.symptoms`): the index loads
+  once at startup (a missing file fails startup, like the error-code index;
+  `Dockerfile` COPYs it, `tests/unit/test_dockerfile.py` enforces that).
+  Matching is deterministic keyword overlap, no model call: stopwords, light
+  stemming, a small curated synonym table (each entry needs a test), IDF
+  weights, score >= 0.5 and at least 2 matched words (one query word the
+  manuals don't contain at all is not counted against the customer), a cause
+  alone never matches, ties go to the symptom the query covers most fully.
+  Appliance-type words in the description narrow the search but are never
+  matched on. Resolution mirrors `diagnose_error` via `fixit_mcp.tools.common`:
+  one owned appliance matches -> `found`; several -> `ambiguous_appliance`
+  (never guessed); none owned but another manual matches -> `found` with
+  `appliance_registered: false` and `suggest_add_appliance`; nothing -> `not_found`
+  with the manual's own nearest phrases (never a cause). Every string in a
+  match is a stored verbatim manual string; the only server-written text is the
+  fixed `message` templates. `diagnose_error`'s description points at it.
+  The demo's system prompt keeps replies to the entries (no cause, step, safety
+  judgment or reassurance of its own).
+
 - **Add-a-manual path** (step 11a, `scripts/add_manual.py`, `make add-manual`,
   `CONTRIBUTING.md`). One command: validate args (duplicate id or brand+model
   refused; an id already present with identical brand/model/type/url is treated
@@ -451,9 +502,12 @@ an AgentCore Memory backend for deployment), and
 `diagnose_error` has its first MCP Apps visual card (step 3d,
 `fixit_mcp.apps`), and a customer can ask whether an appliance is still
 under warranty (`check_warranty`, step 8a, `fixit_mcp.tools.warranty`,
-date comparison only, no coverage claims) — but nothing beyond that yet:
+date comparison only, no coverage claims), and a customer can describe a problem
+with no error code and get the manual's own troubleshooting rows
+(`diagnose_symptom`, step 25b, GE refrigerator and washer only) — but nothing beyond that yet:
 no embeddings, no
-fuzzy/semantic retrieval beyond `difflib` nearest-match suggestions, no
+fuzzy/semantic retrieval beyond `difflib` nearest-match suggestions and the
+symptom tool's deterministic keyword matcher, no
 Strands, no Alexa+-reachable deployment yet (the server runs on AgentCore
 Runtime with IAM-only inbound auth, step 4c, and household data lives in
 AgentCore Memory, step 4b), no auth/account
