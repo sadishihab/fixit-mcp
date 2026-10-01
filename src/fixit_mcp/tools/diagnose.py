@@ -19,6 +19,12 @@ from fixit_mcp.domain.models import Appliance, ErrorCodeRecord, normalize_code
 from fixit_mcp.logging import log_tool_latency
 from fixit_mcp.repository.base import ApplianceRepository
 from fixit_mcp.retrieval.codes import ErrorCodeIndex
+from fixit_mcp.tools.common import (
+    ApplianceChoice,
+    pair_owned_with_records,
+    resolve_owned_appliances,
+    to_choice,
+)
 
 DIAGNOSE_ERROR_DESCRIPTION = (
     "Look up what an appliance error code means: its meaning, likely causes, "
@@ -44,17 +50,6 @@ DIAGNOSE_ERROR_DESCRIPTION = (
     "names which appliance it's actually documented for -- always relay that "
     "the appliance isn't registered to this household, never assume it's theirs."
 )
-
-
-class ApplianceChoice(BaseModel):
-    """One candidate appliance, for an ambiguous_appliance response."""
-
-    appliance_id: str = Field(
-        description="Empty when resolved by brand/model alone, with no owned appliance."
-    )
-    brand: str
-    model: str
-    appliance_type: str
 
 
 class Citation(BaseModel):
@@ -119,15 +114,6 @@ class DiagnoseErrorResult(BaseModel):
     )
 
 
-def _to_choice(appliance: Appliance) -> ApplianceChoice:
-    return ApplianceChoice(
-        appliance_id=appliance.appliance_id,
-        brand=appliance.brand,
-        model=appliance.model,
-        appliance_type=appliance.appliance_type,
-    )
-
-
 def _citation_for(record: ErrorCodeRecord) -> Citation:
     return Citation(
         brand=record.brand, model=record.model, page=record.source_page, section=record.source_section
@@ -170,23 +156,6 @@ def _found_result(
     )
 
 
-def _resolve_owned_appliances(
-    repository: ApplianceRepository,
-    household_id: str,
-    appliance_id: str | None,
-    brand: str | None,
-    model: str | None,
-) -> list[Appliance]:
-    owned = repository.list_by_household(household_id)
-    if appliance_id is not None:
-        owned = [a for a in owned if a.appliance_id == appliance_id]
-    if brand is not None:
-        owned = [a for a in owned if a.brand.lower() == brand.lower()]
-    if model is not None:
-        owned = [a for a in owned if a.model.lower() == model.lower()]
-    return owned
-
-
 def diagnose(
     index: ErrorCodeIndex,
     repository: ApplianceRepository,
@@ -203,19 +172,14 @@ def diagnose(
 
     owned: list[Appliance] = []
     if household_id is not None:
-        owned = _resolve_owned_appliances(repository, household_id, appliance_id, brand, model)
+        owned = resolve_owned_appliances(repository, household_id, appliance_id, brand, model)
 
     if candidates:
         if owned:
-            matches = [
-                (appliance, record)
-                for appliance in owned
-                for record in candidates
-                if record.manual_id == appliance.manual_id
-            ]
+            matches = pair_owned_with_records(owned, candidates)
             if len(matches) == 1:
                 appliance, record = matches[0]
-                return _found_result(record, _to_choice(appliance), appliance_registered=True)
+                return _found_result(record, to_choice(appliance), appliance_registered=True)
             if len(matches) > 1:
                 return DiagnoseErrorResult(
                     status="ambiguous_appliance",
@@ -225,7 +189,7 @@ def diagnose(
                     ),
                     error_code=error_code,
                     code_normalized=code_normalized,
-                    candidate_appliances=[_to_choice(a) for a, _ in matches],
+                    candidate_appliances=[to_choice(a) for a, _ in matches],
                 )
             # Household given, but none of its (possibly already-filtered)
             # appliances have a manual with this code -- fall through and
