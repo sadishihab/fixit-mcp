@@ -247,3 +247,183 @@ def test_nearest_phrases_are_verbatim_manual_phrases_that_share_a_word() -> None
     assert nearest == ["Drum stays still"]
     assert INDEX.nearest_phrases(query_terms("television picture")) == []
     assert INDEX.nearest_phrases(query_terms("drum"), manual_ids={FRIDGE}) == []
+
+
+# --- step 27c: query analysis, polarity, spelling, evidence rules ---------------------------------------
+
+from fixit_mcp.retrieval.symptoms import (  # noqa: E402
+    _PHRASES,
+    _SYNONYM_WORDS,
+    DISTINCTIVE_MAX_SYMPTOMS,
+    OOV_WEIGHT_SHARE,
+    Spelling,
+    _fold,
+    analyze_query,
+    build_index,
+    is_negated,
+)
+
+
+@pytest.mark.parametrize(
+    ("text", "terms", "negated"),
+    [
+        ("the washer won't turn on", ["operat"], True),
+        ("my washer doesn't start", ["operat"], True),
+        ("nothing happens when I press it", ["operat", "press"], True),
+        ("it just stopped working", ["operat"], True),
+        ("the machine is dead", ["machin", "operat"], True),
+        ("it turns on by itself", ["operat", "itself"], False),
+        ("there is standing water", ["drain"], True),
+        ("the fridge is not cold", ["cool"], True),
+        ("the fridge is too warm", ["cool"], True),
+        ("water all over the floor", ["leak"], False),
+        ("not enough water", ["low", "water"], False),
+        ("the lid is hard to close", ["lid", "difficult", "clos"], False),
+    ],
+)
+def test_phrases_and_negation_become_the_manuals_words(text: str, terms: list[str], negated: bool) -> None:
+    a = analyze_query(text)
+
+    assert (a.terms, a.negated) == (terms, negated)
+
+
+def test_negation_is_read_from_the_description_and_from_a_stored_symptoms_own_wording() -> None:
+    assert analyze_query("it is dead").negated is True
+    assert analyze_query("it is lit").negated is False
+    assert is_negated("Water won’t drain") and is_negated("No fill") and not is_negated("Too many suds")
+
+
+@pytest.mark.parametrize(
+    ("text", "terms"),
+    [
+        ("really loud vibrating like crazy", ["sound", "rock"]),
+        ("shirts and jeans came out torn", ["tear"]),
+        ("a light is on", ["lit"]),
+    ],
+)
+def test_fillers_and_garments_are_ignored_and_synonyms_folded(text: str, terms: list[str]) -> None:
+    assert analyze_query(text).terms == terms
+
+
+def test_an_unknown_word_stays_a_term_rather_than_being_ignored() -> None:
+    assert "banana" in analyze_query("the washer smells of banana").terms
+
+
+def test_polarity_must_agree_so_a_wont_spin_description_never_reaches_a_pauses_during_spin_row() -> None:
+    index = build_index(
+        [
+            rec(WASHER, ["Drum won't spin"], ["Belt"], ["Replace it."]),
+            rec(WASHER, ["Drum pauses during the spin cycle"], ["Soak option"], ["Wait."], page=6),
+        ]
+    )
+
+    refused = index.search(index.analyze("my washer won't spin").terms, negated=True)
+    positive = index.search(index.analyze("my washer spins and pauses").terms, negated=False)
+    unfiltered = index.search(["spin"])
+
+    assert [s.group.phrases[0] for s in refused] == ["Drum won't spin"]
+    assert [s.group.phrases[0] for s in positive] == ["Drum pauses during the spin cycle"]
+    assert [g.negated for g in index.groups] == [True, False]
+    assert len(unfiltered) == 2, "without a polarity the search is as before"
+
+
+def test_an_unknown_word_weighs_against_a_match_and_two_of_them_defeat_it() -> None:
+    assert OOV_WEIGHT_SHARE >= 0.6
+    assert _phrases("drum stays still totally") == ["Drum stays still"]  # 'totally' is a listed filler
+    assert _phrases("drum stays still banana") == ["Drum stays still"]  # two real words outweigh one unknown
+    assert _phrases("drum banana") == ["Drum stays still"]  # a distinctive word with one unknown word
+    assert _phrases("drum banana mango") == []  # ...but not with two
+
+
+def test_one_distinctive_word_can_carry_a_match_and_a_common_word_cannot() -> None:
+    assert DISTINCTIVE_MAX_SYMPTOMS == 2
+    assert _phrases("chirping") == ["Alarm chirps"]  # a symptom word only one symptom uses
+    assert _phrases("pours banana") != []  # used by two symptoms: still distinctive
+    assert _phrases("inside banana") == []  # used by three symptoms: one matched word is not enough
+
+
+def test_a_word_found_only_in_a_cause_never_counts_toward_the_minimum() -> None:
+    assert _phrases("hatch mildew") == []  # both are cause-only words
+    assert _phrases("hatch latched") == []
+
+
+def test_one_common_word_that_fits_many_symptoms_matches_none_of_them() -> None:
+    many = build_index([rec(WASHER, [f"Sound number {n}"], ["c"], ["a"], page=n + 1) for n in range(5)])
+    few = build_index([rec(WASHER, [f"Sound number {n}"], ["c"], ["a"], page=n + 1) for n in range(2)])
+
+    assert many.search(["sound"]) == []
+    assert len(few.search(["sound"])) == 2
+    assert len(many.search(["sound", "number"])) == 5, "two matched words identify the group of symptoms"
+
+
+# --- spelling -----------------------------------------------------------------------------------------
+
+
+def _spelling(*terms: str) -> Spelling:
+    return Spelling(frozenset(terms))
+
+
+@pytest.mark.parametrize(
+    ("typo", "fixed"),
+    [("wrinkeld", "wrinkled"), ("dispencer", "dispenser"), ("refridgerator", "refrigerator")],
+)
+def test_a_one_character_slip_on_a_longer_word_is_mended(typo: str, fixed: str) -> None:
+    assert _spelling("wrinkl", "dispenser", "drain").correct(typo) == fixed
+
+
+def test_a_short_word_is_never_corrected() -> None:
+    assert _spelling("leak").correct("leek") == "leek"
+    assert _spelling("beep").correct("beap") == "beap"
+
+
+def test_a_known_word_is_never_corrected_even_when_another_word_is_one_edit_away() -> None:
+    assert _spelling("drain", "drawn").correct("drain") == "drain"
+    assert _spelling("drain", "drawn").correct("drawn") == "drawn"
+
+
+def test_two_equally_close_words_leave_the_word_alone() -> None:
+    assert _spelling("gutter", "butter").correct("sutter") == "sutter"
+    assert _spelling("gutter").correct("sutter") == "gutter"
+
+
+def test_a_slip_two_edits_away_is_not_mended() -> None:
+    assert _spelling("wrinkl").correct("wrnkeld") == "wrnkeld"
+
+
+def test_a_misspelt_word_is_matched_after_the_correction() -> None:
+    index = build_index([rec(WASHER, ["Wrinkling"], ["Overloading"], ["Load less."])])
+
+    assert index.analyze("clothes come out wrinkeld").terms == ["cloth", "wrinkl"]
+    assert [s.group.phrases[0] for s in index.search(index.analyze("wrinkeld").terms)] == ["Wrinkling"]
+
+
+# --- every synonym and phrase maps onto words the stored rows use -------------------------------------
+
+
+COMMITTED = load_symptom_index(DEFAULT_SYMPTOMS_PATH)
+# "frozen" -> freeze was written in step 25b; its target only appears in a cause
+# ("Water in reservoir is frozen"), so it is not required to be in a symptom phrase
+CAUSE_ONLY_TARGETS = {"freez"}
+
+
+def _targets() -> set[str]:
+    out = {_fold(v) for v in _SYNONYM_WORDS.values()}
+    for _phrase, produced in _PHRASES:
+        out |= {_fold(t) for t in produced.split() if t and t != "!neg"}
+    return out
+
+
+def test_every_synonym_and_phrase_target_is_a_word_the_stored_rows_use() -> None:
+    assert len(_targets()) >= 20
+    for target in _targets():
+        assert target in COMMITTED.idf, f"{target!r} appears in no stored row"
+        if target not in CAUSE_ONLY_TARGETS:
+            assert COMMITTED.symptom_df.get(target, 0) >= 1, f"{target!r} is in no symptom phrase"
+
+
+def test_a_synonym_key_that_a_stored_symptom_phrase_uses_is_folded_the_same_way_on_both_sides() -> None:
+    """A fold applies to the stored rows too, so tokenizing a stored phrase gives the same word as
+    tokenizing the customer's version of it."""
+    assert tokenize("Washer rocking/ moving") == ["washer", "rock", "mov"]
+    assert tokenize("Washer shaking") == ["washer", "rock"]
+    assert tokenize("Water won’t drain") == ["water", "drain"]

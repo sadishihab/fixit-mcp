@@ -1,5 +1,6 @@
 """diagnose_symptom's resolution logic, on invented data (tests/symptom_fixtures.py)."""
 
+import json
 from pathlib import Path
 
 import pytest
@@ -196,3 +197,90 @@ def test_no_model_or_ingestion_code_is_imported_by_the_server_side_symptom_path(
 
     for forbidden in ("boto3", "bedrock", "anthropic", "fixit_mcp.ingestion", "converse("):
         assert forbidden not in source.lower(), (module, forbidden)
+
+
+# --- step 27c: polarity, the generic-description guard, and type words through the analysis ------------
+
+
+def _operate_index():
+    from fixit_mcp.retrieval.symptoms import build_index
+    from tests.symptom_fixtures import FRIDGE, WASHER, rec
+
+    return build_index(
+        [
+            rec(WASHER, ["Washer won't operate"], ["Unplugged"], ["Plug it in."]),
+            rec(WASHER, ["Washer spins and pauses"], ["Normal"], ["Wait."], page=6),
+            rec(FRIDGE, ["Fridge won't operate"], ["Unplugged"], ["Plug it in."], page=3),
+        ]
+    )
+
+
+def _run(household: str, text: str, **kw):
+    return diagnose_symptom(_operate_index(), REPO, household, text, **kw)
+
+
+def test_a_bare_it_doesnt_work_names_no_problem_and_no_appliance_so_it_is_not_found() -> None:
+    for text in ("it doesn't work", "it won't turn on", "it's dead"):
+        result = _run("h-both", text)
+
+        assert result.status == "not_found" and result.matches == [], text
+        assert "no specific words" in result.message
+    assert _run("h-both", "nothing works").status == "not_found"  # not a clean fit for any row either
+
+
+def test_the_same_description_with_an_appliance_named_is_answered() -> None:
+    result = _run("h-both", "the washer won't turn on")
+
+    assert result.status == "found" and result.matches[0].symptom == ["Washer won't operate"]
+    assert result.appliance.appliance_id == "a-w"
+
+
+def test_an_appliance_type_given_by_the_assistant_also_anchors_a_generic_description() -> None:
+    assert _run("h-both", "it doesn't work", appliance_type="fridge").status == "found"
+
+
+def test_a_description_that_says_something_does_not_happen_never_reaches_a_row_that_says_it_does() -> None:
+    result = _run("h-washer", "my washer won't spin")
+
+    assert result.status == "not_found", (
+        "polarity: the only 'spin' row is about pausing, not about not spinning"
+    )
+    assert result.matches == []
+    assert result.nearest_phrases == [], "and it is not offered as the closest phrase either"
+
+
+def test_a_misspelt_appliance_word_still_narrows_the_search() -> None:
+    result = diagnose_symptom(INDEX, REPO, "h-both", "my refridgerator alarm keeps chirping")
+
+    assert result.status == "found" and result.appliance.appliance_id == "a-f"
+    assert result.matches[0].symptom == ["Alarm chirps"]
+
+
+def test_the_customers_misspelling_is_never_written_into_the_result() -> None:
+    result = diagnose_symptom(INDEX, REPO, "h-washer", "the drum stayss still")
+
+    assert result.status == "found"
+    assert result.symptom == "the drum stayss still", "the result echoes the description as given, as before"
+    assert "stayss" not in json.dumps([m.model_dump() for m in result.matches]).lower()
+    assert result.matches[0].symptom == ["Drum stays still"], "the matched row is the manual's own wording"
+
+
+def test_a_diagnose_symptom_call_stays_fast_with_spelling_and_phrase_analysis() -> None:
+    import time
+
+    from fixit_mcp.retrieval.symptoms import load_symptom_index
+    from tests.symptom_bank import HOUSEHOLD, household
+
+    index, repo = load_symptom_index(), household()
+    queries = [
+        "my washing machine is vibrateing like crazy",
+        "clothes come out wrinkeld and gray",
+        "the refridgerator alarm",
+    ]
+    start = time.perf_counter()
+    for _ in range(50):
+        for q in queries:
+            diagnose_symptom(index, repo, HOUSEHOLD, q)
+    per_call_ms = (time.perf_counter() - start) * 1000 / (50 * len(queries))
+
+    assert per_call_ms < 25, f"{per_call_ms:.2f} ms per call"

@@ -24,8 +24,6 @@ from fixit_mcp.retrieval.symptoms import (
     MAX_MATCHES,
     ScoredGroup,
     SymptomIndex,
-    appliance_types_in,
-    query_terms,
 )
 from fixit_mcp.tools.common import ApplianceChoice, resolve_owned_appliances, to_choice
 from fixit_mcp.tools.diagnose import Citation
@@ -56,6 +54,8 @@ _NOT_FOUND_ROUTING = (
     " If the customer can read an error code off the appliance's display, use diagnose_error."
 )
 _NO_TERMS = "The description had no specific words to look up in the manuals."
+# Words so general that, with nothing else, they match every appliance ("it doesn't work").
+GENERIC_TERMS = frozenset({"operat"})
 
 
 class SymptomRow(BaseModel):
@@ -184,13 +184,20 @@ def diagnose_symptom(
     appliance_id: str | None = None,
 ) -> DiagnoseSymptomResult:
     """Pure resolution logic, kept apart from the @mcp.tool wrapper so it is unit-testable directly."""
-    terms = query_terms(symptom)
+    analysis = index.analyze(symptom)
+    terms = analysis.terms
+    negated = analysis.negated
 
     if appliance_type:
         type_filter: str | None = normalize_appliance_type(appliance_type)
     else:
-        named = appliance_types_in(symptom)  # the customer's own words, only if they name exactly one type
+        named = analysis.types  # the customer's own words, only if they name exactly one type
         type_filter = next(iter(named)) if len(named) == 1 else None
+
+    # "It doesn't work" names no problem and no appliance: it would match every "won't operate" row of
+    # every manual. Without an appliance to anchor it, that is not_found, not a guess.
+    if set(terms) <= GENERIC_TERMS and not analysis.types and not appliance_type:
+        terms = []
 
     owned_all = resolve_owned_appliances(repository, household_id, appliance_id, None, None)
     owned = _owned_of_type(owned_all, type_filter)
@@ -198,7 +205,9 @@ def diagnose_symptom(
 
     if terms:
         hits = (
-            index.search(terms, manual_ids=owned_manuals, appliance_type=type_filter) if owned_manuals else []
+            index.search(terms, manual_ids=owned_manuals, appliance_type=type_filter, negated=negated)
+            if owned_manuals
+            else []
         )
         by_manual = _top_per_manual(hits)
         owned_hits = [(a, hits_for) for a in owned if (hits_for := by_manual.get(a.manual_id))]
@@ -227,7 +236,7 @@ def diagnose_symptom(
 
         # Nothing in the household's own manuals: look across every manual (restricted to the named
         # appliance type) so an unregistered appliance is reported as such, never attributed to the household.
-        global_by_manual = _top_per_manual(index.search(terms, appliance_type=type_filter))
+        global_by_manual = _top_per_manual(index.search(terms, appliance_type=type_filter, negated=negated))
         if len(global_by_manual) == 1:
             (manual_hits,) = global_by_manual.values()
             first = manual_hits[0].group
@@ -265,7 +274,9 @@ def diagnose_symptom(
         status="not_found",
         message=message,
         symptom=symptom,
-        nearest_phrases=index.nearest_phrases(terms, manual_ids=scope, appliance_type=type_filter),
+        nearest_phrases=index.nearest_phrases(
+            terms, manual_ids=scope, appliance_type=type_filter, negated=negated
+        ),
         suggest_add_appliance=suggest_add_appliance,
     )
 
