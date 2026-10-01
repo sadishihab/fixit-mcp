@@ -50,6 +50,7 @@ EXPECTED_TOOLS = {
     "check_warranty",
 }
 DIAGNOSE_CARD_URI = "ui://fixit-mcp/diagnose-error-card"
+SYMPTOM_CARD_URI = "ui://fixit-mcp/diagnose-symptom-card"
 LATENCY_CALLS = 20
 P95_BUDGET_MS = 500  # The Alexa+ round-trip requirement itself, not the tighter local test budget.
 
@@ -119,6 +120,11 @@ async def check_tools_listed(url: str, auth: httpx.Auth | None = None) -> str:
         _check(
             meta.get("ui", {}).get("resourceUri") == DIAGNOSE_CARD_URI,
             f"diagnose_error ui meta wrong: {meta}",
+        )
+        symptom_meta = tools["diagnose_symptom"].meta or {}
+        _check(
+            symptom_meta.get("ui", {}).get("resourceUri") == SYMPTOM_CARD_URI,
+            f"diagnose_symptom ui meta wrong: {symptom_meta}",
         )
 
     await _with_session(url, body, auth)
@@ -205,6 +211,25 @@ async def check_diagnose_card(url: str, auth: httpx.Auth | None = None) -> str:
 
     await _with_session(url, body, auth)
     return f"resources/read {DIAGNOSE_CARD_URI} returns the MCP Apps card"
+
+
+async def check_diagnose_symptom_card(url: str, auth: httpx.Auth | None = None) -> str:
+    async def body(session: ClientSession) -> None:
+        await session.initialize()
+        listed = {str(r.uri) for r in (await session.list_resources()).resources}
+        _check(SYMPTOM_CARD_URI in listed, f"{SYMPTOM_CARD_URI} not listed: {sorted(listed)}")
+        result = await session.read_resource(SYMPTOM_CARD_URI)
+        _check(len(result.contents) == 1, f"expected one resource content, got {len(result.contents)}")
+        content = result.contents[0]
+        _check(
+            content.mimeType == "text/html;profile=mcp-app",
+            f"wrong card MIME type: {content.mimeType!r}",
+        )
+        _check("buildCardHtml" in content.text, "symptom card has no render function")
+        _check("@@" not in content.text, "symptom card has an unreplaced shared-part marker")
+
+    await _with_session(url, body, auth)
+    return f"resources/read {SYMPTOM_CARD_URI} returns the MCP Apps symptom card"
 
 
 async def check_add_links_manual(url: str, auth: httpx.Auth | None = None) -> str:
@@ -334,6 +359,7 @@ CHECKS: list[Callable[..., Awaitable[str]]] = [
     check_diagnose_symptom,
     check_warranty,
     check_diagnose_card,
+    check_diagnose_symptom_card,
     check_add_links_manual,
     check_platform_session_id_accepted,
     check_latency,

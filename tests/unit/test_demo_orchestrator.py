@@ -817,3 +817,46 @@ def test_symptom_replies_never_call_a_sound_or_symptom_normal_unless_a_row_says_
     assert "Never say a sound or a symptom 'can be normal' or 'is normal'" in prompt
     assert "unless a returned row says so in those words" in prompt
     assert "explains normal behavior" not in prompt  # the old wording invited the word
+
+
+# --- step 27a: the host picks up a new tool's card from its own metadata, by no tool name ------------
+
+
+SYMPTOM_TOOL = ToolDef(
+    name="diagnose_symptom",
+    description="Look up a described problem.",
+    input_schema={"type": "object", "properties": {"symptom": {"type": "string"}}},
+    resource_uri="ui://fixit-mcp/diagnose-symptom-card",
+)
+
+
+@pytest.mark.parametrize("status", ["found", "not_found", "ambiguous_appliance"])
+async def test_diagnose_symptom_gets_its_own_card_for_every_card_status(status: str) -> None:
+    converse = FakeConverse(
+        [
+            _tool_use_response(
+                "t1", "diagnose_symptom", {"symptom": "drum stays still", "household_id": "h"}
+            ),
+            _text_response("ok"),
+        ]
+    )
+    result_json = types.CallToolResult(
+        content=[types.TextContent(type="text", text="{}")],
+        structuredContent={"status": status},
+        isError=False,
+    )
+    session = FakeSession(call_tool_result=result_json, resource=_card_resource())
+
+    result = await run_turn(
+        converse=converse,
+        model_id="m",
+        system_prompt="s",
+        messages=[],
+        tool_defs=[DIAGNOSE_TOOL, SYMPTOM_TOOL],
+        session=session,
+        user_message="my drum stays still",
+    )
+
+    assert result.card is not None
+    assert result.card.resource_uri == "ui://fixit-mcp/diagnose-symptom-card"
+    assert session.read_resource_calls == ["ui://fixit-mcp/diagnose-symptom-card"]

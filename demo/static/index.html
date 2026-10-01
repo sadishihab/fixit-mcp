@@ -294,6 +294,9 @@
   // tests/unit/test_demo_web_ui.py.
 
   var CARD_STATUSES = ["found", "not_found", "ambiguous_appliance"];
+  // Tallest the card iframe grows to. A symptom card can hold three matches, each with several
+  // cause/action rows, so it is much taller than an error-code card (which fit in 900).
+  var CARD_MAX_HEIGHT = 2400;
 
   function formatArgs(args) {
     var keys = Object.keys(args || {});
@@ -614,7 +617,7 @@
           // layout box, so content never overflows its own iframe by a
           // sliver and shows a spurious scrollbar right at the fit
           // boundary (see FRICTION_LOG.md).
-          entry.el.style.height = Math.min(height + 2, 900) + "px";
+          entry.el.style.height = Math.min(height + 2, CARD_MAX_HEIGHT) + "px";
         }
       }
     });

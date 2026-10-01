@@ -451,3 +451,36 @@ def test_a_newer_reply_replaces_the_one_still_loading() -> None:
 def test_page_has_no_aws_credentials_or_sdk() -> None:
     lowered = INDEX_HTML.lower()
     assert "akia" not in lowered and "aws-sdk" not in lowered and "secretaccesskey" not in lowered
+
+
+# --- step 27a: any tool's card, and a taller card ------------------------------------------------------
+
+
+def test_the_page_hardcodes_no_tool_name_for_cards() -> None:
+    """The host decides a card from the result's status and the tool's own resource uri, so a new
+    tool's card (diagnose_symptom's) needs no change here."""
+    assert "diagnose_symptom" not in INDEX_HTML
+    assert "diagnose-symptom-card" not in INDEX_HTML
+
+
+@requires_node
+def test_a_symptom_result_owns_the_card_like_any_other_tool() -> None:
+    response = {
+        "card": {"html": "<html>c</html>", "resource_uri": "ui://x/y"},
+        "tool_calls": [
+            {"name": "list_my_appliances", "arguments": {}, "result": {"appliances": []}},
+            {"name": "diagnose_symptom", "arguments": {"symptom": "s"}, "result": {"status": "found"}},
+        ],
+    }
+
+    picked = _run_json(f"pickCardForTurn({json.dumps(response)})")
+
+    assert picked["arguments"] == {"symptom": "s"} and picked["structuredContent"] == {"status": "found"}
+
+
+def test_the_card_iframe_may_grow_far_taller_than_a_diagnose_error_card() -> None:
+    cap = int(re.search(r"var CARD_MAX_HEIGHT = (\d+);", INDEX_HTML).group(1))
+
+    assert cap >= 2000
+    assert "Math.min(height + 2, CARD_MAX_HEIGHT)" in INDEX_HTML
+    assert "900" not in re.findall(r"Math\.min\([^)]*\)", INDEX_HTML)[0]

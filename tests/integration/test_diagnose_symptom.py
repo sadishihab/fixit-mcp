@@ -161,3 +161,41 @@ async def test_the_default_server_serves_the_committed_index(server_url: str) ->
     assert result.isError is False and content["status"] == "found"
     assert content["appliance_registered"] is True and content["appliance"]["brand"] == "GE"
     assert content["matches"][0]["citation"]["page"] > 0
+
+
+# --- the MCP Apps card (step 27a) -----------------------------------------------------------------
+
+
+async def test_the_tool_definition_declares_the_symptom_card_resource(synthetic_url: str) -> None:
+    from fixit_mcp.apps.resources import DIAGNOSE_CARD_RESOURCE_URI, SYMPTOM_CARD_RESOURCE_URI
+
+    async with streamable_http_client(synthetic_url) as (read_stream, write_stream, _):
+        async with ClientSession(read_stream, write_stream) as session:
+            await session.initialize()
+            tools = {t.name: t for t in (await session.list_tools()).tools}
+
+    assert tools["diagnose_symptom"].meta["ui"]["resourceUri"] == SYMPTOM_CARD_RESOURCE_URI
+    assert tools["diagnose_error"].meta["ui"]["resourceUri"] == DIAGNOSE_CARD_RESOURCE_URI
+    assert SYMPTOM_CARD_RESOURCE_URI != DIAGNOSE_CARD_RESOURCE_URI
+
+
+async def test_both_card_resources_are_listed_and_the_symptom_card_is_readable(synthetic_url: str) -> None:
+    from fixit_mcp.apps.resources import SYMPTOM_CARD_HTML, SYMPTOM_CARD_RESOURCE_URI
+
+    async with streamable_http_client(synthetic_url) as (read_stream, write_stream, _):
+        async with ClientSession(read_stream, write_stream) as session:
+            await session.initialize()
+            listed = {str(r.uri): r for r in (await session.list_resources()).resources}
+            read = await session.read_resource(SYMPTOM_CARD_RESOURCE_URI)
+
+    assert set(listed) == {"ui://fixit-mcp/diagnose-error-card", SYMPTOM_CARD_RESOURCE_URI}
+    assert listed[SYMPTOM_CARD_RESOURCE_URI].mimeType == "text/html;profile=mcp-app"
+    (content,) = read.contents
+    assert content.mimeType == "text/html;profile=mcp-app" and content.text == SYMPTOM_CARD_HTML
+
+
+async def test_the_plain_symptom_result_is_unaffected_by_the_card(synthetic_url: str) -> None:
+    result = await _call(synthetic_url, {"household_id": "h-washer", "symptom": "the drum stays still"})
+
+    assert result.isError is False
+    assert result.structuredContent["status"] == "found" and result.structuredContent["matches"]
