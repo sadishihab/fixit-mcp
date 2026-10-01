@@ -1,5 +1,5 @@
 .PHONY: run test lint format inspector tunnel fetch-manuals parse-manuals extract-codes \
-	add-manual validate-manifest \
+	add-manual validate-manifest extract-symptoms \
 	docker-build docker-run docker-smoke docker-run-agentcore seed-agentcore \
 	iam-policies docker-push deploy-runtime runtime-smoke runtime-latency teardown-runtime teardown-runtime-all \
 	observability observability-teardown \
@@ -85,6 +85,15 @@ add-manual:
 	uv run python scripts/add_manual.py --id "$(ID)" --brand "$(BRAND)" --model "$(MODEL)" \
 		--type "$(TYPE)" --url "$(URL)" --note "$(NOTE)" \
 		$(if $(DRY_RUN),--dry-run,) $(if $(FORCE),--force,) $(if $(YES),--yes,) $(if $(CODE_PAGES),--code-pages "$(CODE_PAGES)",)
+
+# Extracts troubleshooting-table rows (symptoms) from the GE refrigerator and washer PDFs into
+# data/index/symptoms.json (committed), with Amazon Nova Pro only, an estimate printed first and a
+# hard spending cap. DRY_RUN=1 reads the tables and prints the estimate without any Bedrock call.
+# YES=1 skips the confirmation, MANUAL=<manual_id> for one manual, MAX_COST=<usd> (default 1.00),
+# FORCE=1 ignores the extraction cache.
+extract-symptoms:
+	uv run python scripts/extract_symptoms.py $(if $(MANUAL),--manual $(MANUAL),) $(if $(DRY_RUN),--dry-run,) \
+		$(if $(YES),--yes,) $(if $(FORCE),--force,) $(if $(MAX_COST),--max-cost $(MAX_COST),)
 
 # Checks every manifest entry (fields, unique ids, notes, seeded appliances'
 # manual_id). Also runs as part of `make test`.
