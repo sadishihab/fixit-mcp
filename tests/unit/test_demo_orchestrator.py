@@ -862,32 +862,53 @@ async def test_diagnose_symptom_gets_its_own_card_for_every_card_status(status: 
     assert session.read_resource_calls == ["ui://fixit-mcp/diagnose-symptom-card"]
 
 
-def test_found_symptom_replies_are_at_most_two_short_sentences_with_the_causes_named() -> None:
-    """Live rehearsal: 'too many suds' was spoken as one very long sentence reading the causes and
-    actions of all three rows. A found symptom reply is two short sentences: the problem and the number
-    of causes (named in the rows' own words), then a pointer to the card for the steps."""
+def test_a_found_symptom_with_several_rows_follows_the_fixed_template() -> None:
+    """Live rehearsal: 'too many suds' still had two of three steps read out in ~70 words. With more than
+    one row the reply is exactly one fixed sentence naming the causes, then a pointer to the card."""
     prompt = build_system_prompt("house-001")
 
-    assert "For a found diagnose_symptom result, reply in at most two short sentences" in prompt
-    assert "say the manual lists the problem and how many possible causes it gives" in prompt
-    assert "naming those causes with the rows' own cause text" in prompt
-    assert "say the card shows the manual's steps for each" in prompt
+    assert "For a found diagnose_symptom result follow this template exactly" in prompt
+    assert (
+        '"The manual lists <symptom phrase> with <N> possible causes: <cause 1>, <cause 2> and <cause 3>. '
+        "The card shows the manual's steps.\""
+    ) in prompt
+    assert "filling in only the blanks from the result and adding nothing" in prompt
+    assert (
+        "the unregistered sentence below and the footnote note further on are the only exceptions" in prompt
+    )
+    assert "each cause is that row's own possible_causes text" in prompt
+    assert "(for two causes: <cause 1> and <cause 2>)" in prompt
 
 
-def test_a_single_matching_row_has_its_what_to_do_stated_verbatim() -> None:
+def test_steps_are_never_read_aloud_when_there_is_more_than_one_row() -> None:
     prompt = build_system_prompt("house-001")
 
-    assert "If only one row matched, state that row's what_to_do text verbatim instead" in prompt
+    assert "Never read any steps aloud when there is more than one row" in prompt
+
+
+def test_a_single_matching_row_has_only_its_what_to_do_stated() -> None:
+    """Live rehearsal: 'my refrigerator is beeping' ran four sentences."""
+    prompt = build_system_prompt("house-001")
+
+    assert "With exactly one row, state that row's what_to_do text, nothing else" in prompt
+
+
+def test_an_unregistered_appliance_gets_exactly_the_one_notice_sentence() -> None:
+    prompt = build_system_prompt("house-001")
+
+    assert (
+        "add as the last sentence exactly: "
+        "\"That's for a <brand> <model> which isn't registered to your household.\""
+    ) in prompt
 
 
 def test_a_text_incomplete_row_is_never_read_aloud() -> None:
-    """Live rehearsal: the assistant ended on 'switch to High Efficiency detergent such as.' -- a row the
-    result marked text_incomplete, read as if it were finished."""
+    """The assistant once ended on 'switch to High Efficiency detergent such as.' -- a row the result
+    marked text_incomplete, read as if it were finished."""
     prompt = build_system_prompt("house-001")
 
-    assert "Never read aloud a row marked text_incomplete" in prompt
-    assert "the manual's text for that step is cut off" in prompt
-    assert "do not read its what_to_do" in prompt
+    assert "Never read the what_to_do of a row marked text_incomplete" in prompt
+    assert '"The manual\'s text for that step is cut off."' in prompt
     assert "never finish a sentence an entry leaves unfinished" in prompt, "the earlier rule stays"
 
 
@@ -910,5 +931,5 @@ def test_the_new_symptom_sentences_sit_inside_the_symptom_paragraph() -> None:
         )
     ]
 
-    assert "at most two short sentences" in symptom and "text_incomplete" in symptom
-    assert "at most two short sentences" not in prompt.replace(symptom, ""), "no other tool's rules changed"
+    assert "follow this template exactly" in symptom and "text_incomplete" in symptom
+    assert "follow this template exactly" not in prompt.replace(symptom, ""), "no other tool's rules changed"
