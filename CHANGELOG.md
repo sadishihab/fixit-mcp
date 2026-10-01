@@ -28,16 +28,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     "wrinkeld", "refridgerator") is mended, but only when exactly one known word is one edit away.
   - **Evidence rules.** A word the manuals do not contain now counts against a match (before, one such word
     was ignored); only a short list of fillers ("really", "way", "like crazy") is ignored. A match needs two
-    matched symptom words or one distinctive word (used by at most two symptoms); a word found only in a cause
+    matched symptom words, or one distinctive word (used by at most two symptoms) in a description with no
+    unknown word; a word found only in a cause
     no longer counts toward the minimum, and counts for less (weight 0.25, was 0.4). A bare "it doesn't work"
     with no appliance named is `not_found`. One common word that fits more than three symptoms ("my washer is
     noisy") matches none of them; before, it returned three arbitrary sounds as `found`.
-- Measured on a bank of 90 invented phrasings (`tests/fixtures/symptom_paraphrases.yaml`; 74 used while
-  tuning, 16 held out and not looked at until the end). Tuning split: correct matches 25 of 47 before, 43 of 47
-  now; wrong symptom first 4 before, 0 now; descriptions that should find nothing but matched 5 of 27 before, 0
-  now. Held-out split: correct matches 4 of 10 before and after (no gain); wrong symptom first 1 before and
-  after; should-find-nothing but matched 2 of 6 before, 0 now. `tests/unit/test_symptom_bank.py` fails on any
-  new wrong answer and if recall drops.
+- **An off-topic description gets no suggestions.** "My car won't start" used to be `not_found` with "Washer
+  won't operate" as the closest phrase. A description with a word no stored row contains and no distinctive
+  known word (used by at most two symptoms) is now off-topic: it matches nothing, `nearest_phrases` is empty and
+  the message says "The manuals we have don't cover ...". A description that shares a distinctive word with a row
+  keeps its closest phrases, and so does one with no unknown word at all ("my washer is noisy"). The symptom card
+  shows the "Closest in the manual" block only when there are phrases, and says "The manuals we have don't cover
+  this." otherwise.
+- **An unknown word now needs two matched symptom words.** One distinctive word is no longer enough when the
+  description also has a word no row contains: "a gas smell from my fridge" no longer goes to "Water has poor
+  taste/odor". Words that describe the load ("whites", "dark", "bedding") and "full" are ignored.
+- **Fixed: spelling mending could delete a word.** In 27c, "burning" was "corrected" to "turning", a word the
+  matcher ignores, so "burning plastic" lost its first word. Spelling no longer corrects toward ignored words or
+  toward phrase words, and phrase words are never corrected themselves.
+- Measured on a bank of 94 invented phrasings (`tests/fixtures/symptom_paraphrases.yaml`; 78 used while tuning,
+  16 held out and not looked at until the end). Tuning split, original matcher against now: correct matches 25 of
+  47 before, 43 of 47 now; wrong symptom first 4 before, 0 now; descriptions that should find nothing but matched
+  7 of 31 before, 0 now; closest-phrase behavior as declared 7 of 10 before, 10 of 10 now. Held-out split: correct
+  matches 4 of 10 before and after (no gain); wrong symptom first 1 before and after; should-find-nothing but
+  matched 2 of 6 before, 0 now. `tests/unit/test_symptom_bank.py` fails on any new wrong answer and if recall drops.
 
 ### Known limitations
 

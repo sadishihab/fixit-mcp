@@ -416,10 +416,15 @@ Alexa+ MCP Toolkit and helps customers with home appliances:
   it), a "does not happen" polarity that must agree between the description and
   the symptom ("won't spin" never reaches "pauses during spin"), spelling
   tolerance for one-character slips on words of 5+ letters only when exactly
-  one known word is one edit away, IDF weights, score >= 0.5, and either two
-  matched symptom words or one distinctive word (used by at most two
-  symptoms). An unknown word counts against a match (only a short filler list
-  is ignored), a cause word never counts toward the minimum and weighs 0.25,
+  one known word is one edit away (never toward a word the matcher ignores or a
+  phrase word: "burning" must not become "turning"), IDF weights, score >= 0.5,
+  and either two matched symptom words or one distinctive word (used by at most
+  two symptoms) in a description with no unknown word. An unknown word counts
+  against a match (only a short filler list is ignored), a description with an
+  unknown word and no distinctive known word is off-topic (step 27e: it matches
+  nothing, gets no nearest phrases and the message "The manuals we have don't
+  cover ...", and the card shows its "Closest in the manual" block only when
+  there are phrases), a cause word never counts toward the minimum and weighs 0.25,
   one common word that fits more than three symptoms ("noisy") matches none, a
   bare "it doesn't work" with no appliance is not_found, and ties go to the
   symptom the query covers most fully. Appliance-type words in the description
@@ -428,7 +433,8 @@ Alexa+ MCP Toolkit and helps customers with home appliances:
   (`tests/fixtures/symptom_paraphrases.yaml`, run as
   `uv run python -m tests.symptom_bank`) is the regression test: it fails on any
   wrong cited answer beyond the one flagged `known_wrong` and if recall drops;
-  74 tuning cases plus 16 held-out ones (read only after tuning). Matching is
+  78 tuning cases plus 16 held-out ones (read only after tuning); a case may also declare
+  `nearest: present|absent`. Matching is
   still keyword-based and can miss things; see CHANGELOG's known limitations. Resolution mirrors `diagnose_error` via `fixit_mcp.tools.common`:
   one owned appliance matches -> `found`; several -> `ambiguous_appliance`
   (never guessed); none owned but another manual matches -> `found` with
