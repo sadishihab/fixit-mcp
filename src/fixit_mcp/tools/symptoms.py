@@ -15,6 +15,7 @@ from typing import Literal
 from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel, Field
 
+from fixit_mcp.apps.resources import SYMPTOM_CARD_HTML, SYMPTOM_CARD_RESOURCE_URI
 from fixit_mcp.domain.appliance_types import normalize_appliance_type
 from fixit_mcp.domain.models import Appliance
 from fixit_mcp.logging import log_tool_latency
@@ -270,7 +271,29 @@ def diagnose_symptom(
 
 
 def register_symptom_tool(mcp: FastMCP, repository: ApplianceRepository, index: SymptomIndex) -> None:
-    @mcp.tool(name="diagnose_symptom", description=DIAGNOSE_SYMPTOM_DESCRIPTION)
+    """Register diagnose_symptom and its MCP Apps visual card, declared the way diagnose_error declares
+    its own: one static ui:// resource, linked from the tool definition's `_meta.ui.resourceUri`. The
+    card's script renders every status (found, not_found, ambiguous_appliance) from the result the host
+    pushes to it; the tool's plain structured result is unchanged by it."""
+
+    @mcp.resource(
+        SYMPTOM_CARD_RESOURCE_URI,
+        name="diagnose-symptom-card",
+        title="Symptom card",
+        description=(
+            "Visual card for a diagnose_symptom result: the matched problem as the manual words it, "
+            "its possible causes and what the manual says to do, and the citation."
+        ),
+        mime_type="text/html;profile=mcp-app",
+    )
+    def diagnose_symptom_card() -> str:
+        return SYMPTOM_CARD_HTML
+
+    @mcp.tool(
+        name="diagnose_symptom",
+        description=DIAGNOSE_SYMPTOM_DESCRIPTION,
+        meta={"ui": {"resourceUri": SYMPTOM_CARD_RESOURCE_URI}},
+    )
     @log_tool_latency("diagnose_symptom")
     def diagnose_symptom_tool(
         household_id: str,

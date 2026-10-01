@@ -9,6 +9,7 @@ that could drift out of sync. Skipped (not failed) if `node` isn't on PATH,
 so `make test` still passes on a machine without Node -- see FRICTION_LOG.md.
 """
 
+import hashlib
 import json
 import re
 import shutil
@@ -16,7 +17,13 @@ import subprocess
 
 import pytest
 
-from fixit_mcp.apps.resources import DIAGNOSE_CARD_HTML, DIAGNOSE_CARD_PATH, DIAGNOSE_CARD_RESOURCE_URI
+from fixit_mcp.apps.resources import (
+    DIAGNOSE_CARD_HTML,
+    DIAGNOSE_CARD_NAME,
+    DIAGNOSE_CARD_PATH,
+    DIAGNOSE_CARD_RESOURCE_URI,
+    assemble_card,
+)
 
 NODE_PATH = shutil.which("node")
 requires_node = pytest.mark.skipif(NODE_PATH is None, reason="node is not on PATH")
@@ -88,7 +95,16 @@ def test_template_is_loaded_once_at_import_time_not_per_call() -> None:
     # function -- reading DIAGNOSE_CARD_PATH here is the *test's* check that
     # the loaded constant matches the file, not something the server does
     # per request.
-    assert DIAGNOSE_CARD_HTML == DIAGNOSE_CARD_PATH.read_text()
+    assert DIAGNOSE_CARD_HTML == assemble_card(DIAGNOSE_CARD_PATH, DIAGNOSE_CARD_NAME)
+
+
+# The exact document diagnose_error's card served before its CSS, escape helper and handshake were
+# moved into shared files (step 27a). Sharing them must not change a byte of what that card serves.
+DIAGNOSE_CARD_SHA256_BEFORE_SHARING = "4b179dde9ced90dd840e21af2594396a1672864c4a5077594024ad8edae07317"
+
+
+def test_sharing_card_parts_left_the_diagnose_card_byte_for_byte_unchanged() -> None:
+    assert hashlib.sha256(DIAGNOSE_CARD_HTML.encode()).hexdigest() == DIAGNOSE_CARD_SHA256_BEFORE_SHARING
 
 
 def test_resource_uri_uses_the_ui_scheme() -> None:

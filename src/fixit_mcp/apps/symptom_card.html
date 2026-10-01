@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Symptom card</title>
+<style>
+@@SHARED_CSS_HEAD@@
+  /* The three rules below are the same as diagnose_card.html's; they sit between that card's own
+     rules there, so they cannot be part of the shared head/tail without changing its bytes. */
+  .appliance {
+    color: var(--muted);
+    font-size: 13px;
+  }
+  h3 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+    margin: 14px 0 6px;
+  }
+  ul, ol { margin: 0; padding-left: 20px; }
+  li { margin-bottom: 4px; }
+  .kicker {
+    margin-left: auto;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: var(--border);
+    color: var(--fg);
+  }
+  .match + .match {
+    margin-top: 16px;
+    padding-top: 14px;
+    border-top: 1px dashed var(--border);
+  }
+  .symptom {
+    margin: 0 0 2px;
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1.3;
+  }
+  .symptom-phrase { display: block; }
+  .symptom-label {
+    display: inline-block;
+    margin-top: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--muted);
+  }
+  .row + .row {
+    margin-top: 12px;
+    padding-top: 4px;
+    border-top: 1px solid var(--border);
+  }
+  /* A row whose text ends mid-sentence in the extracted manual: muted, dashed, like the other
+     "this is a fact, not an error" notices -- never red or amber. */
+  .incomplete {
+    display: inline-block;
+    margin-top: 8px;
+    padding: 1px 8px;
+    border: 1px dashed var(--state-border);
+    background: var(--state-bg);
+    border-radius: 999px;
+    color: var(--muted);
+    font-size: 11px;
+  }
+  .footnote {
+    margin: 8px 0 0;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .query { font-weight: 600; color: var(--fg); }
+@@SHARED_CSS_TAIL@@
+</style>
+</head>
+<body>
+<div id="root"><div class="empty">Waiting for a diagnosis...</div></div>
+<script>
+@@SHARED_JS@@
+  // not_found: purely informational -- the customer's own description, a short fixed message
+  // (not the backend `message`, which tells the assistant to try another tool), and the manual's
+  // nearest phrases as a plain list. No click handlers, same scope decision as diagnose_card.html.
+  function buildNotFoundHtml(result) {
+    var queryHtml = result.symptom ? '<span class="query">' + esc(result.symptom) + "</span>" : "";
+    var nearest = result.nearest_phrases || [];
+    var nearestHtml = nearest.length
+      ? '<h3>Closest in the manual</h3><ul class="suggestions">' + listHtml(nearest) + "</ul>"
+      : "";
+    return (
+      '<div class="state-card state-not-found">' +
+        '<div class="state-header">' + queryHtml + '<span class="state-label">Not found</span></div>' +
+        '<p class="state-message">We don’t have this problem in the manuals we have.</p>' +
+        nearestHtml +
+      "</div>"
+    );
+  }
+
+  // ambiguous_appliance: lists which of the household's appliances could match. No click handlers.
+  function buildAmbiguousHtml(result) {
+    var candidates = result.candidate_appliances || [];
+    var candidatesHtml = candidates.length
+      ? '<ul class="suggestions">' +
+        candidates
+          .map(function (c) {
+            var label = esc(c.brand) + " " + esc(c.model);
+            return "<li>" + label + (c.appliance_type ? " (" + esc(c.appliance_type) + ")" : "") + "</li>";
+          })
+          .join("") +
+        "</ul>"
+      : "";
+    var message = result.message || "More than one appliance could match -- which one is it?";
+    return (
+      '<div class="state-card state-ambiguous">' +
+        '<div class="state-header"><span class="state-label">Which appliance?</span></div>' +
+        '<p class="state-message">' + esc(message) + "</p>" +
+        candidatesHtml +
+      "</div>"
+    );
+  }
+
+  // One cause/action row of a matched symptom: the manual's own columns, with the third column
+  // labelled by the row's own response_label ("What To Do" or "Reason").
+  function rowHtml(row) {
+    var causes = listHtml(row.possible_causes);
+    var response = listHtml(row.what_to_do);
+    var label = row.response_label || "What to do";
+    var footnotes = (row.footnotes || [])
+      .map(function (note) { return '<p class="footnote">' + esc(note) + "</p>"; })
+      .join("");
+    return (
+      '<div class="row">' +
+        (causes ? "<h3>Possible causes</h3><ul>" + causes + "</ul>" : "") +
+        (response ? "<h3>" + esc(label) + "</h3><ul>" + response + "</ul>" : "") +
+        (row.text_incomplete ? '<span class="incomplete">incomplete in the manual</span>' : "") +
+        footnotes +
+      "</div>"
+    );
+  }
+
+  function matchHtml(match) {
+    var phrases = (match.symptom || [])
+      .map(function (p) { return '<span class="symptom-phrase">' + esc(p) + "</span>"; })
+      .join("");
+    var label =
+      match.symptom_label && match.symptom_label.toLowerCase() !== "problem"
+        ? '<span class="symptom-label">' + esc(match.symptom_label) + "</span>"
+        : "";
+    var citation = match.citation;
+    var citationHtml = citation
+      ? '<div class="citation">Source: ' + esc(citation.brand) + " " + esc(citation.model) +
+        " manual, p. " + esc(citation.page) + (citation.section ? " — " + esc(citation.section) : "") +
+        "</div>"
+      : "";
+    return (
+      '<section class="match">' +
+        '<h2 class="symptom">' + phrases + "</h2>" + label +
+        (match.rows || []).map(rowHtml).join("") +
+        citationHtml +
+      "</section>"
+    );
+  }
+
+  // Builds the card's inner HTML from a diagnose_symptom DiagnoseSymptomResult. Returns "" only when
+  // there is nothing to show (no result yet, or an unrecognized status). Never guesses at content the
+  // tool result didn't provide, per CLAUDE.md rule 3.
+  function buildCardHtml(result) {
+    if (!result) {
+      return "";
+    }
+    if (result.status === "not_found") {
+      return buildNotFoundHtml(result);
+    }
+    if (result.status === "ambiguous_appliance") {
+      return buildAmbiguousHtml(result);
+    }
+    if (result.status !== "found") {
+      return "";
+    }
+
+    var appliance = result.appliance;
+    var applianceLine = appliance ? esc(appliance.brand) + " " + esc(appliance.model) : "";
+    // Documented for a real appliance, but not one this household registered -- say so plainly,
+    // right under the header, before the manual's content (same notice as diagnose_card.html).
+    var notRegisteredHtml =
+      result.appliance_registered === false && appliance
+        ? '<div class="registration-notice">Documented for ' + esc(appliance.brand) + " " +
+          esc(appliance.model) + ", which isn't registered to your household.</div>"
+        : "";
+    var matches = (result.matches || []).slice(0, 3);
+
+    return (
+      '<div class="card">' +
+        '<div class="card-header">' +
+          (applianceLine ? '<span class="appliance">' + applianceLine + "</span>" : "") +
+          '<span class="kicker">From the manual</span>' +
+        "</div>" +
+        notRegisteredHtml +
+        matches.map(matchHtml).join("") +
+      "</div>"
+    );
+  }
+
+  function render(result) {
+    var root = document.getElementById("root");
+    var html = buildCardHtml(result);
+    root.innerHTML = html || '<div class="empty">No visual card for this result.</div>';
+  }
+
+@@SHARED_HANDSHAKE@@
+</script>
+</body>
+</html>
