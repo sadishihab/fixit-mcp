@@ -1,0 +1,119 @@
+# Paraphrase bank for diagnose_symptom's matcher (step 27c).
+#
+# Every phrasing is invented here (none is manual text). Each case says which stored row the
+# customer should be sent to, or `none` when the right answer is not_found: an appliance or
+# problem the manuals do not cover, a vague complaint, a safety or cost question.
+#
+# A row is named by (appliance, page, row): `row` is the 0-based index of the record among the
+# records of that manual's page, counted in data/index/symptoms.json order. A symptom that spans
+# several rows is named by its first row. `expect` is a list when more than one symptom is a
+# correct answer (the matcher must put one of them first).
+#
+# The bank is evaluated through the tool, for a household that owns both the GE refrigerator and
+# the GE washer: a wrong cited answer (a match for a `none` case, or the wrong symptom first) is
+# worse than not_found, and `ambiguous_appliance` for a `none` case counts as a wrong match.
+#
+# known_wrong: a case the matcher still answers wrongly, with the reason. The test allows exactly these and
+#   fails if any other wrong answer appears, or if a known-wrong case stops being wrong (remove the flag).
+#
+# tags: plain | slang | misspelling | short | long | unsupported | offtopic | safety | other-appliance
+
+cases:
+  # ---- washer ---------------------------------------------------------------------------------
+  - {id: w-suds-plain, tag: plain, query: "my washer is full of suds", expect: [{appliance: washer, page: 26, row: 5}]}
+  - {id: w-suds-foam, tag: slang, query: "way too much foam in the washing machine", expect: [{appliance: washer, page: 26, row: 5}]}
+  - {id: w-noturnon-plain, tag: plain, query: "the washer won't turn on", expect: [{appliance: washer, page: 27, row: 5}]}
+  - {id: w-noturnon-long, tag: long, query: "I press the start button on my washing machine and nothing happens at all", expect: [{appliance: washer, page: 27, row: 5}]}
+  - {id: w-stoppedworking, tag: slang, query: "my washer just stopped working", expect: [{appliance: washer, page: 27, row: 5}]}
+  - {id: w-dead, tag: slang, query: "the washer is completely dead", expect: [{appliance: washer, page: 27, row: 5}]}
+  - {id: w-drain-plain, tag: plain, query: "the washer won't drain", expect: [{appliance: washer, page: 26, row: 20}]}
+  - {id: w-drain-standing, tag: plain, query: "there is standing water in my washer after the cycle", expect: [{appliance: washer, page: 26, row: 20}]}
+  - {id: w-drain-misspelled, tag: misspelling, query: "washer wont drainn", expect: [{appliance: washer, page: 26, row: 20}]}
+  - {id: w-shake-plain, tag: plain, query: "my washer shakes violently", expect: [{appliance: washer, page: 28, row: 21}]}
+  - {id: w-shake-vibrate, tag: slang, query: "the washing machine is vibrating like crazy", expect: [{appliance: washer, page: 28, row: 21}]}
+  - {id: w-shake-walks, tag: slang, query: "my washer walks across the floor when it spins", expect: [{appliance: washer, page: 28, row: 21}]}
+  - {id: w-vibrate-misspelled, tag: misspelling, query: "washing machine is vibrateing", expect: [{appliance: washer, page: 28, row: 21}]}
+  - {id: w-click, tag: plain, query: "washing machine makes a clicking noise", expect: [{appliance: washer, page: 28, row: 12}]}
+  - {id: w-hum, tag: plain, query: "i hear a humming sound from the washer when it drains", expect: [{appliance: washer, page: 28, row: 17}]}
+  - {id: w-gurgle, tag: plain, query: "gurgling from my washer", expect: [{appliance: washer, page: 28, row: 19}]}
+  - {id: w-squeal, tag: slang, query: "squealing noise from my washer", expect: [{appliance: washer, page: 28, row: 22}]}
+  - {id: w-leak-plain, tag: plain, query: "water leaking from the washer", expect: [{appliance: washer, page: 26, row: 8}]}
+  - {id: w-leak-floor, tag: slang, query: "my washing machine puts water all over the floor", expect: [{appliance: washer, page: 26, row: 8}]}
+  - {id: w-leak-short, tag: short, query: "washer leaks", expect: [{appliance: washer, page: 26, row: 8}]}
+  - {id: w-wet-soaking, tag: slang, query: "clothes come out soaking wet", expect: [{appliance: washer, page: 28, row: 0}]}
+  - {id: w-wet-damp, tag: plain, query: "my clothes are still damp after the wash", expect: [{appliance: washer, page: 28, row: 0}]}
+  - {id: w-gray, tag: plain, query: "my white clothes look gray", expect: [{appliance: washer, page: 27, row: 16}]}
+  - {id: w-yellow, tag: plain, query: "whites are turning yellow", expect: [{appliance: washer, page: 27, row: 16}]}
+  - {id: w-lint, tag: plain, query: "lint all over my dark clothes", expect: [{appliance: washer, page: 27, row: 21}]}
+  - {id: w-wrinkled-misspelled, tag: misspelling, query: "clothes come out wrinkeld", expect: [{appliance: washer, page: 28, row: 8}]}
+  - {id: w-holes, tag: plain, query: "the washer is putting holes in my shirts", expect: [{appliance: washer, page: 28, row: 5}]}
+  - {id: w-pills, tag: slang, query: "little fuzz balls on my sweaters after washing", expect: [{appliance: washer, page: 28, row: 4}]}
+  - {id: w-pauses, tag: plain, query: "the washer pauses in the middle of the wash", expect: [{appliance: washer, page: 27, row: 0}]}
+  - {id: w-packet, tag: plain, query: "the detergent packet didn't dissolve", expect: [{appliance: washer, page: 27, row: 11}]}
+  # ---- refrigerator -----------------------------------------------------------------------------
+  - {id: f-beep-plain, tag: plain, query: "my fridge keeps beeping", expect: [{appliance: fridge, page: 46, row: 7}]}
+  - {id: f-beep-alarm, tag: slang, query: "the refrigerator alarm keeps going off", expect: [{appliance: fridge, page: 46, row: 7}]}
+  - {id: f-squeak, tag: plain, query: "my fridge door squeaks", expect: [{appliance: fridge, page: 48, row: 6}]}
+  - {id: f-creak, tag: slang, query: "the refrigerator door is creaking", expect: [{appliance: fridge, page: 48, row: 6}]}
+  - {id: f-notcold, tag: plain, query: "the fridge is not cold", expect: [{appliance: fridge, page: 46, row: 8}, {appliance: fridge, page: 47, row: 10}]}
+  - {id: f-notcooling-misspelled, tag: misspelling, query: "my refridgerator is not cooling", expect: [{appliance: fridge, page: 46, row: 8}, {appliance: fridge, page: 47, row: 10}]}
+  - {id: f-handle, tag: plain, query: "the fridge handle is loose", expect: [{appliance: fridge, page: 46, row: 6}]}
+  - {id: f-dispenser-nowork, tag: plain, query: "the water dispenser doesn't work", expect: [{appliance: fridge, page: 46, row: 13}]}
+  - {id: f-nowater, tag: slang, query: "no water coming out of my fridge", expect: [{appliance: fridge, page: 46, row: 13}, {appliance: fridge, page: 47, row: 1}]}
+  - {id: f-icemaker, tag: plain, query: "the ice maker isn't making ice", expect: [{appliance: fridge, page: 47, row: 1}]}
+  - {id: f-dispenser-leak-misspelled, tag: misspelling, query: "my fridge dispencer is leaking", expect: [{appliance: fridge, page: 47, row: 5}]}
+  - {id: f-taste, tag: plain, query: "my fridge water tastes funny", expect: [{appliance: fridge, page: 46, row: 9}]}
+  - {id: f-keurig-leak, tag: plain, query: "my keurig brewer leaks while brewing", expect: [{appliance: fridge, page: 48, row: 5}]}
+  - {id: f-lid, tag: plain, query: "the k-cup lid is hard to close", expect: [{appliance: fridge, page: 48, row: 4}]}
+  - {id: f-resetfilter, tag: plain, query: "the reset filter light is on", expect: [{appliance: fridge, page: 46, row: 4}]}
+  - {id: f-overfill, tag: plain, query: "the dispenser overfills my glass", expect: [{appliance: fridge, page: 47, row: 9}]}
+  - {id: f-spurt, tag: plain, query: "water spurts out of the fridge dispenser", expect: [{appliance: fridge, page: 47, row: 0}]}
+  # ---- none: another appliance, another object, vague, safety, cost, or not in the manuals -----
+  - {id: n-dryer-slow, tag: other-appliance, query: "my dryer takes forever to dry", expect: none}
+  - {id: n-dryer-noise, tag: other-appliance, query: "the dryer is making a loud thumping noise", expect: none}
+  - {id: n-dryer-start, tag: other-appliance, query: "my dryer won't start", expect: none}
+  - {id: n-dishwasher, tag: other-appliance, query: "the dishwasher is not draining", expect: none}
+  - {id: n-oven-heat, tag: other-appliance, query: "my oven won't heat up", expect: none}
+  - {id: n-microwave, tag: other-appliance, query: "the microwave sparks when I heat my lunch", expect: none}
+  - {id: n-car-start, tag: offtopic, query: "my car won't start", expect: none}
+  - {id: n-tv, tag: offtopic, query: "the tv has no picture", expect: none}
+  - {id: n-laptop, tag: offtopic, query: "my laptop is overheating", expect: none}
+  - {id: n-broken, tag: offtopic, query: "it's broken", expect: none}
+  - {id: n-wrong, tag: offtopic, query: "something is wrong with it", expect: none}
+  - {id: n-weather, tag: offtopic, query: "what is the weather today", expect: none}
+  - {id: n-safe-run, tag: safety, query: "is it safe to run my washer", expect: none}
+  - {id: n-call-someone, tag: safety, query: "should I call someone about my fridge", expect: none}
+  - {id: n-fire, tag: safety, query: "is my fridge going to catch fire", expect: none}
+  - {id: n-cost, tag: unsupported, query: "how much does a new washer motor cost", expect: none}
+  - {id: n-w-nospin, tag: unsupported, query: "my washer won't spin", expect: none}
+  - {id: n-w-grinding, tag: unsupported, query: "the washer is making a grinding noise", expect: none}
+  - {id: n-w-noisy, tag: unsupported, query: "my washer is too noisy at night", expect: none}
+  - {id: n-w-rust, tag: unsupported, query: "the washer drum is rusty", expect: none}
+  - {id: n-w-door, tag: unsupported, query: "the washer lid is stuck shut", expect: none}
+  - {id: n-f-frost, tag: unsupported, query: "my freezer is covered in frost", expect: none}
+  - {id: n-f-bulb, tag: unsupported, query: "the light inside my fridge burned out", expect: none}
+  - {id: n-f-grind, tag: unsupported, query: "my fridge makes a loud grinding noise", expect: none}
+
+  # generic sound complaints name no sound: the right answer is not_found, not three arbitrary sounds
+  - {id: n-w-noisy-plain, tag: unsupported, query: "my washer is noisy", expect: none}
+  - {id: n-w-loud, tag: unsupported, query: "the washer is loud", expect: none}
+  - {id: n-w-makes-noise, tag: unsupported, query: "washer makes a noise", expect: none}
+
+  # ---- held-out set: written before any tuning and not inspected case by case while tuning --------
+  # (the report counts these separately; they check that improvements generalize beyond the cases above)
+  - {id: h-w-cycle-stall, split: heldout, tag: plain, query: "the washing machine stalls halfway through the spin", expect: [{appliance: washer, page: 27, row: 4}]}
+  - {id: h-w-wontstart, split: heldout, tag: plain, query: "my washer doesn't start", expect: [{appliance: washer, page: 27, row: 5}]}
+  - {id: h-w-leaks-puddle, split: heldout, tag: slang, query: "there is a puddle under my washer", expect: [{appliance: washer, page: 26, row: 8}]}
+  - {id: h-w-bubbles, split: heldout, tag: slang, query: "washer is overflowing with soapy bubbles", expect: [{appliance: washer, page: 26, row: 5}]}
+  - {id: h-w-rocks, split: heldout, tag: plain, query: "my washer is rocking back and forth", expect: [{appliance: washer, page: 28, row: 21}], known_wrong: "matches the Sounds row 'back and forth' on those two common words; wrong in the old matcher too"}
+  - {id: h-w-stains, split: heldout, tag: plain, query: "colored spots on my laundry", expect: [{appliance: washer, page: 27, row: 14}]}
+  - {id: h-f-chirp, split: heldout, tag: plain, query: "refrigerator keeps chirping", expect: [{appliance: fridge, page: 46, row: 7}]}
+  - {id: h-f-warm, split: heldout, tag: plain, query: "the fridge isn't cooling anymore", expect: [{appliance: fridge, page: 46, row: 8}, {appliance: fridge, page: 47, row: 10}]}
+  - {id: h-f-dispenser-drip, split: heldout, tag: plain, query: "water drips from the dispenser", expect: [{appliance: fridge, page: 47, row: 5}]}
+  - {id: h-f-lubricate, split: heldout, tag: plain, query: "the fridge door makes a squeaking sound", expect: [{appliance: fridge, page: 48, row: 6}]}
+  - {id: h-n-dryer, split: heldout, tag: other-appliance, query: "my dryer smells like something is burning", expect: none}
+  - {id: h-n-car, split: heldout, tag: offtopic, query: "the car battery is dead", expect: none}
+  - {id: h-n-phone, split: heldout, tag: offtopic, query: "my phone won't turn on", expect: none}
+  - {id: h-n-vague, split: heldout, tag: offtopic, query: "it doesn't work", expect: none}
+  - {id: h-n-w-stuck, split: heldout, tag: unsupported, query: "the washer door will not open", expect: none}
+  - {id: h-n-safety, split: heldout, tag: safety, query: "can the fridge leak gas", expect: none}
