@@ -3,6 +3,11 @@
 FixIt's knowledge base is built from real manufacturer manuals. Adding one is a
 single command; you don't need to touch the pipeline internals.
 
+Are you a manufacturer, or working for one, and want to run FixIt on your own
+manuals? Read [`docs/for-manufacturers.md`](docs/for-manufacturers.md) first. How the
+parts fit together, and which make model calls, is in
+[`docs/architecture.md`](docs/architecture.md).
+
 ## Add a manual in one command
 
 ```bash

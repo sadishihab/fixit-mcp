@@ -65,6 +65,13 @@ Alexa+, not the real one, for the same reason.
 See [`docs/alexa-plus-requirements.md`](docs/alexa-plus-requirements.md) for the
 full requirements checklist and [`CLAUDE.md`](CLAUDE.md) for the architecture.
 
+**Documentation**
+- [`docs/for-manufacturers.md`](docs/for-manufacturers.md): a guide for a manufacturer, or
+  a developer working for one, who wants to run FixIt on its own manuals: the pipeline,
+  what you own, deploying, the grounding eval, costs, and what is not done yet.
+- [`docs/architecture.md`](docs/architecture.md): the architecture as a diagram, one
+  paragraph per component, and which parts make model calls and which never do.
+
 ## Tools
 
 | Tool | What it does |
@@ -111,6 +118,12 @@ full requirements checklist and [`CLAUDE.md`](CLAUDE.md) for the architecture.
 TODO: link once recorded.
 
 ## Architecture
+
+![FixIt architecture: the client, the MCP server, its in-memory indexes and household memory, and the offline ingestion pipeline](docs/images/architecture.png)
+
+The diagram (Mermaid source and one paragraph per component) is in
+[`docs/architecture.md`](docs/architecture.md); the sketch below is the same
+shape in text.
 
 ```
 Alexa+ (real client: not connected yet; the demo simulates it)
