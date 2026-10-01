@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **A public container image on GitHub Container Registry**, `ghcr.io/sadishihab/fixit-mcp`, so `docker run -p 8000:8000 ghcr.io/sadishihab/fixit-mcp:latest` serves the six tools with no AWS account (SQLite household store, demo households seeded, non-root, `0.0.0.0:8000/mcp`; `linux/amd64` and `linux/arm64`). `.github/workflows/image.yml` publishes it only when a version tag (`v*`) is pushed, using the built-in `GITHUB_TOKEN` and nothing else, and only after a smoke job has started the amd64 image and run `scripts/smoke_test.py` against it. "Run workflow" builds and smoke-tests both architectures without pushing. The Dockerfile and the AgentCore deployment path are unchanged.
 - **An MCP Apps visual card for `diagnose_symptom`** (`ui://fixit-mcp/diagnose-symptom-card`), declared on the tool definition the way `diagnose_error` declares its own, in the same visual language: the matched symptom phrases as the title, each row's possible causes and the third column under its own label ("What To Do" or "Reason"), muted footnotes, a muted "incomplete in the manual" marker, a citation line per match (up to three matches), and muted states for `not_found` (with the manual's nearest phrases), `ambiguous_appliance` and the `appliance_registered: false` notice. No click handlers, no external resources, every field escaped.
 
 ### Changed

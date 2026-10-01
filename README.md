@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/sadishihab/fixit-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/sadishihab/fixit-mcp/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![Container image](https://img.shields.io/badge/image-ghcr.io%2Fsadishihab%2Ffixit--mcp-2496ED?logo=docker&logoColor=white)](https://github.com/sadishihab/fixit-mcp/pkgs/container/fixit-mcp)
 
 A self-hosted MCP server for diagnosing appliance problems, built for the
 **Build, Ship, Shape: Amazon Developer Hackathon** (Alexa+ track).
@@ -42,6 +43,52 @@ eval (`make eval`), both of which call Claude on Amazon Bedrock; extracting code
 from new manuals with `FIXIT_EXTRACTOR=bedrock` (the default `stub` extractor
 needs no AWS, but finds codes only, not their meanings); the `agentcore`
 household backend; and building, pushing and deploying to AgentCore Runtime.
+
+## Run it with Docker (no AWS account)
+
+If you have Docker but don't want to install Python, run the published image:
+
+```bash
+docker run --rm -p 8000:8000 ghcr.io/sadishihab/fixit-mcp:latest
+```
+
+The server is then at `http://localhost:8000/mcp` (MCP over Streamable HTTP). It
+needs no AWS account, no credentials and no environment variables. Point something
+at it:
+
+- **MCP Inspector** (needs Node.js): `npx @modelcontextprotocol/inspector`, choose
+  transport **Streamable HTTP**, and connect to `http://localhost:8000/mcp`.
+- **`make try-it`**, from a clone of this repository (`uv sync` first): it connects
+  to `localhost:8000`, lists the six tools and makes four read-only calls for the
+  seeded demo household `house-002`, exactly as in the section above.
+
+**What is in the image.** The server, and the two committed indexes it loads at
+startup: 46 error-code records (five manuals) and 114 troubleshooting rows (the GE
+refrigerator and washer), plus the manual catalog. **Not in it:** the manual PDFs
+(they are never stored in this repository either) or any AWS settings. It runs as a
+non-root user and listens on `0.0.0.0:8000/mcp`. It is built for `linux/amd64` and
+`linux/arm64`.
+
+**Where household data goes.** The image uses the SQLite household store, inside
+the container, and seeds the demo households (`house-001`, `house-002`) the first
+time it starts. Appliances you add are **lost when the container is removed**,
+unless you mount a volume:
+
+```bash
+docker run --rm -p 8000:8000 -v fixit-state:/app/data/state ghcr.io/sadishihab/fixit-mcp:latest
+```
+
+**This image is for trying FixIt out, not a production deployment.** It has no
+authentication (any caller that can reach the port can read or change any
+household), so don't expose it to the internet. For a real deployment see
+[Deploying to AgentCore Runtime](#deploying-to-agentcore-runtime) and
+[`docs/for-manufacturers.md`](docs/for-manufacturers.md).
+
+The image is published to GitHub Container Registry by
+[`.github/workflows/image.yml`](.github/workflows/image.yml) whenever a version tag
+(`v*`) is pushed, never on an ordinary push, and is only published after the
+workflow has started the image and run the same smoke checks as `make docker-smoke`
+against it. Tags are the version (`0.3.0`, `0.3`) and `latest`.
 
 ## Overview
 
