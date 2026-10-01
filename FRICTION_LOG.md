@@ -2631,3 +2631,18 @@ full detail behind each number.
 - **Severity**: Low. Rare so far (two occurrences), and the step-13 client timeouts already turn one into a logged failure on the caller's side.
 - **Workaround**: the dashboard's text panel and the `fixit-errors` alarm description state the gap. The only certain way to see a 504 is from the client, e.g. a scheduled SigV4 canary; not built (cost and scope).
 - **Actionable suggestion for Amazon**: document how AgentCore Runtime's front door reports its own gateway timeouts, both which metric counts a 504 and whether the invocation span records it.
+
+### 2026-10-01 — step 25a: symptom tables expose three gaps in our PDF reading, and one silent empty answer from Nova 2 Lite
+
+- **Tool/SDK**: PyMuPDF (`find_tables()`, span extraction), `fixit_mcp.ingestion.parser`/`text_repair`, Amazon Nova Pro and Nova 2 Lite via Bedrock `converse`.
+- **Task attempted**: Test whether Nova can extract the "Problem / Possible Causes / What To Do" rows from the GE refrigerator (p.46) and washer (p.26) manuals, for a possible symptom tool (`docs/symptom-tool-plan.md`).
+- **Findings**:
+  - **Observed**: the parser reads the fridge's three-column table as two columns (its own docstring says it handles at most two), so a page comes out as a Problem run, then a Causes run, then an Actions run, with row alignment lost. `Table.extract()` from `find_tables()` rebuilds the rows correctly on the fridge and washer; on the unruled range table it returns a mangled two-column result.
+  - **Observed**: `Table.extract()` flattens control characters to spaces. The fridge font encodes `&`, `(` and `*` as tab, VT and CR, so a repaired cell read `plug=, rotate` instead of `plug**, rotate`. Separately, `repair_line_tokens` splits on `\s+`, which treats those same control characters as whitespace, so a token-level repair can never restore them.
+  - **Observed**: in the fridge, corrupted and clean text share one font name but are separate *spans*, and a corrupted span always contains the encoded space (`\x03`). Repairing per span with the already-established +29 offset fixed every row on p.46, including the quote marks (U+00B3/U+00B4 stand for the curly quotes, hand-checked). The parser's `Line` joins spans, so it can't do this today.
+  - **Observed**: Nova 2 Lite returned a bare `[]` once for a 22-row page (2 output tokens, temperature 0); the identical retry extracted all 22 rows. Nova Pro never did this in 4 runs.
+  - **Observed**: given the parser's plain page text, Nova Pro copied the garbled glyphs and control characters into its JSON, which then failed to parse.
+  - **Inferred**: the `[]` is nondeterministic output, not a prompt problem, since the same input succeeded on retry.
+- **Severity**: Medium. Nothing shipped; each would have silently dropped or garbled rows if the extraction had been run on the plain text and trusted.
+- **Workaround**: in the scratch test only: geometry-based row reader, per-span repair, and a row-count plus verbatim-join audit that would have caught all of the above.
+- **Actionable suggestion**: any extraction run on a page whose table geometry is known should check the expected row count and retry on a mismatch, never accept `[]` as "nothing here".
