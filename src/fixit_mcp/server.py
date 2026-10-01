@@ -11,12 +11,14 @@ from fixit_mcp.repository.base import ApplianceRepository
 from fixit_mcp.repository.in_memory import InMemoryApplianceRepository
 from fixit_mcp.repository.sqlite import SqliteApplianceRepository
 from fixit_mcp.retrieval.codes import ErrorCodeIndex, load_index
+from fixit_mcp.retrieval.symptoms import SymptomIndex, load_symptom_index
 from fixit_mcp.tools.appliances import register_appliance_tools
 from fixit_mcp.tools.diagnose import register_diagnose_tool
+from fixit_mcp.tools.symptoms import register_symptom_tool
 from fixit_mcp.tools.warranty import register_warranty_tool
 
 SERVER_INSTRUCTIONS = (
-    "FixIt helps customers diagnose appliance error codes, remembers which "
+    "FixIt helps customers diagnose appliance error codes and described problems, remembers which "
     "appliances a household owns, guides repairs, orders replacement parts, "
     "and schedules maintenance. All tools are fast, pre-indexed lookups -- "
     "they never call an LLM themselves; you (the assistant) handle language "
@@ -29,6 +31,7 @@ def create_server(
     repository: ApplianceRepository | None = None,
     error_code_index: ErrorCodeIndex | None = None,
     manual_catalog: ManualCatalog | None = None,
+    symptom_index: SymptomIndex | None = None,
 ) -> FastMCP:
     """Build the FixIt FastMCP server: Streamable HTTP, stateless, with tools registered.
 
@@ -40,7 +43,8 @@ def create_server(
     InMemoryApplianceRepository each time; "agentcore" is AgentCore Memory,
     warmed up with one read here so the first tool call doesn't pay for it)
     and manual_catalog is loaded from data/manuals/manifest.yaml exactly
-    once, unless a caller injects either.
+    once, unless a caller injects either. symptom_index is loaded from
+    data/index/symptoms.json the same way (once, at startup).
     """
     settings = settings or Settings()
     configure_logging(settings.log_level)
@@ -59,9 +63,11 @@ def create_server(
         repository = _make_repository(settings)
     error_code_index = error_code_index or load_index()
     manual_catalog = manual_catalog or load_manual_catalog()
+    symptom_index = symptom_index or load_symptom_index()
 
     register_appliance_tools(mcp, repository, manual_catalog)
     register_diagnose_tool(mcp, repository, error_code_index)
+    register_symptom_tool(mcp, repository, symptom_index)
     register_warranty_tool(mcp, repository)
 
     return mcp
