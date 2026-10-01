@@ -70,6 +70,53 @@ class ErrorCodeRecord(BaseModel):
     extraction_confidence: float = Field(ge=0.0, le=1.0)
 
 
+class SymptomRecord(BaseModel):
+    """One row of a manual's troubleshooting table (step 25b), kept as the manual words it.
+
+    Written offline by `fixit_mcp.ingestion.symptom_extraction` into
+    `data/index/symptoms.json` and read at server startup by
+    `fixit_mcp.retrieval.symptoms`. Like `ErrorCodeRecord` it lives in the
+    neutral domain layer so the running server never imports ingestion code.
+
+    Every string is a verbatim copy of the manual's own text (whitespace
+    collapsed): the extraction audit refuses a row whose strings, joined, do not
+    reproduce the source cell. There is deliberately no meaning, difficulty,
+    parts or safety field: each would be an inference. Safety wording stays inside
+    the verbatim strings.
+    """
+
+    manual_id: str
+    brand: str
+    model: str
+    appliance_type: str
+    symptom: list[str] = Field(description="The Problem/Sounds cell's phrases, verbatim. Never empty.")
+    symptom_label: str = Field(description="The manual's own header of the first column, e.g. 'Problem'.")
+    symptom_continued: bool = Field(
+        default=False,
+        description=(
+            "True when the manual left the first cell blank and `symptom` is carried over from the "
+            "row above (set by code from the layout, never by the model)."
+        ),
+    )
+    possible_causes: list[str] = Field(default_factory=list)
+    what_to_do: list[str] = Field(default_factory=list, description="In the order the manual gives them.")
+    response_label: str = Field(
+        description=(
+            "The manual's own header of the third column: 'What To Do' (an action) or "
+            "'Reason' (an explanation)."
+        )
+    )
+    footnotes: list[str] = Field(
+        default_factory=list, description="Verbatim footnotes whose marker (* or **) appears in this row."
+    )
+    text_incomplete: bool = Field(
+        default=False,
+        description="A string in this row ends mid-sentence in the manual text we have (e.g. 'such as').",
+    )
+    source_page: int
+    source_section: str | None = None
+
+
 def normalize_code(code: str) -> str:
     """Uppercased, separator-stripped form of a manufacturer error code.
 
