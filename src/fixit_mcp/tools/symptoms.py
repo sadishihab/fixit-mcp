@@ -263,7 +263,12 @@ def diagnose_symptom(
 
     suggest_add_appliance = not owned
     scope = owned_manuals if owned_manuals else None
-    message = f"No symptom in our manuals matches {symptom!r}." if terms else _NO_TERMS
+    if not terms:
+        message = _NO_TERMS
+    elif index.is_off_topic(terms):
+        message = f"The manuals we have don't cover {symptom!r}."
+    else:
+        message = f"No symptom in our manuals matches {symptom!r}."
     if suggest_add_appliance:
         message += (
             " We don't see a matching appliance registered for this household -- it may not be "

@@ -190,7 +190,9 @@ def test_one_filler_word_the_manuals_do_not_contain_does_not_raise_the_bar() -> 
 
 def test_two_unknown_words_keep_the_two_matched_words_requirement() -> None:
     assert _phrases("my drum plays music") == []  # one real word, two unknown ones
-    assert _phrases("drum music") != []  # one unknown word is tolerated
+    assert (
+        _phrases("drum music") == []
+    )  # step 27e: an unknown word no longer lets one distinctive word carry it
 
 
 def test_one_matching_word_among_several_is_not_enough() -> None:
@@ -331,15 +333,18 @@ def test_an_unknown_word_weighs_against_a_match_and_two_of_them_defeat_it() -> N
     assert OOV_WEIGHT_SHARE >= 0.6
     assert _phrases("drum stays still totally") == ["Drum stays still"]  # 'totally' is a listed filler
     assert _phrases("drum stays still banana") == ["Drum stays still"]  # two real words outweigh one unknown
-    assert _phrases("drum banana") == ["Drum stays still"]  # a distinctive word with one unknown word
-    assert _phrases("drum banana mango") == []  # ...but not with two
+    assert (
+        _phrases("drum banana") == []
+    )  # an unknown word may be the real subject: one distinctive word is not enough
+    assert _phrases("drum banana mango") == []
 
 
 def test_one_distinctive_word_can_carry_a_match_and_a_common_word_cannot() -> None:
     assert DISTINCTIVE_MAX_SYMPTOMS == 2
     assert _phrases("chirping") == ["Alarm chirps"]  # a symptom word only one symptom uses
-    assert _phrases("pours banana") != []  # used by two symptoms: still distinctive
-    assert _phrases("inside banana") == []  # used by three symptoms: one matched word is not enough
+    assert _phrases("pours") != []  # used by two symptoms: still distinctive
+    assert _phrases("pours banana") == []  # ...but not when the description also has an unknown word
+    assert _phrases("inside banana") == []  # used by three symptoms: not distinctive at all
 
 
 def test_a_word_found_only_in_a_cause_never_counts_toward_the_minimum() -> None:
@@ -427,3 +432,63 @@ def test_a_synonym_key_that_a_stored_symptom_phrase_uses_is_folded_the_same_way_
     assert tokenize("Washer rocking/ moving") == ["washer", "rock", "mov"]
     assert tokenize("Washer shaking") == ["washer", "rock"]
     assert tokenize("Water won’t drain") == ["water", "drain"]
+
+
+# --- step 27e: off-topic descriptions, nearest phrases, and spelling that must never delete a word -------
+
+
+def test_a_description_with_an_unknown_word_and_no_distinctive_known_word_is_off_topic() -> None:
+    assert INDEX.is_off_topic(INDEX.analyze("car inside").terms)  # 'inside' fits three symptoms
+    assert not INDEX.is_off_topic(INDEX.analyze("car drum").terms)  # 'drum' is distinctive
+    assert not INDEX.is_off_topic(INDEX.analyze("inside").terms)  # no unknown word at all
+    assert not INDEX.is_off_topic([])
+
+
+def test_an_off_topic_description_matches_nothing_even_with_two_known_common_words() -> None:
+    from fixit_mcp.retrieval.symptoms import build_index
+
+    index = build_index(
+        [
+            rec(WASHER, ["Water leaks"], ["Hose"], ["Tighten it."]),
+            rec(WASHER, ["Water leaks from the door seal"], ["Seal"], ["Wipe it."], page=6),
+            rec(WASHER, ["Water leaks under the tub"], ["Tub"], ["Level it."], page=7),
+        ]
+    )
+
+    assert len(index.search(index.analyze("water leaks").terms)) == 3
+    assert index.search(index.analyze("water leaks from the car").terms) == []
+    assert index.nearest_phrases(index.analyze("water leaks from the car").terms) == []
+
+
+def test_nearest_phrases_are_withheld_when_the_description_is_off_topic_and_kept_otherwise() -> None:
+    assert (
+        INDEX.nearest_phrases(INDEX.analyze("my car inside").terms) == []
+    )  # unknown 'car', only a common word
+    assert INDEX.nearest_phrases(INDEX.analyze("the drum plays music at night").terms) == ["Drum stays still"]
+    assert INDEX.nearest_phrases(INDEX.analyze("cabinet inside").terms) != [], "no unknown word: offered"
+
+
+def test_with_an_unknown_word_only_symptoms_that_share_a_distinctive_word_are_suggested() -> None:
+    phrases = INDEX.nearest_phrases(INDEX.analyze("the drum is inside a banana").terms)
+
+    assert phrases == ["Drum stays still"], "'inside' alone would also reach the fridge and washer rows"
+
+
+def test_spelling_never_corrects_toward_a_word_the_matcher_ignores() -> None:
+    # "turn" is a stopword on the query side but a word of the manuals' causes: "burning" must stay "burning"
+    spelling = _spelling("turn", "drum")
+
+    assert spelling.correct("burning") == "burning"
+    assert analyze_query("burning smell", spelling).terms == ["burn", "odor"]
+
+
+def test_phrase_words_are_known_words_but_never_correction_targets() -> None:
+    spelling = _spelling("drum")
+
+    assert spelling.correct("balls") == "balls"  # part of the 'fuzz balls' phrase: known, left alone
+    assert spelling.correct("burning") == "burning"
+
+
+def test_a_description_of_the_load_is_context_not_a_symptom_word() -> None:
+    assert analyze_query("my whites are turning yellow").terms == ["yellow"]
+    assert analyze_query("dark bedding came out gray").terms == ["gray"]

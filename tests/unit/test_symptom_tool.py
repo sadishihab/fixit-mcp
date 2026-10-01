@@ -284,3 +284,45 @@ def test_a_diagnose_symptom_call_stays_fast_with_spelling_and_phrase_analysis() 
     per_call_ms = (time.perf_counter() - start) * 1000 / (50 * len(queries))
 
     assert per_call_ms < 25, f"{per_call_ms:.2f} ms per call"
+
+
+# --- step 27e: off-topic descriptions get no nearest phrases and a message that says so ----------------
+
+
+def test_an_off_topic_description_is_not_found_without_nearest_phrases_and_says_so() -> None:
+    result = run("h-washer", "my car won't start and the inside is cold")
+
+    assert result.status == "not_found" and result.matches == [] and result.candidate_appliances == []
+    assert result.nearest_phrases == []
+    assert result.message.startswith("The manuals we have don't cover ")
+    assert "No symptom in our manuals matches" not in result.message
+    assert "diagnose_error" in result.message, "the pointer to error codes is kept"
+
+
+def test_a_description_that_shares_a_distinctive_word_still_gets_nearest_phrases() -> None:
+    result = run("h-washer", "the drum plays music at night")
+
+    assert result.status == "not_found" and result.nearest_phrases == ["Drum stays still"]
+    assert result.message.startswith("No symptom in our manuals matches")
+    assert "don't cover" not in result.message
+
+
+def test_a_description_with_no_unknown_word_keeps_its_nearest_phrases() -> None:
+    result = run("h-both", "cabinet inside", appliance_type="fridge")
+
+    assert result.status in {"found", "not_found"}
+    assert "don't cover" not in result.message
+
+
+def test_the_off_topic_message_and_missing_appliance_notice_can_both_apply() -> None:
+    result = run("h-none", "the car inside", appliance_type="washer")
+
+    assert result.status == "not_found" and result.nearest_phrases == []
+    assert result.message.startswith("The manuals we have don't cover ")
+    assert result.suggest_add_appliance is True and "add_appliance" in result.message
+
+
+def test_no_description_at_all_keeps_its_own_message() -> None:
+    result = run("h-washer", "it is just not, I do, but it is")
+
+    assert "no specific words" in result.message and result.nearest_phrases == []

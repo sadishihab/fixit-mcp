@@ -89,13 +89,18 @@
   function buildNotFoundHtml(result) {
     var queryHtml = result.symptom ? '<span class="query">' + esc(result.symptom) + "</span>" : "";
     var nearest = result.nearest_phrases || [];
+    // With suggestions: "not this exact problem, but here is what is close". Without: the description is about
+    // something these manuals do not cover (an off-topic description gets no suggestions), so say only that.
     var nearestHtml = nearest.length
       ? '<h3>Closest in the manual</h3><ul class="suggestions">' + listHtml(nearest) + "</ul>"
       : "";
+    var messageHtml = nearest.length
+      ? "We don’t have this exact problem in the manuals we have."
+      : "The manuals we have don’t cover this.";
     return (
       '<div class="state-card state-not-found">' +
         '<div class="state-header">' + queryHtml + '<span class="state-label">Not found</span></div>' +
-        '<p class="state-message">We don’t have this problem in the manuals we have.</p>' +
+        '<p class="state-message">' + messageHtml + "</p>" +
         nearestHtml +
       "</div>"
     );

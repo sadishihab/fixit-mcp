@@ -30,10 +30,13 @@ with the rows that continue it):
               + CAUSE_WEIGHT x weight of the others found in its cause text) / weight of all query words.
   c. A symptom matches only if score >= MIN_SCORE and either at least MIN_MATCHED_TERMS query words
      (or all of them, for a one-word query) are in its own phrases, or one is DISTINCTIVE (used by at
-     most DISTINCTIVE_MAX_SYMPTOMS symptoms, like "suds"). A cause alone never matches.
+     most DISTINCTIVE_MAX_SYMPTOMS symptoms, like "suds") and the description has no unknown word. A
+     cause alone never matches.
   d. Polarity must agree: "won't spin" is not matched to "pauses during spin" (a symptom is negated
      when its own wording is: "won't drain", "not cooling").
   e. One common word that fits more than MAX_MATCHES symptoms ("noisy" -> sound) matches none of them.
+  f. A description with a word no stored row contains AND no distinctive known word is off-topic ("my car
+     won't start", "water leaking from the car"): it matches nothing and is offered no nearest phrase.
 
 The thresholds and tables are tuned on the paraphrase bank (tests/fixtures/symptom_paraphrases.yaml,
 tests/unit/test_symptom_bank.py), which fails on any wrong cited answer, and on the cases in
@@ -82,13 +85,14 @@ _STOPWORDS = frozenset(
 _FILLERS = frozenset(
     """way really super totally completely extremely absolutely literally actually basically honestly
     constantly always anymore lately today suddenly randomly crazy violently badly terribly seriously
-    pretty rather kinda sorta floor little tiny""".split()
+    pretty rather kinda sorta floor little tiny full""".split()
 )
 
-# Words for things a customer wears or washes; the symptom is about the machine, so they are context.
+# Words for what a customer washes, or how the load is described; the symptom is about the machine or what
+# it did to the load, so these are context ("whites are turning yellow" is about yellow).
 _GARMENTS = frozenset(
     """shirt shirts sweater sweaters sock socks towel towels jean jeans pants blouse blouses dress
-    dresses sheets""".split()
+    dresses sheets bedding linens white whites dark darks""".split()
 )
 
 _DETERMINERS = frozenset("the a an my our your its his her their this that".split())
@@ -354,19 +358,35 @@ class Spelling:
         for phrase in _TYPE_PHRASES:
             for word in phrase.split():
                 forms.setdefault(word, "type:" + word)
-        for phrase_stems, _out in _PHRASE_STEMS:
-            for word in phrase_stems:
-                for form in _forms(word):
-                    forms.setdefault(form, "phrase:" + word)
+        # Phrase words are known words (never mended themselves) but deliberately NOT targets: they are
+        # common words ("turn", "water"), so a real word one letter away from one ("burning" ->
+        # "turning") would be silently renamed.
+        self.known = frozenset(
+            form for phrase_stems, _out in _PHRASE_STEMS for word in phrase_stems for form in _forms(word)
+        )
         self.forms = forms
         self.fixed = _STOPWORDS | _FILLERS | _GARMENTS | _DETERMINERS | _NEGATIONS | frozenset(_TYPE_PHRASES)
+        # Words the matcher ignores must never be a correction target
+        # ("burning" -> "turning" would delete it).
+        self.ignored = _STOPWORDS | _FILLERS | _GARMENTS | _DETERMINERS | _NEGATIONS
+        self.ignored_stems = frozenset(stem(w) for w in self.ignored)
 
     def correct(self, word: str) -> str:
         if len(word) < MIN_SPELLING_LENGTH or not word.isalpha():
             return word
-        if word in self.fixed or word in self.forms or _fold(word) in self.terms or stem(word) in _SYNONYMS:
+        if (
+            word in self.fixed
+            or word in self.forms
+            or word in self.known
+            or _fold(word) in self.terms
+            or stem(word) in _SYNONYMS
+        ):
             return word
-        candidates = sorted(c for c in _one_edit(word) if c in self.forms)
+        candidates = sorted(
+            c
+            for c in _one_edit(word)
+            if c in self.forms and c not in self.ignored and stem(c) not in self.ignored_stems
+        )
         if candidates and len({self.forms[c] for c in candidates}) == 1:
             return candidates[0]
         return word
@@ -545,17 +565,30 @@ class SymptomIndex:
         negated: bool | None = None,
     ) -> list[ScoredGroup]:
         """The groups that clear the matching rules (see the module docstring), best first."""
+        if self.is_off_topic(terms):
+            return []
         needed = min(MIN_MATCHED_TERMS, len(terms))
+        # A word no stored row contains ("gas" in "a gas smell from my fridge") may be the real subject, so
+        # one distinctive word ("odor") is no longer enough: two matched symptom words are required.
+        has_unknown = any(t not in self.idf for t in terms)
         found = [
             s
             for s in self.score_all(terms, manual_ids, appliance_type, negated)
-            if s.score >= MIN_SCORE and (s.matched_in_symptom >= needed or s.distinctive)
+            if s.score >= MIN_SCORE
+            and (s.matched_in_symptom >= needed or (s.distinctive and not has_unknown))
         ]
         # One common word that fits many symptoms ("my washer is noisy" -> sound, in ten rows) identifies
         # none of them; returning the first three would be a guess presented as an answer.
         if len(terms) == 1 and len(found) > MAX_MATCHES and not any(s.distinctive for s in found):
             return []
         return found
+
+    def is_off_topic(self, terms: list[str]) -> bool:
+        """True when the description has a word no stored row contains and shares no distinctive word with
+        any row: it is about something these manuals do not cover ("my car won't start")."""
+        has_unknown = any(t not in self.idf for t in terms)
+        has_distinctive = any(1 <= self.symptom_df.get(t, 0) <= DISTINCTIVE_MAX_SYMPTOMS for t in terms)
+        return bool(terms) and has_unknown and not has_distinctive
 
     def nearest_phrases(
         self,
@@ -566,9 +599,17 @@ class SymptomIndex:
         negated: bool | None = None,
     ) -> list[str]:
         """The manual's own first phrase of the closest symptoms that share at least one word with the
-        query but did not clear the matching rules -- a verbatim "did you mean", never a cause."""
+        query but did not clear the matching rules -- a verbatim "did you mean", never a cause.
+
+        When the description also has a word no stored row contains ("car" in "my car won't start"), the
+        suggestion needs more than a common word like "start" to rest on: only symptoms that share a
+        DISTINCTIVE word with the description are offered, and none if there is no such word.
+        """
+        has_unknown = any(t not in self.idf for t in terms)
         phrases: list[str] = []
         for s in self.score_all(terms, manual_ids, appliance_type, negated):
+            if has_unknown and not s.distinctive:
+                continue
             phrase = s.group.phrases[0]
             if phrase not in phrases:
                 phrases.append(phrase)

@@ -35,6 +35,15 @@ class Result:
     outcome: str
     top: tuple[str, int, int] | None  # (appliance, page, row) of the first match returned
     in_top3: bool = False
+    nearest: list[str] | None = None  # nearest_phrases of a not_found, when a case declares what to expect
+
+    @property
+    def nearest_ok(self) -> bool | None:
+        """None when the case says nothing about nearest phrases; else whether it was honoured."""
+        want = self.case.get("nearest")
+        if want is None:
+            return None
+        return bool(self.nearest) == (want == "present")
 
 
 def load_bank(path: Path = BANK_PATH) -> list[dict]:
@@ -89,7 +98,7 @@ def evaluate(records: list[SymptomRecord] | None = None, cases: list[dict] | Non
         top = tops[0] if tops else None
         if case["expect"] == "none":
             outcome = OK if out.status == "not_found" else WRONG
-            results.append(Result(case, outcome, top))
+            results.append(Result(case, outcome, top, nearest=out.nearest_phrases))
             continue
         accepted = {(e["appliance"], e["page"], e["row"]) for e in case["expect"]}
         if out.status == "not_found":
@@ -121,6 +130,8 @@ def summarize(results: list[Result]) -> dict:
         "none_cases": len(none),
         "none_ok": count(none, OK),
         "none_wrongly_matched": count(none, WRONG),
+        "nearest_checked": sum(1 for r in none if r.nearest_ok is not None),
+        "nearest_violations": sum(1 for r in none if r.nearest_ok is False),
         "by_outcome": {r.case["id"]: r.outcome for r in results},
     }
 
@@ -137,9 +148,16 @@ def report(results: list[Result], heldout: bool = False) -> str:
         f"WRONG symptom first {s['wrong_among_expected']}",
         f"none cases: correctly not_found {s['none_ok']}/{s['none_cases']}, "
         f"WRONGLY MATCHED {s['none_wrongly_matched']}",
+        "nearest phrases as declared: "
+        f"{s['nearest_checked'] - s['nearest_violations']}/{s['nearest_checked']}",
         "",
     ]
     for r in results:
+        if r.nearest_ok is False:
+            lines.append(
+                f"  NEAREST   {r.case['id']:28} {r.case['query']!r}  "
+                f"declared={r.case['nearest']} got={r.nearest}"
+            )
         if r.outcome in (MISS, AMBIGUOUS, WRONG):
             want = (
                 "none"

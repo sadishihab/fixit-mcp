@@ -1,15 +1,17 @@
 {
   "tuning": {
-    "cases": 74,
+    "cases": 78,
     "expected_cases": 47,
     "right": 25,
     "right_in_top3": 27,
     "miss": 17,
     "ambiguous": 1,
     "wrong_among_expected": 4,
-    "none_cases": 27,
-    "none_ok": 22,
-    "none_wrongly_matched": 5,
+    "none_cases": 31,
+    "none_ok": 24,
+    "none_wrongly_matched": 7,
+    "nearest_checked": 10,
+    "nearest_violations": 3,
     "by_outcome": {
       "w-suds-plain": "right",
       "w-suds-foam": "right",
@@ -84,7 +86,11 @@
       "n-f-grind": "ok",
       "n-w-noisy-plain": "wrong",
       "n-w-loud": "wrong",
-      "n-w-makes-noise": "wrong"
+      "n-w-makes-noise": "wrong",
+      "n-car-leak": "wrong",
+      "n-car-noise": "ok",
+      "n-f-smell-plastic": "ok",
+      "n-f-smell-gas": "wrong"
     }
   },
   "heldout": {
@@ -98,6 +104,8 @@
     "none_cases": 6,
     "none_ok": 4,
     "none_wrongly_matched": 2,
+    "nearest_checked": 0,
+    "nearest_violations": 0,
     "by_outcome": {
       "h-w-cycle-stall": "miss",
       "h-w-wontstart": "right",

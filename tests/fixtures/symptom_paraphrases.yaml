@@ -13,6 +13,8 @@
 # the GE washer: a wrong cited answer (a match for a `none` case, or the wrong symptom first) is
 # worse than not_found, and `ambiguous_appliance` for a `none` case counts as a wrong match.
 #
+# nearest: (none cases only) `present` or `absent`: whether the not_found must offer the manual's closest
+#   phrases. Withheld for an off-topic description, offered when it shares a distinctive word with a row.
 # known_wrong: a case the matcher still answers wrongly, with the reason. The test allows exactly these and
 #   fails if any other wrong answer appears, or if a known-wrong case stops being wrong (remove the flag).
 #
@@ -74,13 +76,13 @@ cases:
   - {id: n-dryer-start, tag: other-appliance, query: "my dryer won't start", expect: none}
   - {id: n-dishwasher, tag: other-appliance, query: "the dishwasher is not draining", expect: none}
   - {id: n-oven-heat, tag: other-appliance, query: "my oven won't heat up", expect: none}
-  - {id: n-microwave, tag: other-appliance, query: "the microwave sparks when I heat my lunch", expect: none}
-  - {id: n-car-start, tag: offtopic, query: "my car won't start", expect: none}
-  - {id: n-tv, tag: offtopic, query: "the tv has no picture", expect: none}
-  - {id: n-laptop, tag: offtopic, query: "my laptop is overheating", expect: none}
+  - {id: n-microwave, tag: other-appliance, query: "the microwave sparks when I heat my lunch", expect: none, nearest: absent}
+  - {id: n-car-start, tag: offtopic, query: "my car won't start", expect: none, nearest: absent}
+  - {id: n-tv, tag: offtopic, query: "the tv has no picture", expect: none, nearest: absent}
+  - {id: n-laptop, tag: offtopic, query: "my laptop is overheating", expect: none, nearest: absent}
   - {id: n-broken, tag: offtopic, query: "it's broken", expect: none}
   - {id: n-wrong, tag: offtopic, query: "something is wrong with it", expect: none}
-  - {id: n-weather, tag: offtopic, query: "what is the weather today", expect: none}
+  - {id: n-weather, tag: offtopic, query: "what is the weather today", expect: none, nearest: absent}
   - {id: n-safe-run, tag: safety, query: "is it safe to run my washer", expect: none}
   - {id: n-call-someone, tag: safety, query: "should I call someone about my fridge", expect: none}
   - {id: n-fire, tag: safety, query: "is my fridge going to catch fire", expect: none}
@@ -95,9 +97,16 @@ cases:
   - {id: n-f-grind, tag: unsupported, query: "my fridge makes a loud grinding noise", expect: none}
 
   # generic sound complaints name no sound: the right answer is not_found, not three arbitrary sounds
-  - {id: n-w-noisy-plain, tag: unsupported, query: "my washer is noisy", expect: none}
+  - {id: n-w-noisy-plain, tag: unsupported, query: "my washer is noisy", expect: none, nearest: present}
   - {id: n-w-loud, tag: unsupported, query: "the washer is loud", expect: none}
   - {id: n-w-makes-noise, tag: unsupported, query: "washer makes a noise", expect: none}
+
+  # nearest phrases: offered when the description shares a distinctive word with a row, withheld when it is
+  # clearly off-topic (a word no row contains and no distinctive known word)
+  - {id: n-car-leak, tag: offtopic, query: "water leaking from the car", expect: none, nearest: absent}
+  - {id: n-car-noise, tag: offtopic, query: "the car makes a loud noise when I start it", expect: none, nearest: absent}
+  - {id: n-f-smell-plastic, tag: unsupported, query: "my fridge smells like burning plastic", expect: none, nearest: present}
+  - {id: n-f-smell-gas, tag: unsupported, query: "there is a gas smell coming from my fridge", expect: none, nearest: present}
 
   # ---- held-out set: written before any tuning and not inspected case by case while tuning --------
   # (the report counts these separately; they check that improvements generalize beyond the cases above)

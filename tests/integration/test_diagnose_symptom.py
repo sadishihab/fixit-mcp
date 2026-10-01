@@ -199,3 +199,19 @@ async def test_the_plain_symptom_result_is_unaffected_by_the_card(synthetic_url:
 
     assert result.isError is False
     assert result.structuredContent["status"] == "found" and result.structuredContent["matches"]
+
+
+async def test_off_topic_gets_no_nearest_phrases_but_an_on_topic_miss_does_over_http(server_url: str) -> None:
+    """On the committed index, over real Streamable HTTP (step 27e)."""
+    off_topic = await _call(server_url, {"household_id": "house-002", "symptom": "my car won't start"})
+    noisy = await _call(server_url, {"household_id": "house-002", "symptom": "my washer is noisy"})
+
+    car = off_topic.structuredContent
+    assert car["status"] == "not_found" and car["matches"] == [] and car["nearest_phrases"] == []
+    assert car["message"].startswith("The manuals we have don't cover ")
+    washer = noisy.structuredContent
+    assert washer["status"] == "not_found" and washer["matches"] == []
+    assert washer["nearest_phrases"], (
+        "a generic washer-noise complaint still gets the manual's closest phrases"
+    )
+    assert washer["message"].startswith("No symptom in our manuals matches")

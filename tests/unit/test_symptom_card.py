@@ -314,3 +314,42 @@ def test_every_field_is_escaped() -> None:
     for result in (found, not_found, ambiguous):
         out = build(result)
         assert "<img" not in out and "&lt;img" in out, result["status"]
+
+
+# --- step 27e: the closest-in-the-manual block only when there are phrases ---------------------------------
+
+
+@requires_node
+def test_not_found_with_phrases_says_not_this_exact_problem_and_lists_them() -> None:
+    out = build(NOT_FOUND)
+
+    assert "We don’t have this exact problem in the manuals we have." in out
+    assert "Closest in the manual" in out and "<li>Gizmo hums loudly</li>" in out
+    assert "don’t cover this" not in out
+
+
+@requires_node
+def test_not_found_without_phrases_says_the_manuals_do_not_cover_it_and_shows_no_block() -> None:
+    out = build({**NOT_FOUND, "nearest_phrases": []})
+
+    assert "The manuals we have don’t cover this." in out
+    assert "Closest in the manual" not in out and "<ul" not in out and "<h3" not in out
+    assert "the cat is hungry" in out and "Not found" in out, "the customer's words and the state label stay"
+    assert "exact problem" not in out
+
+
+@requires_node
+def test_a_missing_nearest_phrases_field_is_treated_as_no_phrases() -> None:
+    result = {k: v for k, v in NOT_FOUND.items() if k != "nearest_phrases"}
+
+    out = build(result)
+
+    assert "The manuals we have don’t cover this." in out and "Closest in the manual" not in out
+
+
+@requires_node
+def test_the_off_topic_state_is_still_muted_with_no_click_handlers() -> None:
+    out = build({**NOT_FOUND, "nearest_phrases": []})
+
+    assert 'class="state-card state-not-found"' in out
+    assert not any(marker in out for marker in CLICK_MARKERS)
