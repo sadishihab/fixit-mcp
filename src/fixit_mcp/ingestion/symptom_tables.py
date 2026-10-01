@@ -48,6 +48,25 @@ def collapse(text: str) -> str:
     return " ".join(text.split())
 
 
+def join_lines(lines: list[str]) -> str:
+    """Join printed lines with a space, except where a line breaks right after a hyphen in front of a
+    lowercase continuation ("non-" + "stick" -> "non-stick") or after an en dash inside a range in
+    front of an alphanumeric ("48°C–" + "60°C" -> "48°C–60°C"): the manuals break lines at the real
+    punctuation, so the space is a typesetting artifact, not part of the wording."""
+    out = ""
+    for line in lines:
+        line = collapse(line)
+        if not line:
+            continue
+        glued_hyphen = out.endswith("-") and len(out) > 1 and out[-2].isalpha() and line[0].islower()
+        glued_range = out.endswith("\u2013") and len(out) > 1 and not out[-2].isspace() and line[0].isalnum()
+        if out and (glued_hyphen or glued_range):
+            out += line
+        else:
+            out = f"{out} {line}" if out else line
+    return out
+
+
 def has_control_chars(text: str) -> bool:
     return any(ord(ch) < 32 and ch != "\n" for ch in text)
 
@@ -87,10 +106,18 @@ def _span_lines(page: pymupdf.Page, clip: pymupdf.Rect | None, offset: int | Non
     return lines
 
 
-def _cell_items(page: pymupdf.Page, bbox: tuple | None, offset: int | None) -> list[str]:
+def _apply_fixes(text: str, fixes: dict[str, str] | None) -> str:
+    for wrong, right in (fixes or {}).items():
+        text = text.replace(wrong, right)
+    return text
+
+
+def _cell_items(
+    page: pymupdf.Page, bbox: tuple | None, offset: int | None, fixes: dict[str, str] | None = None
+) -> list[str]:
     if bbox is None:
         return []
-    items = [collapse(text) for _, text in _span_lines(page, pymupdf.Rect(bbox), offset)]
+    items = [_apply_fixes(collapse(text), fixes) for _, text in _span_lines(page, pymupdf.Rect(bbox), offset)]
     items = [item for item in items if item]
     if any(has_control_chars(item) for item in items):
         raise TableReadError(f"unrepaired control characters in a cell: {items!r}")
@@ -109,7 +136,7 @@ class TableRow:
         return (self.problem, self.causes, self.actions)[index]
 
     def text(self, index: int) -> str:
-        return collapse(" ".join(self.cell(index)))
+        return join_lines(self.cell(index))
 
     def all_text(self) -> str:
         return " ".join(self.text(i) for i in range(3))
@@ -141,10 +168,15 @@ def _page_footnotes(page: pymupdf.Page, below_y: float, offset: int | None) -> l
     return notes
 
 
-def read_symptom_tables(pdf_path: str | Path, manual_id: str, offset: int | None) -> list[SymptomTable]:
+def read_symptom_tables(
+    pdf_path: str | Path, manual_id: str, offset: int | None, text_fixes: dict[str, str] | None = None
+) -> list[SymptomTable]:
     """Every troubleshooting table in the PDF whose header row is Problem|Sounds / Possible Causes /
     What To Do|Reason, as rows. A table that does not have those three columns (the unruled GE range
-    table, which `find_tables()` reads as two merged columns) is not returned."""
+    table, which `find_tables()` reads as two merged columns) is not returned.
+
+    `text_fixes` is {wrong: right} for reviewed corrections span-level repair cannot make (a corrupted
+    one-character span with no control character); only ever set after checking the rendered page."""
     tables: list[SymptomTable] = []
     doc = pymupdf.open(str(pdf_path))
     try:
@@ -165,7 +197,7 @@ def read_symptom_tables(pdf_path: str | Path, manual_id: str, offset: int | None
                 body: list[TableRow] = []
                 for row in rows[1:]:
                     cells = (list(row.cells) + [None, None, None])[:3]
-                    body.append(TableRow(*(_cell_items(page, c, offset) for c in cells)))
+                    body.append(TableRow(*(_cell_items(page, c, offset, text_fixes) for c in cells)))
                 page_text = page.get_text()
                 tables.append(
                     SymptomTable(

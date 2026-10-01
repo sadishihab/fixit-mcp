@@ -232,6 +232,7 @@ class TableResult:
     table: SymptomTable
     rows: list[ExtractedRow] = field(default_factory=list)
     problems: list[Problem] = field(default_factory=list)  # of the last attempt; empty = accepted
+    attempt_problems: list[list[Problem]] = field(default_factory=list)  # one entry per rejected attempt
     attempts: int = 0
     cached: bool = False
     cost_usd: float = 0.0
@@ -324,6 +325,7 @@ class NovaSymptomExtractor:
                         json.dumps([r.model_dump() for r in result.rows], ensure_ascii=False)
                     )
                 return result
+            result.attempt_problems.append(result.problems)
             hint = "; ".join((f"row {p.row}: " if p.row else "") + p.message for p in result.problems[:5])
             prompt = (
                 base_prompt + f"\n\nYour previous answer was rejected: {hint}. The table has exactly "

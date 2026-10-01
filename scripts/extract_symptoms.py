@@ -47,6 +47,12 @@ CACHE_DIR = REPO_ROOT / "data" / "index" / ".extract_cache" / "symptoms"
 # unruled and needs a different reader, so it is not here yet.
 DEFAULT_MANUAL_IDS = ("ge-gfe28gynfs-refrigerator", "ge-gtw680bsjws-washer")
 DEFAULT_MAX_COST_USD = 1.00
+# Reviewed corrections the span-level font repair cannot make, per manual: {wrong: right}. Each was
+# checked against the rendered page. The refrigerator's p.48 prints the "I" of "IMPORTANT" as a lone
+# regular-weight span "," (no control character) in front of the clean bold "MPORTANT:".
+REVIEWED_TEXT_FIXES: dict[str, dict[str, str]] = {
+    "ge-gfe28gynfs-refrigerator": {",MPORTANT:": "IMPORTANT:"},
+}
 
 
 def load_manifest(path: Path = MANIFEST_PATH) -> dict[str, dict]:
@@ -75,8 +81,11 @@ def print_report(manual_id: str, results: list[TableResult]) -> None:
             f"  {r.table.page:>4} {r.table.table_index:>3}  {len(r.table.rows):>13} {len(r.rows):>9} "
             f"{r.attempts:>8} {'yes' if r.cached else 'no':>6}  {verdict}  ${r.cost_usd:.4f}"
         )
-        for problem in r.problems:
-            print(f"        - {'row ' + str(problem.row) + ': ' if problem.row else ''}{problem.message}")
+        for n, earlier in enumerate(r.attempt_problems, 1):
+            print(f"      attempt {n} was rejected:")
+            for problem in earlier[:6]:
+                where = f"row {problem.row}: " if problem.row else ""
+                print(f"        - {where}{problem.message[:230]}")
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -128,7 +137,7 @@ def main(argv: list[str] | None = None) -> int:
             exit_code = 1
             continue
         offset = document_offset(pdf)
-        tables = read_symptom_tables(pdf, manual_id, offset)
+        tables = read_symptom_tables(pdf, manual_id, offset, REVIEWED_TEXT_FIXES.get(manual_id))
         brand, model, kind = entry["brand"], entry["model"], entry["appliance_type"]
         print(
             f"\n{manual_id}: font offset {offset:+d}" if offset else f"\n{manual_id}: no font repair needed"

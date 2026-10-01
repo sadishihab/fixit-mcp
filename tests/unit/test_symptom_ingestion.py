@@ -526,3 +526,47 @@ def test_the_script_dry_run_makes_no_bedrock_client(monkeypatch: pytest.MonkeyPa
 def test_the_default_manuals_are_the_two_supported_ge_manuals() -> None:
     assert extract_symptoms.DEFAULT_MANUAL_IDS == ("ge-gfe28gynfs-refrigerator", "ge-gtw680bsjws-washer")
     assert extract_symptoms.DEFAULT_MAX_COST_USD == 1.00
+
+
+# --- line joining, reviewed fixes, attempt history ---------------------------------------
+
+
+def test_join_lines_joins_after_a_real_hyphen_without_a_space() -> None:
+    from fixit_mcp.ingestion.symptom_tables import join_lines
+
+    assert join_lines(["a non-", "stick pan"]) == "a non-stick pan"
+    assert join_lines(["re-", "assembled"]) == "re-assembled"
+    assert join_lines(["Step one -", "Step two"]) == "Step one - Step two"  # a dash, not a word hyphen
+    assert join_lines(["ends with a-", "Capital"]) == "ends with a- Capital"
+    assert join_lines(["plain", "", "lines"]) == "plain lines"
+    assert join_lines(["at 120\u00b0F\u2013140\u00b0F (48\u00b0C\u2013", "60\u00b0C)"]) == (
+        "at 120\u00b0F\u2013140\u00b0F (48\u00b0C\u201360\u00b0C)"
+    )
+    assert join_lines(["a pause \u2013", "then more"]) == "a pause \u2013 then more"
+
+
+def test_a_row_cell_text_uses_the_hyphen_aware_join() -> None:
+    table = _table([(["Gizmo"], ["If doors were re-", "assembled"], ["Act"])])
+    answer = [
+        ExtractedRow(symptom=["Gizmo"], possible_causes=["If doors were re-assembled"], what_to_do=["Act"])
+    ]
+
+    assert audit_rows(table, answer) == []
+
+
+def test_reviewed_text_fixes_apply_only_to_the_named_string() -> None:
+    from fixit_mcp.ingestion.symptom_tables import _apply_fixes
+
+    assert _apply_fixes(",MPORTANT: Do not", {",MPORTANT:": "IMPORTANT:"}) == "IMPORTANT: Do not"
+    assert _apply_fixes("Leave , alone", {",MPORTANT:": "IMPORTANT:"}) == "Leave , alone"
+    assert _apply_fixes("unchanged", None) == "unchanged"
+
+
+def test_each_rejected_attempt_keeps_its_problems_for_the_report() -> None:
+    table = _table(ROWS, FOOTNOTES)
+    client = FakeConverse(["[]", _good_json(table)])
+
+    result = _extractor(client).extract_table("Acme", "X1", "gizmo", table)
+
+    assert result.accepted and len(result.attempt_problems) == 1
+    assert "empty answer" in result.attempt_problems[0][0].message
