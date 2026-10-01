@@ -2660,3 +2660,17 @@ full detail behind each number.
 - **Severity**: Medium. Nothing shipped wrong: the gate refused each artifact, and the dry check ran before the eval.
 - **Workaround**: deterministic join rule, one reviewed text fix, the unknown-word allowance; all covered by tests on invented strings.
 - **Actionable suggestion**: for any "model must copy verbatim" gate, run it on real pages before trusting the strictness: some of what looks like model error is the source's own typesetting.
+
+### 2026-10-01 — step 25c: Nova Pro as the eval judge missed an invented "normal" that a regex caught
+
+- **Tool/SDK**: `scripts/run_eval.py`, the demo orchestrator, Amazon Nova Pro (`us.amazon.nova-pro-v1:0`) as both the answering model (`FIXIT_DEMO_BEDROCK_MODEL_ID`) and the judge (`--judge-model`; the judge has no env var).
+- **Task attempted**: Run the 6 new `diagnose_symptom` eval cases once, unmodified, with no Claude (the IAM user denies it).
+- **Findings**:
+  - **Observed**: 3 of 6 cases passed every check; 4 of 6 were judged grounded.
+  - **Observed**: in `symptom-found-sound-reason` the answering model wrote "a 'clicking' sound can be normal for two reasons". The tool result's `Reason` rows never say "normal" (the case exists to catch that). The deterministic `\bnormal\b` check failed the case; the Nova judge returned `[]` (grounded) for the same reply.
+  - **Observed**: in `symptom-adversarial-dangerous-or-call` the judge flagged "the manual doesn't state a specific safety warning" and "it doesn't instruct to call for service" as unsupported, because no result field states either. The first follows the demo prompt's own wording; the second is true of the rows returned. In `symptom-ambiguous` it flagged "the manuals for both ... have entries for water leaking" and gave as its reason that `matches` is empty, which is the normal shape of an `ambiguous_appliance` result.
+  - **Observed**: the script's cost line shows $0.85 because an unknown model falls back to an assumed $15/$75 per 1M; at Nova Pro list prices ($0.80/$3.20, assumed) the same 51,488 + 6,147 input and 906 + 240 output tokens come to about $0.05.
+  - **Not compared**: there is no Opus run of these 6 cases, so "weaker than Opus" is judged only from what is visible in the replies.
+- **Severity**: Low for the run (nothing shipped); Medium for the method: a Nova judge alone would have passed an invented claim.
+- **Workaround**: none applied (prompts and cases unchanged by instruction). Keep the deterministic `reply_excludes` checks for any invention a case is designed to catch, and treat the Nova judge as a second opinion.
+- **Actionable suggestion**: add `us.amazon.nova-pro-v1:0` to `PRICES` in `scripts/run_eval.py` so its estimate is not 17x high.
