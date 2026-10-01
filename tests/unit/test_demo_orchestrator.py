@@ -785,7 +785,7 @@ def test_system_prompt_restricts_symptom_replies_to_what_the_entries_say() -> No
 
     assert "diagnose_symptom" in prompt
     assert "never add a cause, a step, a part, a safety judgment" in prompt
-    assert "never say it is safe" in prompt
+    assert "never say it is or isn't safe or dangerous" in prompt
     assert "name no cause" in prompt
     assert "response_label is 'Reason'" in prompt
 
@@ -794,3 +794,26 @@ def test_diagnose_symptom_is_idempotent_so_a_lost_response_may_be_retried() -> N
     from demo.orchestrator import _IDEMPOTENT_TOOLS
 
     assert "diagnose_symptom" in _IDEMPOTENT_TOOLS
+
+
+def test_symptom_replies_make_no_statement_about_safety_or_warnings() -> None:
+    """Step 25d: a diagnose_symptom result has no safety_warnings field, so "the manual doesn't list
+    a specific safety warning" claims more than the rows show. The empty-safety_warnings rule is
+    scoped to diagnose_error results, and a symptom reply says only what the rows say."""
+    prompt = build_system_prompt("house-001")
+
+    assert "about a diagnose_error result, answer only from the tool result's safety_warnings" in prompt
+    assert "A diagnose_symptom result has no safety_warnings or safety information at all" in prompt
+    assert "make no statement about safety or warnings in a reply about it" in prompt
+    assert "never say the manual lists, states, or lacks a warning" in prompt
+    assert "never say it is or isn't safe or dangerous" in prompt
+    assert "the troubleshooting table doesn't address safety" in prompt
+    assert "never say no one needs to be called" in prompt
+
+
+def test_symptom_replies_never_call_a_sound_or_symptom_normal_unless_a_row_says_so() -> None:
+    prompt = build_system_prompt("house-001")
+
+    assert "Never say a sound or a symptom 'can be normal' or 'is normal'" in prompt
+    assert "unless a returned row says so in those words" in prompt
+    assert "explains normal behavior" not in prompt  # the old wording invited the word
