@@ -19,7 +19,8 @@ with the rows that continue it):
               + CAUSE_WEIGHT x weight of the others found in its cause text) / weight of all query words.
   4. A symptom matches only if at least one query word is in its own phrases (a cause alone never
      matches), it has at least MIN_MATCHED_TERMS matched words (or the query has only one content
-     word), and score >= MIN_SCORE.
+     word, not counting one word the manuals don't contain at all, which can never match), and
+     score >= MIN_SCORE.
 
 The thresholds are tuned on the paraphrase and off-topic cases in tests/unit/test_retrieval_symptoms.py
 and evals/cases.yaml, not derived from theory.
@@ -261,7 +262,10 @@ class SymptomIndex:
         self, terms: list[str], manual_ids: set[str] | None = None, appliance_type: str | None = None
     ) -> list[ScoredGroup]:
         """The groups that clear the matching rules (see the module docstring), best first."""
-        needed = min(MIN_MATCHED_TERMS, len(terms))
+        # One word the manuals don't contain at all ("way" in "way too many suds") can never match, so it
+        # must not raise the bar; two or more unknown words keep the full two-word requirement.
+        unknown = sum(1 for t in terms if t not in self.idf)
+        needed = MIN_MATCHED_TERMS if unknown > 1 else min(MIN_MATCHED_TERMS, len(terms) - unknown)
         return [
             s
             for s in self.score_all(terms, manual_ids, appliance_type)

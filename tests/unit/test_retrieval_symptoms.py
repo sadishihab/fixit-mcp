@@ -183,6 +183,16 @@ def test_a_word_found_only_in_a_cause_never_matches() -> None:
     assert _phrases("too much soap") == []
 
 
+def test_one_filler_word_the_manuals_do_not_contain_does_not_raise_the_bar() -> None:
+    assert _phrases("drum stays still totally")[0] == "Drum stays still"
+    assert _phrases("whistling absolutely")[0] == "Whistling"  # a single real word plus one filler
+
+
+def test_two_unknown_words_keep_the_two_matched_words_requirement() -> None:
+    assert _phrases("my drum plays music") == []  # one real word, two unknown ones
+    assert _phrases("drum music") != []  # one unknown word is tolerated
+
+
 def test_one_matching_word_among_several_is_not_enough() -> None:
     assert "Drum stays still" not in _phrases("the drum plays music every night")
 

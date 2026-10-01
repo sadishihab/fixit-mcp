@@ -19,7 +19,9 @@
 #
 # Note: two manuals (GE refrigerator, GE washer) document no discrete error codes and
 # the GE range only a "F— and a number or letter" family, so "found" cases cover the
-# five manuals with codes and those three appear as not_found cases.
+# five manuals with codes and those three appear as not_found cases. The refrigerator and
+# washer do have symptom tables, which the "symptom" cases below exercise through
+# diagnose_symptom (step 25b); the GE range's table is not extracted yet.
 
 fixtures:
   lg_dryer: {brand: LG, model: DLEX8000W, appliance_type: dryer, purchase_date: "2023-01-15", warranty_end_date: "2025-01-15"}
@@ -339,6 +341,63 @@ cases:
         reply_excludes: ["not registered", "isn't registered", "haven't registered"],
       }
     may_state: [humidity sensor failure; this IS the household's own dryer, so no notice]
+
+  # --- symptoms: a described problem with no error code (diagnose_symptom, step 25b) -------------
+  # The result carries the manual's own rows only; every cause/step in a reply must trace to them.
+  - id: symptom-found-suds
+    category: symptom
+    appliances: [ge_washer]
+    turns: ["My washer is making way too many suds."]
+    expect: {tools: [diagnose_symptom], forbid_tools: [diagnose_error], reply_includes: [["detergent"]]}
+    may_state: [the manual's causes for too many suds (soft water, too much detergent, type of detergent) and what it says to do for each]
+  - id: symptom-found-sound-reason
+    category: symptom
+    appliances: [ge_washer]
+    turns: ["My washer makes a clicking noise."]
+    # The sounds table's third column is a "Reason", not an instruction, and no row in it says the
+    # sound is "normal": a reply that calls it normal or tells the customer not to worry is invented.
+    expect: {tools: [diagnose_symptom], reply_excludes: ["\\bnormal\\b", "nothing to worry", "no need to (worry|call)", "not a (problem|concern)"]}
+    may_state: [the reason the manual gives for the clicking sound, as it words it]
+  - id: symptom-not-found
+    category: symptom
+    appliances: [ge_washer]
+    turns: ["My washer smells like burning plastic."]
+    expect: {tools: [diagnose_symptom], reply_excludes: ["motor", "belt", "wiring", "overheat", "melt", "electrical", "fire"]}
+    may_state: [the manuals we have don't list that problem, nearest_phrases if any; no cause]
+  - id: symptom-ambiguous
+    category: symptom
+    appliances: [ge_fridge, ge_washer]
+    turns: ["Water is leaking."]
+    expect: {tools: [diagnose_symptom], reply_includes: [["refrigerator", "fridge"], ["washer", "washing"]], allow_clarifying_question: true}
+    may_state: [ask which appliance: the GE refrigerator or the GE washer]
+  - id: symptom-unregistered
+    category: symptom
+    appliances: [ge_fridge]
+    turns: ["My washer has way too many suds."]
+    # The entry exists, but for a GE GTW680BSJWS this household hasn't registered: say so.
+    expect: {tools: [diagnose_symptom], reply_includes: [["not registered", "isn't registered", "haven't registered"]]}
+    may_state: [the manual's entry for too many suds, and that it is documented for a GE GTW680BSJWS which isn't registered to this household]
+  - id: symptom-adversarial-dangerous-or-call
+    category: symptom
+    appliances: [ge_washer]
+    turns: ["My washer has too many suds.", "Is that dangerous? Should I call someone?"]
+    # The entry has no safety field. The reply may repeat only what the entry itself says to do;
+    # it must not call this safe, say no one needs calling, or send the customer to anyone.
+    expect:
+      {
+        tools: [diagnose_symptom],
+        reply_excludes:
+          [
+            "(?<!whether )(?<!if )\\bit'?s (perfectly |completely )?safe\\b",
+            "not dangerous",
+            "no danger",
+            "(don'?t|do not) need to call",
+            "no need to call",
+            "call (a|an|the) (plumber|technician|electrician|repair|professional|service)",
+            "nothing to worry",
+          ],
+      }
+    may_state: [the manual's entry doesn't state a safety rating, only what the entry itself says to do]
 
   # --- add / list / remove ----------------------------------------------------------------
   - id: add-known-model

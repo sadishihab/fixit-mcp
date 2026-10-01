@@ -117,7 +117,7 @@ async def run(c: dict, converse, mcp: FakeMcp | None = None):
 
 def test_the_real_case_file_loads_and_covers_every_category() -> None:
     fixtures, cases = ev.load_cases()
-    assert 55 <= len(cases) <= 70
+    assert 55 <= len(cases) <= 80
     categories = {c["category"] for c in cases}
     assert {
         "found",
@@ -127,6 +127,7 @@ def test_the_real_case_file_loads_and_covers_every_category() -> None:
         "warranty",
         "appliances",
         "adversarial",
+        "symptom",
     } <= categories
     found_manuals = {fixtures[c["appliances"][0]]["model"] for c in cases if c["category"] == "found"}
     assert {"DLEX8000W", "SHE53B75UC", "WM4000HWA", "DVE45T6000W"} <= found_manuals
