@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **An MCP Apps visual card for `diagnose_symptom`** (`ui://fixit-mcp/diagnose-symptom-card`), declared on the tool definition the way `diagnose_error` declares its own, in the same visual language: the matched symptom phrases as the title, each row's possible causes and the third column under its own label ("What To Do" or "Reason"), muted footnotes, a muted "incomplete in the manual" marker, a citation line per match (up to three matches), and muted states for `not_found` (with the manual's nearest phrases), `ambiguous_appliance` and the `appliance_registered: false` notice. No click handlers, no external resources, every field escaped.
+
+### Changed
+
+- The cards' shared CSS, escape helper and MCP Apps handshake now live once (`card_shared_*`, `card_handshake.js`) and are assembled into each card at import time. The `diagnose_error` card served over `resources/read` is byte-for-byte unchanged (a test pins its hash).
+- The demo page's card iframe may grow to 2,400 px (was 900) so a three-match symptom card is not clipped.
+
 ## [0.2.0] - 2026-10-01
 
 Adds a sixth tool, `diagnose_symptom`, for problems a customer describes without an

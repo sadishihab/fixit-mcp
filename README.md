@@ -52,7 +52,7 @@ structured, cited data extracted offline from real manuals (extraction runs on
 Amazon Bedrock at ingestion time, never inside the live tools); it keeps a
 household's appliances across sessions in Amazon Bedrock AgentCore Memory; it
 answers "is it still under warranty?" with a deterministic date comparison; it
-returns an MCP Apps visual card for diagnoses; and it runs on Amazon Bedrock
+returns MCP Apps visual cards for error-code diagnoses and for described problems; and it runs on Amazon Bedrock
 AgentCore Runtime.
 
 Not built: OAuth account linking. The deployed server accepts only AWS-signed
@@ -72,8 +72,8 @@ full requirements checklist and [`CLAUDE.md`](CLAUDE.md) for the architecture.
 | `list_my_appliances` | Lists a household's registered appliances. |
 | `add_appliance` | Registers a new appliance for a household, linking it to a manual on file when one matches. |
 | `remove_appliance` | Removes an appliance from a household's registry. |
-| `diagnose_error` | Looks up an appliance error code's meaning, causes, repair steps, parts, and safety warnings, cited to the source manual; has an MCP Apps visual card. |
-| `diagnose_symptom` | Finds a problem the customer describes in their own words (no error code) in the troubleshooting tables of their appliances' manuals and returns the manual's own rows — the problem, possible causes, what it says to do — cited to a page. Keyword matching only, no model call; says `not_found` rather than guess. Covers the GE refrigerator and washer so far. |
+| `diagnose_error` | Looks up an appliance error code's meaning, causes, repair steps, parts, and safety warnings, cited to the source manual; has an MCP Apps visual card (`ui://fixit-mcp/diagnose-error-card`). |
+| `diagnose_symptom` | Finds a problem the customer describes in their own words (no error code) in the troubleshooting tables of their appliances' manuals and returns the manual's own rows — the problem, possible causes, what it says to do — cited to a page. Keyword matching only, no model call; says `not_found` rather than guess. Covers the GE refrigerator and washer so far. Has an MCP Apps visual card (`ui://fixit-mcp/diagnose-symptom-card`). |
 | `check_warranty` | Reports whether a registered appliance's recorded warranty is active or expired, from a deterministic server-side date comparison — never a coverage claim. |
 
 ## Project status
@@ -211,7 +211,7 @@ make docker-smoke   # in another terminal: end-to-end MCP checks against the run
 ```
 
 `make docker-smoke` runs `scripts/smoke_test.py`, which covers both protocol
-versions, every tool, the MCP Apps card, and a foreign `Mcp-Session-Id`
+versions, every tool, both MCP Apps cards, and a foreign `Mcp-Session-Id`
 header. On an x86_64 host it skips the latency check, because QEMU emulation
 makes each call about 10x slower than native. Set `DOCKER_PLATFORM=linux/amd64`
 for a native local build if you need real latency numbers. The container

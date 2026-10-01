@@ -70,7 +70,8 @@ sandboxed iframe (`sandbox="allow-scripts"`, srcdoc, **never**
 card's own postMessage handshake: it responds to the card's
 `ui/initialize` request, then immediately pushes
 `ui/notifications/tool-input` and `ui/notifications/tool-result` with
-that turn's `diagnose_error` arguments/result.
+that turn's tool arguments/result (for any tool that declares a card:
+`diagnose_error`'s or `diagnose_symptom`'s).
 
 Two things confirmed by reading `src/fixit_mcp/apps/diagnose_card.html`'s
 actual script and the MCP Apps spec
@@ -99,8 +100,10 @@ directly, not assumed:
   *it* hands the iframe as `srcdoc` (a `ResizeObserver`-based
   `ui/notifications/size-changed` reporter) so the iframe grows to fit
   its content instead of showing a scrollbar or a blank area. The
-  resource the server ships and `tests/unit/test_diagnose_card.py` tests
-  is untouched.
+  resource the server ships and `tests/unit/test_diagnose_card.py` /
+  `tests/unit/test_symptom_card.py` test is untouched. The iframe grows up to
+  2,400 px (`CARD_MAX_HEIGHT`): a `diagnose_symptom` card with three matches is
+  far taller than a `diagnose_error` card.
 
 ## Spoken replies with Polly (optional, off by default)
 
@@ -152,7 +155,7 @@ demo-only; the FixIt server never touches Polly.
 `resourceUri` (via its own `_meta.ui.resourceUri`, exactly as `diagnose_error`
 does -- see `CLAUDE.md`) *and* that call's result has a `status` of
 `found`, `not_found`, or `ambiguous_appliance` -- the three states
-`diagnose_card.html` itself knows how to render (a full card, or one of
+the card templates themselves know how to render (a full card, or one of
 its two muted informational states). This rule is generic over any tool
 with a `resourceUri`, not hardcoded to `diagnose_error` by name. A tool
 with no `resourceUri` at all, or a result whose `status` is none of those

@@ -349,6 +349,32 @@ Alexa+ MCP Toolkit and helps customers with home appliances:
   forward into the model's own reply, the same class of leak
   `FRICTION_LOG.md`'s step 6b/6e entries caught for other tools.
 
+- **Symptom card** (step 27a, `fixit_mcp.apps`). `diagnose_symptom` declares
+  `ui://fixit-mcp/diagnose-symptom-card` exactly as `diagnose_error` declares
+  its card (`meta={"ui": {"resourceUri": ...}}` on the tool definition, the
+  resource registered in `register_symptom_tool`, `text/html;profile=mcp-app`,
+  the same postMessage handshake, no click handlers, no network, every field
+  escaped). `found` shows the matched symptom phrases as the title, then each
+  row's possible causes and the third column under the row's own
+  `response_label` ("What To Do" or "Reason"), muted footnotes, a muted
+  "incomplete in the manual" marker for `text_incomplete` rows, and a citation
+  line per match, up to 3 matches as separate blocks; `appliance_registered:
+  false` is the same muted notice as the error card's; `not_found` is a muted
+  state with the customer's words and the manual's `nearest_phrases`;
+  `ambiguous_appliance` is muted with the candidates. The assistant-facing
+  `message` of a `not_found` is never shown. **Shared parts**: the CSS head and
+  tail, the `esc`/`listHtml` helpers and the handshake live once in
+  `card_shared_head.css`, `card_shared_tail.css`, `card_shared.js` and
+  `card_handshake.js`, and `fixit_mcp.apps.resources.assemble_card` fills them
+  into each card's template (`diagnose_card.html`, `symptom_card.html`) at
+  import time. `diagnose_error`'s served card is **byte-for-byte unchanged** by
+  that move (`tests/unit/test_diagnose_card.py` pins its sha256). The only
+  duplication is ~15 lines of `.appliance`/`h3`/`ul`/`li` rules, which sit
+  between that card's own rules and so cannot join the shared runs without
+  changing its bytes. The demo host needed no per-tool change (it reads each
+  tool's own `resourceUri` and keys on result status); only its iframe height cap
+  rose from 900 to 2400 px, since three matches are much taller.
+
 - **Symptom tool** (step 25b). `diagnose_symptom` answers a problem the
   customer describes with no error code, from the manuals' "Problem / Possible
   Causes / What To Do" tables. Two halves, like the error-code path.
@@ -500,7 +526,7 @@ persistent state the customer can add to and remove via `add_appliance`/
 `remove_appliance` (step 3c, `fixit_mcp.repository.sqlite`; step 4b adds
 an AgentCore Memory backend for deployment), and
 `diagnose_error` has its first MCP Apps visual card (step 3d,
-`fixit_mcp.apps`), and a customer can ask whether an appliance is still
+`fixit_mcp.apps`; `diagnose_symptom` has one too, step 27a), and a customer can ask whether an appliance is still
 under warranty (`check_warranty`, step 8a, `fixit_mcp.tools.warranty`,
 date comparison only, no coverage claims), and a customer can describe a problem
 with no error code and get the manual's own troubleshooting rows
@@ -511,7 +537,7 @@ symptom tool's deterministic keyword matcher, no
 Strands, no Alexa+-reachable deployment yet (the server runs on AgentCore
 Runtime with IAM-only inbound auth, step 4c, and household data lives in
 AgentCore Memory, step 4b), no auth/account
-linking, no visual cards for any other tool, no web client, no
+linking, no visual cards for the other tools, no web client, no
 parts-ordering or maintenance-scheduling tools. See
 `docs/alexa-plus-requirements.md` for the full done/todo/not-needed
 checklist against the Alexa+ MCP Toolkit
