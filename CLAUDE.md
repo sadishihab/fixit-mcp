@@ -410,13 +410,26 @@ Alexa+ MCP Toolkit and helps customers with home appliances:
   (`fixit_mcp.retrieval.symptoms`, `fixit_mcp.tools.symptoms`): the index loads
   once at startup (a missing file fails startup, like the error-code index;
   `Dockerfile` COPYs it, `tests/unit/test_dockerfile.py` enforces that).
-  Matching is deterministic keyword overlap, no model call: stopwords, light
-  stemming, a small curated synonym table (each entry needs a test), IDF
-  weights, score >= 0.5 and at least 2 matched words (one query word the
-  manuals don't contain at all is not counted against the customer), a cause
-  alone never matches, ties go to the symptom the query covers most fully.
-  Appliance-type words in the description narrow the search but are never
-  matched on. Resolution mirrors `diagnose_error` via `fixit_mcp.tools.common`:
+  Matching is deterministic keyword overlap, no model call (step 25b, widened
+  in step 27c): stopwords, light stemming, a reviewed synonym and multi-word
+  phrase table (every target must be a word the stored rows use; a test checks
+  it), a "does not happen" polarity that must agree between the description and
+  the symptom ("won't spin" never reaches "pauses during spin"), spelling
+  tolerance for one-character slips on words of 5+ letters only when exactly
+  one known word is one edit away, IDF weights, score >= 0.5, and either two
+  matched symptom words or one distinctive word (used by at most two
+  symptoms). An unknown word counts against a match (only a short filler list
+  is ignored), a cause word never counts toward the minimum and weighs 0.25,
+  one common word that fits more than three symptoms ("noisy") matches none, a
+  bare "it doesn't work" with no appliance is not_found, and ties go to the
+  symptom the query covers most fully. Appliance-type words in the description
+  narrow the search but are never matched on. Every mechanism can only rename a
+  word or block a match, never invent one. The paraphrase bank
+  (`tests/fixtures/symptom_paraphrases.yaml`, run as
+  `uv run python -m tests.symptom_bank`) is the regression test: it fails on any
+  wrong cited answer beyond the one flagged `known_wrong` and if recall drops;
+  74 tuning cases plus 16 held-out ones (read only after tuning). Matching is
+  still keyword-based and can miss things; see CHANGELOG's known limitations. Resolution mirrors `diagnose_error` via `fixit_mcp.tools.common`:
   one owned appliance matches -> `found`; several -> `ambiguous_appliance`
   (never guessed); none owned but another manual matches -> `found` with
   `appliance_registered: false` and `suggest_add_appliance`; nothing -> `not_found`

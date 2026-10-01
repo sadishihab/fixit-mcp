@@ -14,6 +14,8 @@ changed or added relative to the plan:
   after a real hyphen or en dash. No manifest field was added: the default manuals are a
   constant in `scripts/extract_symptoms.py`.
 - Real extraction: 114 rows (42 + 72), every table accepted, about $0.10 in total.
+- Matching was widened in step 27c (synonym and phrase table, polarity, spelling, stricter evidence
+  rules); the thresholds above changed. See `src/fixit_mcp/retrieval/symptoms.py`'s docstring and CHANGELOG.
 
 Original 25a status: plan only; the experiment ran in a scratch directory.
 Spend then: $0.043 of a $1.00 cap, Nova models only.

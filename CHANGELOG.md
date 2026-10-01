@@ -15,6 +15,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The cards' shared CSS, escape helper and MCP Apps handshake now live once (`card_shared_*`, `card_handshake.js`) and are assembled into each card at import time. The `diagnose_error` card served over `resources/read` is byte-for-byte unchanged (a test pins its hash).
 - The demo page's card iframe may grow to 2,400 px (was 900) so a three-match symptom card is not clipped.
+- **`diagnose_symptom` matches more everyday phrasings, and gives fewer wrong answers.** Still deterministic
+  and model-free, still `not_found` rather than a guess. What changed in the matcher:
+  - A reviewed table of synonyms and multi-word phrases folds everyday words onto the manual's own
+    ("won't turn on", "stopped working", "dead" -> does not operate; "shaking", "vibrating", "wobbling" ->
+    rocking; "damp", "soaked" -> wet; "squealing", "creaking" -> squeaking; "alarm" -> beeping; "not cold",
+    "too warm" -> not cooling; "water all over the floor" -> leaks; and similar). Every target is a word the stored
+    rows use; a test enforces it.
+  - **Negation must agree.** "won't spin" no longer reaches the row about how the washer "pauses during
+    spin", and "my car won't start" no longer reaches "Washer won't operate".
+  - Light spelling tolerance: a single-character slip on a word of five or more letters ("dispencer",
+    "wrinkeld", "refridgerator") is mended, but only when exactly one known word is one edit away.
+  - **Evidence rules.** A word the manuals do not contain now counts against a match (before, one such word
+    was ignored); only a short list of fillers ("really", "way", "like crazy") is ignored. A match needs two
+    matched symptom words or one distinctive word (used by at most two symptoms); a word found only in a cause
+    no longer counts toward the minimum, and counts for less (weight 0.25, was 0.4). A bare "it doesn't work"
+    with no appliance named is `not_found`. One common word that fits more than three symptoms ("my washer is
+    noisy") matches none of them; before, it returned three arbitrary sounds as `found`.
+- Measured on a bank of 90 invented phrasings (`tests/fixtures/symptom_paraphrases.yaml`; 74 used while
+  tuning, 16 held out and not looked at until the end). Tuning split: correct matches 25 of 47 before, 43 of 47
+  now; wrong symptom first 4 before, 0 now; descriptions that should find nothing but matched 5 of 27 before, 0
+  now. Held-out split: correct matches 4 of 10 before and after (no gain); wrong symptom first 1 before and
+  after; should-find-nothing but matched 2 of 6 before, 0 now. `tests/unit/test_symptom_bank.py` fails on any
+  new wrong answer and if recall drops.
+
+### Known limitations
+
+These replace the 0.2.0 note about the symptom tool's matching; the other 0.1.0 and 0.2.0 limitations stand.
+
+- **Matching is still keyword-based and can miss things.** The gain is real on phrasings its vocabulary
+  covers, and none on ones it does not: on the held-out phrasings it found 4 of 10, the same as before.
+  Phrasings that still find nothing include: "chirping" (for beeping), "stalls halfway through the spin",
+  "a puddle under my washer", "soapy bubbles", "no water coming out of my fridge" (the word "water" fits too
+  many symptoms), "my washer walks across the floor", "the dispenser overfills my glass", and long descriptions
+  with several extra words ("I press the start button ... and nothing happens at all"). "Water drips from the
+  dispenser" is `ambiguous_appliance` for a household with both a refrigerator and a washer, which is honest.
+- **One known wrong answer remains**: "my washer is rocking back and forth" is sent to the Sounds row "Back
+  and forth" because they share those two common words (the old matcher did the same). It is flagged in the
+  bank; no clean general rule fixed it without breaking correct matches.
+- The bank is invented wording written by the maintainer, not recorded customer speech, so the percentages
+  say how the matcher does on these phrasings, not on real customers.
+- Still true from 0.2.0: only the GE refrigerator and washer have symptom rows (the GE range's table is not
+  extracted), the two "such as" rows end mid-sentence, and the ambiguous-household path was exercised live only
+  on invented data.
 
 ## [0.2.0] - 2026-10-01
 
