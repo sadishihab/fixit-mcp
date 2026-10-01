@@ -1,0 +1,65 @@
+flowchart TB
+  classDef model fill:#ffe8cc,stroke:#c26a00,color:#3d2400
+  classDef nomodel fill:#e3f4e3,stroke:#2f7d32,color:#12351a
+  classDef store fill:#e8eefc,stroke:#3b5bdb,color:#10204f
+  classDef ext fill:#f1f1f1,stroke:#777777,color:#222222,stroke-dasharray: 4 3
+
+  subgraph client["Assistant client"]
+    direction TB
+    alexa["Real Alexa+<br/>not connected yet"]:::ext
+    demo["Demo backend: simulated Alexa+<br/>FastAPI + web UI, make demo"]:::model
+    bedrock["Amazon Bedrock Converse<br/>writes the assistant's replies"]:::model
+    polly["Amazon Polly<br/>optional voice, off by default"]:::model
+    demo -->|"tool-use loop"| bedrock
+    demo -.->|"FIXIT_DEMO_POLLY=1"| polly
+  end
+
+  subgraph offline["Offline ingestion: the only place models are used"]
+    direction LR
+    pdf["Manufacturer manual PDF<br/>public download"]:::ext
+    parser["Parser<br/>PyMuPDF, font repair"]:::nomodel
+    ecx["Error-code extractor<br/>Claude on Bedrock, or no-model stub"]:::model
+    valid["Schema validation<br/>bounded retries"]:::nomodel
+    tablereader["Table reader<br/>find_tables rows, span repair"]:::nomodel
+    nova["Symptom extractor<br/>Amazon Nova Pro"]:::model
+    audit["Audit gate<br/>row count, verbatim join, retries"]:::nomodel
+    pdf --> parser --> ecx --> valid
+    pdf --> tablereader --> nova --> audit
+  end
+
+  ecidx[("error_codes.json<br/>committed")]:::store
+  sidx[("symptoms.json<br/>committed")]:::store
+  valid --> ecidx
+  audit --> sidx
+
+  subgraph runtime["MCP server on AgentCore Runtime: no model calls, ever"]
+    direction TB
+    tools["Six tools<br/>list_my_appliances, add_appliance, remove_appliance<br/>diagnose_error, diagnose_symptom, check_warranty"]:::nomodel
+    idx["In-memory indexes, loaded once at startup<br/>error codes, symptoms, manual catalog"]:::nomodel
+    cards["MCP Apps cards<br/>ui:// resources"]:::nomodel
+    repo["Repository interface<br/>list, add, remove"]:::nomodel
+    tools --> idx
+    tools --> cards
+    tools --> repo
+  end
+
+  demo -->|"MCP, Streamable HTTP<br/>IAM SigV4 today"| tools
+  alexa -.->|"needs OAuth linking<br/>not built"| tools
+  ecidx -->|"baked into the image"| idx
+  sidx -->|"baked into the image"| idx
+
+  memory[("AgentCore Memory<br/>households: one event per appliance")]:::store
+  cw["CloudWatch<br/>metric filters, dashboard, alarms"]:::nomodel
+  repo --> memory
+  tools -.->|"JSON log lines: latency per tool"| cw
+
+  evalrun["Grounding eval, make eval<br/>drives the demo, then a judge model"]:::model
+  evalrun -.-> demo
+
+  subgraph legend["Legend"]
+    direction LR
+    lg1["Makes model or AI-service calls"]:::model
+    lg2["Never makes a model call"]:::nomodel
+    lg3[("Stored data")]:::store
+    lg4["Outside this repo, or not connected"]:::ext
+  end
