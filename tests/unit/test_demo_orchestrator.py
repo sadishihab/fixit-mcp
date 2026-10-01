@@ -860,3 +860,55 @@ async def test_diagnose_symptom_gets_its_own_card_for_every_card_status(status: 
     assert result.card is not None
     assert result.card.resource_uri == "ui://fixit-mcp/diagnose-symptom-card"
     assert session.read_resource_calls == ["ui://fixit-mcp/diagnose-symptom-card"]
+
+
+def test_found_symptom_replies_are_at_most_two_short_sentences_with_the_causes_named() -> None:
+    """Live rehearsal: 'too many suds' was spoken as one very long sentence reading the causes and
+    actions of all three rows. A found symptom reply is two short sentences: the problem and the number
+    of causes (named in the rows' own words), then a pointer to the card for the steps."""
+    prompt = build_system_prompt("house-001")
+
+    assert "For a found diagnose_symptom result, reply in at most two short sentences" in prompt
+    assert "say the manual lists the problem and how many possible causes it gives" in prompt
+    assert "naming those causes with the rows' own cause text" in prompt
+    assert "say the card shows the manual's steps for each" in prompt
+
+
+def test_a_single_matching_row_has_its_what_to_do_stated_verbatim() -> None:
+    prompt = build_system_prompt("house-001")
+
+    assert "If only one row matched, state that row's what_to_do text verbatim instead" in prompt
+
+
+def test_a_text_incomplete_row_is_never_read_aloud() -> None:
+    """Live rehearsal: the assistant ended on 'switch to High Efficiency detergent such as.' -- a row the
+    result marked text_incomplete, read as if it were finished."""
+    prompt = build_system_prompt("house-001")
+
+    assert "Never read aloud a row marked text_incomplete" in prompt
+    assert "the manual's text for that step is cut off" in prompt
+    assert "do not read its what_to_do" in prompt
+    assert "never finish a sentence an entry leaves unfinished" in prompt, "the earlier rule stays"
+
+
+def test_the_symptom_wording_rules_keep_every_earlier_symptom_rule() -> None:
+    prompt = build_system_prompt("house-001")
+
+    assert "Never say a sound or a symptom 'can be normal' or 'is normal'" in prompt
+    assert "make no statement about safety or warnings in a reply about it" in prompt
+    assert "If its appliance_registered is false, say the entry is for a brand and model" in prompt
+    assert "If an entry carries a footnote, say it limits which models" in prompt
+    assert "name no cause" in prompt  # not_found
+    assert "Keep replies to at most two sentences" in prompt  # the general limit is unchanged
+
+
+def test_the_new_symptom_sentences_sit_inside_the_symptom_paragraph() -> None:
+    prompt = build_system_prompt("house-001")
+    symptom = prompt[
+        prompt.index("If the customer describes a problem") : prompt.index(
+            "If the customer asks about warranty"
+        )
+    ]
+
+    assert "at most two short sentences" in symptom and "text_incomplete" in symptom
+    assert "at most two short sentences" not in prompt.replace(symptom, ""), "no other tool's rules changed"
