@@ -11,6 +11,7 @@ Render filled-in copies with `make iam-policies` (written to
 | `runtime-execution-policy.json` | Inline policy on `FixItAgentCoreRuntimeRole` | What the running container may do |
 | `deployer-policy.json` | A **customer managed policy** `FixItRuntimeDeployer`, attached to the IAM user/role that runs `scripts/push_image.py` / `scripts/deploy_runtime.py` | Push, deploy, invoke, tear down, read logs |
 | `observability-policy.json` | A **customer managed policy** `FixItObservability`, attached to `fixit-dev` (step 23b) | Create and delete the FixIt dashboard, the `fixit-*` alarms, the metric filters and 90-day log retention on the runtime's log group, and the `fixit-alerts` SNS topic with its email subscription; read metrics and alarms |
+| `polly-policy.json` | A **customer managed policy** `FixItPolly`, attached to `fixit-dev` (step 24b) | `polly:SynthesizeSpeech` only, for the demo's optional spoken replies (`FIXIT_DEMO_POLLY=1`). No placeholders: Polly has no resource to scope it to, so `Resource` is `"*"`. About 130 characters |
 
 Deliberately **not** in the execution role, though AWS's sample role has them:
 - `bedrock:InvokeModel*` -- the server never calls an LLM (CLAUDE.md rule 3).

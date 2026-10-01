@@ -404,6 +404,107 @@
     return html + reporter;
   }
 
+  // Spoken replies. Tries POST /speak (Amazon Polly, server-side; the page never
+  // holds AWS credentials) and falls back to the browser's own voice on any
+  // non-200, network error, or rejected/failed playback. All browser APIs come in
+  // through `deps`, so this runs under Node in the tests.
+  //   deps: fetchFn, makeAudio(url) -> audio-like, makeObjectUrl(blob),
+  //         revokeObjectUrl(url), browserSpeak(text), browserCancel()
+  function createSpeaker(deps) {
+    var state = { token: 0, muted: false, disabled: false, current: null };
+
+    function release() {
+      var current = state.current;
+      state.current = null;
+      if (!current) {
+        return;
+      }
+      try {
+        current.audio.pause();
+      } catch (e) {}
+      try {
+        deps.revokeObjectUrl(current.url);
+      } catch (e) {}
+    }
+
+    function stop() {
+      state.token += 1;
+      release();
+      deps.browserCancel();
+    }
+
+    function speak(text) {
+      if (state.muted || !text) {
+        return Promise.resolve();
+      }
+      stop();
+      var token = state.token;
+      var fellBack = false;
+      function fallback() {
+        if (fellBack || token !== state.token || state.muted) {
+          return;
+        }
+        fellBack = true;
+        release();
+        deps.browserSpeak(text);
+      }
+      if (state.disabled) {
+        fallback();
+        return Promise.resolve();
+      }
+      return deps
+        .fetchFn("/speak", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text: text }),
+        })
+        .then(function (response) {
+          if (!response.ok) {
+            return response
+              .json()
+              .catch(function () {
+                return null;
+              })
+              .then(function (body) {
+                // Polly is switched off on the backend: stop asking this page load.
+                if (response.status === 503 && body && body.error === "speech_disabled") {
+                  state.disabled = true;
+                }
+                throw new Error("speak failed");
+              });
+          }
+          return response.blob();
+        })
+        .then(function (blob) {
+          if (token !== state.token || state.muted) {
+            return undefined; // muted, or a newer reply replaced this one
+          }
+          var url = deps.makeObjectUrl(blob);
+          var audio = deps.makeAudio(url);
+          state.current = { audio: audio, url: url };
+          audio.onended = function () {
+            if (state.current && state.current.audio === audio) {
+              release();
+            }
+          };
+          audio.onerror = fallback;
+          return audio.play();
+        })
+        .catch(fallback);
+    }
+
+    return {
+      speak: speak,
+      stop: stop,
+      setMuted: function (value) {
+        state.muted = !!value;
+        if (state.muted) {
+          stop();
+        }
+      },
+    };
+  }
+
   // ---- DOM wiring below (impure, not covered by the Node pure-function tests) ----
 
   (function () {
@@ -422,7 +523,6 @@
     }
 
     var sessionId = newSessionId();
-    var muted = false;
     var recognizing = false;
     var cardsByWindow = new WeakMap();
     // One turn at a time: while a /chat request is in flight the input, the
@@ -549,13 +649,31 @@
       container.appendChild(details);
     }
 
-    function speak(text) {
-      if (muted || !("speechSynthesis" in window) || !text) {
-        return;
-      }
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
-    }
+    var speaker = createSpeaker({
+      fetchFn: function (url, options) {
+        return fetch(url, options);
+      },
+      makeAudio: function (url) {
+        return new Audio(url);
+      },
+      makeObjectUrl: function (blob) {
+        return URL.createObjectURL(blob);
+      },
+      revokeObjectUrl: function (url) {
+        URL.revokeObjectURL(url);
+      },
+      browserSpeak: function (text) {
+        if ("speechSynthesis" in window) {
+          window.speechSynthesis.cancel();
+          window.speechSynthesis.speak(new SpeechSynthesisUtterance(text));
+        }
+      },
+      browserCancel: function () {
+        if ("speechSynthesis" in window) {
+          window.speechSynthesis.cancel();
+        }
+      },
+    });
 
     function sendMessage(text) {
       var trimmed = (text || "").trim();
@@ -612,7 +730,7 @@
           }
           renderDetails(turn, data.tool_calls);
           scrollToBottom();
-          speak(data.reply_text);
+          speaker.speak(data.reply_text);
         })
         .catch(function (err) {
           thinking.className = "msg assistant error";
@@ -638,22 +756,18 @@
     });
 
     newConvoBtn.addEventListener("click", function () {
+      speaker.stop();
       sessionId = newSessionId();
       clearConversation();
     });
 
-    var speechSupported = "speechSynthesis" in window;
-    if (!speechSupported) {
-      muteBtn.style.display = "none";
-    } else {
-      muteBtn.addEventListener("click", function () {
-        muted = !muted;
-        muteBtn.textContent = muted ? "Unmute replies" : "Mute replies";
-        if (muted) {
-          window.speechSynthesis.cancel();
-        }
-      });
-    }
+    // Mute stops and silences both the Polly audio and the browser voice.
+    var isMuted = false;
+    muteBtn.addEventListener("click", function () {
+      isMuted = !isMuted;
+      muteBtn.textContent = isMuted ? "Unmute replies" : "Mute replies";
+      speaker.setMuted(isMuted);
+    });
 
     var SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognitionCtor) {

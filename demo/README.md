@@ -54,8 +54,9 @@ reach the page.
 A dark, Echo-Show-style conversation view: a persistent "Simulated
 Alexa+" label, a text input, and a mic button (hidden quietly if the
 browser has no `SpeechRecognition`; the typed path always works).
-Replies are optionally spoken with `speechSynthesis` (a mute toggle,
-hidden if unsupported). Each turn shows one chip per tool call (name, key
+Replies are spoken with the browser's `speechSynthesis`, or with Amazon
+Polly when enabled (see "Spoken replies with Polly" below); a mute toggle
+stops both. Each turn shows one chip per tool call (name, key
 arguments, `latency_ms`), and a hidden-by-default "Details" disclosure
 with the turn's raw `tool_calls` JSON -- the actual MCP data behind the
 answer. A "New conversation" button starts a fresh `session_id`
@@ -100,6 +101,32 @@ directly, not assumed:
   its content instead of showing a scrollbar or a blank area. The
   resource the server ships and `tests/unit/test_diagnose_card.py` tests
   is untouched.
+
+## Spoken replies with Polly (optional, off by default)
+
+`FIXIT_DEMO_POLLY=1` makes the page speak replies with Amazon Polly's
+generative engine and the `Matthew` voice instead of the browser voice. It is
+demo-only; the FixIt server never touches Polly.
+
+- After a reply's text and card render, the page calls `POST /speak`
+  (`{"text": "..."}`) and plays the returned MP3 with `Audio`. AWS credentials
+  stay in the backend process; the browser only receives audio bytes.
+- **Fallback:** any non-200, network error, or rejected/failed playback makes the
+  page speak with `speechSynthesis` instead. With Polly off, `/speak` answers
+  `503 {"error": "speech_disabled"}` and the page stops asking for the rest of
+  that page load. **Mute** stops both the Polly audio and the browser voice.
+- **Cache:** audio is stored in `demo/.audio_cache/` (gitignored), keyed by a
+  hash of engine, voice, format and text, so an identical reply costs nothing,
+  across restarts too. Replies the model words differently are new text.
+- **Limits:** text over 500 characters is refused (`413`); blank text is `422`.
+  Polly calls have a 5 s timeout and one attempt.
+- **Spend guard:** the process counts characters it synthesized (cache hits are
+  free and not counted) and logs the running total on every call. At 50,000 it
+  stops (`503 speech_budget_exhausted`) until restart, or raise
+  `FIXIT_DEMO_POLLY_MAX_CHARS`. Pricing and the cost estimate for the video are
+  in the step 24a report: about $30 per million characters, so a typical
+  one-to-two-sentence reply costs a fraction of a cent.
+- IAM: `polly:SynthesizeSpeech` only; see `deploy/iam/polly-policy.json`.
 
 ## API
 
@@ -204,6 +231,14 @@ All `FIXIT_DEMO_*` environment variables (`demo/config.py`):
 | `FIXIT_DEMO_TOOL_TIMEOUT_SECONDS` | `15` | budget for each MCP tool call / card fetch |
 | `FIXIT_DEMO_CONVERSE_TIMEOUT_SECONDS` | `30` | budget for each Bedrock Converse call |
 | `FIXIT_DEMO_TURN_TIMEOUT_SECONDS` | `90` | budget for a whole turn |
+| `FIXIT_DEMO_POLLY` | `0` | `1`: speak replies with Amazon Polly (`POST /speak`), browser voice as fallback |
+| `FIXIT_DEMO_POLLY_VOICE` | `Matthew` | Polly voice id |
+| `FIXIT_DEMO_POLLY_ENGINE` | `generative` | Polly engine |
+| `FIXIT_DEMO_POLLY_REGION` | `us-east-1` | Polly region |
+| `FIXIT_DEMO_POLLY_MAX_CHARS` | `50000` | hard stop: characters synthesized per process |
+| `FIXIT_DEMO_POLLY_REQUEST_MAX_CHARS` | `500` | longest text one `/speak` call accepts |
+| `FIXIT_DEMO_POLLY_TIMEOUT_SECONDS` | `5` | Polly read timeout (one attempt) |
+| `FIXIT_DEMO_POLLY_CACHE_DIR` | `demo/.audio_cache` | audio cache (gitignored) |
 | `FIXIT_DEMO_LIVE_AGENT_ARN` | *(unset)* | only for the opt-in live test, below |
 
 ## Tests

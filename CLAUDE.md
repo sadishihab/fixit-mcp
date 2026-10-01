@@ -412,6 +412,18 @@ Alexa+ MCP Toolkit and helps customers with home appliances:
   `--max-cost` guard (default $10). Evaluation tooling only; never imported by
   `src/` (a test checks). Results in gitignored `evals/results-*.json`.
 
+- **Demo spoken replies via Polly** (step 24b, `demo/speech.py`, `POST /speak`).
+  Demo-only and **off by default** (`FIXIT_DEMO_POLLY=0`); the MCP server never
+  imports it or calls Polly (rule 3 is unaffected). Generative engine, voice
+  Matthew, MP3. The page calls `/speak` after rendering a reply and falls back
+  to `speechSynthesis` on any non-200 or failed playback; AWS credentials never
+  reach the browser. Audio is cached in gitignored `demo/.audio_cache/` by a hash
+  of engine, voice, format and text; a per-process character counter hard-stops
+  at `FIXIT_DEMO_POLLY_MAX_CHARS` (50,000) and a request is capped at 500
+  characters. IAM is one action in `deploy/iam/polly-policy.json` (customer
+  managed policy `FixItPolly`). Tests use a fake Polly client; never call real
+  Polly from a test.
+
 ## Testing
 
 **Every change needs tests.** No exceptions for "small" changes.

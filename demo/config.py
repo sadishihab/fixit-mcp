@@ -52,3 +52,21 @@ class DemoSettings(BaseSettings):
     # Only read by the opt-in live test (FIXIT_DEMO_TESTS=1) -- a deployed
     # AgentCore Runtime ARN to run one real conversation against.
     live_agent_arn: str = ""
+
+    # Spoken replies through Amazon Polly (step 24b), OFF by default: the page
+    # then keeps using the browser's own voice. When on, POST /speak
+    # synthesizes with the generative engine; the browser never sees AWS
+    # credentials, only audio bytes.
+    polly: bool = False
+    polly_region: str = "us-east-1"
+    polly_engine: str = "generative"
+    polly_voice: str = "Matthew"
+    # Longest text one /speak call accepts. Replies are one or two sentences.
+    polly_request_max_chars: int = 500
+    # Spend guard: characters synthesized by this process. Past this, /speak
+    # answers 503 and the page falls back to the browser voice. Cache hits
+    # are free and never count. Restarting the process resets the count.
+    polly_max_chars: int = 50_000
+    polly_timeout_seconds: float = 5.0
+    # Audio is cached here by hash of engine, voice, format and text.
+    polly_cache_dir: str = "demo/.audio_cache"

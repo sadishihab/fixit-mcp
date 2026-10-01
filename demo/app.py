@@ -26,7 +26,7 @@ import structlog
 from botocore.config import Config
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 from mcp import ClientSession
 from pydantic import BaseModel
 
@@ -41,6 +41,7 @@ from demo.orchestrator import (
     run_turn,
     within,
 )
+from demo.speech import MEDIA_TYPE, Speaker, SpeechUnavailable
 from demo.web import INDEX_HTML
 
 # Any localhost origin, any port -- this demo has no web UI of its own yet
@@ -66,6 +67,10 @@ class CardOut(BaseModel):
     html: str
 
 
+class SpeakRequest(BaseModel):
+    text: str
+
+
 class ChatResponse(BaseModel):
     reply_text: str
     tool_calls: list[ToolCallOut]
@@ -73,8 +78,11 @@ class ChatResponse(BaseModel):
     simulated_alexa_plus: bool = True
 
 
-def create_app(target: MCPTarget, settings: DemoSettings | None = None) -> FastAPI:
+def create_app(
+    target: MCPTarget, settings: DemoSettings | None = None, polly_client: Any | None = None
+) -> FastAPI:
     settings = settings or DemoSettings()
+    speaker = Speaker(settings, polly_client)
     sessions = SessionManager(target)
     conversations = ConversationStore()
     # The client's own limits sit just above the per-call budget, so a stuck
@@ -128,6 +136,20 @@ def create_app(target: MCPTarget, settings: DemoSettings | None = None) -> FastA
         # The single-page simulated-Alexa+ UI (demo/static/index.html),
         # loaded once at import time -- see demo/web.py.
         return INDEX_HTML
+
+    @app.post("/speak")
+    async def speak(request: SpeakRequest) -> Response:
+        """Audio (MP3) for a reply the page already shows, via Amazon Polly.
+        Any problem is a non-200 and the page falls back to the browser voice."""
+        try:
+            speech = await speaker.speak(request.text)
+        except SpeechUnavailable as exc:
+            return JSONResponse(status_code=exc.status_code, content={"error": exc.code})
+        return Response(
+            content=speech.audio,
+            media_type=MEDIA_TYPE,
+            headers={"Cache-Control": "no-store", "X-Speech-Cache": "hit" if speech.cache_hit else "miss"},
+        )
 
     @app.post("/chat", response_model=ChatResponse)
     async def chat(request: ChatRequest) -> ChatResponse | JSONResponse:

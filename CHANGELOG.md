@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Optional Amazon Polly voice for the simulated Alexa+ demo (`FIXIT_DEMO_POLLY=1`, off by default): `POST /speak` with generative-engine voice Matthew, an audio cache keyed by text, a 500-character request cap, a 50,000-character per-run spend guard, and the browser voice as the fallback. Needs `polly:SynthesizeSpeech` (`deploy/iam/polly-policy.json`). Demo-only; the server makes no Polly calls.
+
 ## [0.1.0] - 2026-10-01
 
 First release, built for the Alexa+ track of the *Build, Ship, Shape: Amazon

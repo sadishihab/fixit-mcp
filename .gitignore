@@ -27,3 +27,6 @@ data/state/
 
 # Grounding eval results (scripts/run_eval.py) -- local, per run.
 evals/results-*.json
+
+# Spoken-reply audio cache (demo/speech.py) -- derived, local.
+demo/.audio_cache/

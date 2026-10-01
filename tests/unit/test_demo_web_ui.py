@@ -54,6 +54,7 @@ def test_no_cdn_or_external_script_references() -> None:
 
 def test_page_talks_only_to_its_own_origin() -> None:
     assert 'fetch("/chat"' in INDEX_HTML
+    assert '"/speak"' in INDEX_HTML
     assert "http://" not in INDEX_HTML
     assert "https://" not in INDEX_HTML
 
@@ -206,7 +207,9 @@ var document = { getElementById: function (id) { return els[id]; }, createElemen
 var window = { addEventListener: function () {}, crypto: { randomUUID: function () { return "sid-" + Math.random(); } } };
 var pendingFetches = [];
 var fetchBodies = [];
+var speakBodies = [];
 function fetch(url, opts) {
+  if (url === "/speak") { speakBodies.push(JSON.parse(opts.body)); return Promise.reject(new Error("no polly in this stub")); }
   fetchBodies.push(JSON.parse(opts.body));
   return new Promise(function (resolve, reject) { pendingFetches.push({ resolve: resolve, reject: reject }); });
 }
@@ -275,5 +278,176 @@ def test_input_is_re_enabled_after_a_failed_turn_and_a_409_says_to_wait() -> Non
     assert "hiccup" in result["msgOther"]
 
 
+@requires_node
+def test_reply_is_spoken_via_speak_after_it_renders_and_mute_toggles_without_error() -> None:
+    result = _run_wiring(
+        f"""
+(async function () {{
+  els.textInput.value = "hello"; els.sendBtn.handlers.click();
+  pendingFetches[0].resolve({_OK_RESPONSE});
+  await new Promise(function (r) {{ setTimeout(r, 20); }});
+  els.muteBtn.handlers.click();
+  var label = els.muteBtn.textContent;
+  els.textInput.value = "again"; els.sendBtn.handlers.click();
+  pendingFetches[1].resolve({_OK_RESPONSE});
+  await new Promise(function (r) {{ setTimeout(r, 20); }});
+  console.log(JSON.stringify({{ speak: speakBodies, label: label, muteVisible: els.muteBtn.style.display !== "none" }}));
+  process.exit(0);
+}})();
+"""
+    )
+    assert result["speak"] == [{"text": "hi"}]  # the second reply is muted: no request at all
+    assert result["label"] == "Unmute replies"
+    assert result["muteVisible"] is True  # Mute now covers Polly audio too, so it is always shown
+
+
 def test_the_page_gives_up_on_a_request_that_never_answers() -> None:
     assert "AbortController" in INDEX_HTML and "REQUEST_TIMEOUT_MS" in INDEX_HTML
+
+
+# --- spoken replies: createSpeaker (step 24b) ------------------------------------
+
+_SPEAKER_HARNESS = """
+var log = [];
+function makeDeps(fetchImpl, playImpl) {
+  return {
+    fetchFn: fetchImpl,
+    makeAudio: function (url) {
+      var a = { url: url, paused: false, pause: function () { this.paused = true; log.push("pause"); },
+                play: playImpl || function () { return Promise.resolve(); } };
+      log.push("audio:" + url);
+      return a;
+    },
+    makeObjectUrl: function () { return "blob:1"; },
+    revokeObjectUrl: function () { log.push("revoke"); },
+    browserSpeak: function (t) { log.push("browser:" + t); },
+    browserCancel: function () { log.push("cancel"); },
+  };
+}
+function okResponse() { return Promise.resolve({ ok: true, status: 200, blob: function () { return Promise.resolve("B"); } }); }
+function errResponse(status, body) {
+  return Promise.resolve({ ok: false, status: status, json: function () { return body ? Promise.resolve(body) : Promise.reject(new Error("no body")); } });
+}
+function tick() { return new Promise(function (r) { setTimeout(r, 0); }); }
+"""
+
+
+def _run_speaker(js_body: str) -> list[str]:
+    js = _SPEAKER_HARNESS + "(async function () {" + js_body + "console.log(JSON.stringify(log));})();"
+    return json.loads(_run(js))
+
+
+@requires_node
+def test_speaker_plays_polly_audio_and_does_not_use_the_browser_voice() -> None:
+    log = _run_speaker(
+        "var s = createSpeaker(makeDeps(function () { return okResponse(); })); await s.speak('Hello.'); await tick();"
+    )
+    assert "audio:blob:1" in log
+    assert not [e for e in log if e.startswith("browser:")]
+
+
+@requires_node
+def test_speaker_falls_back_to_browser_voice_on_non_200() -> None:
+    log = _run_speaker(
+        "var s = createSpeaker(makeDeps(function () { return errResponse(503, {error: 'speech_failed'}); }));"
+        "await s.speak('Hello.');"
+    )
+    assert log.count("browser:Hello.") == 1
+    assert not [e for e in log if e.startswith("audio:")]
+
+
+@requires_node
+def test_speaker_falls_back_when_the_request_itself_fails() -> None:
+    log = _run_speaker(
+        "var s = createSpeaker(makeDeps(function () { return Promise.reject(new Error('offline')); }));"
+        "await s.speak('Hello.');"
+    )
+    assert log.count("browser:Hello.") == 1
+
+
+@requires_node
+def test_speaker_falls_back_when_play_is_rejected() -> None:
+    log = _run_speaker(
+        "var s = createSpeaker(makeDeps(function () { return okResponse(); },"
+        " function () { return Promise.reject(new Error('NotAllowedError')); }));"
+        "await s.speak('Hello.');"
+    )
+    assert log.count("browser:Hello.") == 1
+    assert "revoke" in log
+
+
+@requires_node
+def test_speaker_falls_back_once_when_audio_errors_after_play_started() -> None:
+    log = _run_speaker(
+        "var made; var d = makeDeps(function () { return okResponse(); });"
+        "var orig = d.makeAudio; d.makeAudio = function (u) { made = orig(u); return made; };"
+        "var s = createSpeaker(d); await s.speak('Hello.');"
+        "made.onerror(); made.onerror();"
+    )
+    assert log.count("browser:Hello.") == 1
+
+
+@requires_node
+def test_speaker_stops_asking_after_the_backend_says_speech_is_disabled() -> None:
+    log = _run_speaker(
+        "var calls = 0;"
+        "var s = createSpeaker(makeDeps(function () { calls += 1; return errResponse(503, {error: 'speech_disabled'}); }));"
+        "await s.speak('One.'); await s.speak('Two.'); log.push('calls:' + calls);"
+    )
+    assert "calls:1" in log
+    assert "browser:One." in log and "browser:Two." in log
+
+
+@requires_node
+def test_speaker_keeps_asking_after_an_ordinary_failure() -> None:
+    log = _run_speaker(
+        "var calls = 0;"
+        "var s = createSpeaker(makeDeps(function () { calls += 1; return errResponse(503, {error: 'speech_failed'}); }));"
+        "await s.speak('One.'); await s.speak('Two.'); log.push('calls:' + calls);"
+    )
+    assert "calls:2" in log
+
+
+@requires_node
+def test_mute_stops_both_the_audio_and_the_browser_voice() -> None:
+    log = _run_speaker(
+        "var s = createSpeaker(makeDeps(function () { return okResponse(); }));"
+        "await s.speak('Hello.'); log.push('--mute'); s.setMuted(true);"
+    )
+    tail = log[log.index("--mute") :]
+    assert "pause" in tail and "revoke" in tail and "cancel" in tail
+
+
+@requires_node
+def test_muted_speaker_makes_no_request_and_speaks_nothing() -> None:
+    log = _run_speaker(
+        "var calls = 0; var s = createSpeaker(makeDeps(function () { calls += 1; return okResponse(); }));"
+        "s.setMuted(true); log.length = 0; await s.speak('Hello.'); log.push('calls:' + calls);"
+    )
+    assert log == ["calls:0"]
+
+
+@requires_node
+def test_muting_while_audio_is_still_downloading_plays_nothing() -> None:
+    log = _run_speaker(
+        "var release; var d = makeDeps(function () { return new Promise(function (r) { release = r; }); });"
+        "var s = createSpeaker(d); var p = s.speak('Hello.'); s.setMuted(true);"
+        "release({ ok: true, status: 200, blob: function () { return Promise.resolve('B'); } }); await p;"
+    )
+    assert not [e for e in log if e.startswith(("audio:", "browser:"))]
+
+
+@requires_node
+def test_a_newer_reply_replaces_the_one_still_loading() -> None:
+    log = _run_speaker(
+        "var rel = []; var d = makeDeps(function () { return new Promise(function (r) { rel.push(r); }); });"
+        "var s = createSpeaker(d); var a = s.speak('First.'); var b = s.speak('Second.');"
+        "var ok = { ok: true, status: 200, blob: function () { return Promise.resolve('B'); } };"
+        "rel[0](ok); rel[1](ok); await a; await b;"
+    )
+    assert log.count("audio:blob:1") == 1
+
+
+def test_page_has_no_aws_credentials_or_sdk() -> None:
+    lowered = INDEX_HTML.lower()
+    assert "akia" not in lowered and "aws-sdk" not in lowered and "secretaccesskey" not in lowered

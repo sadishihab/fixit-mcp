@@ -330,6 +330,7 @@ def test_every_committed_template_renders_to_valid_json_with_no_placeholders(tmp
     assert {p.name for p in written} == {
         "deployer-policy.json",
         "observability-policy.json",
+        "polly-policy.json",
         "runtime-execution-policy.json",
         "runtime-execution-trust.json",
     }
@@ -342,7 +343,10 @@ def test_every_committed_template_renders_to_valid_json_with_no_placeholders(tmp
 def test_committed_templates_contain_no_real_account_id() -> None:
     for template in (REPO_ROOT / "deploy" / "iam").glob("*.json"):
         text = template.read_text()
-        assert "${AWS_ACCOUNT_ID}" in text or "aws-service-role" in text
+        # polly-policy.json references no account resource at all (Resource "*").
+        assert (
+            "${AWS_ACCOUNT_ID}" in text or "aws-service-role" in text or template.name == "polly-policy.json"
+        )
         assert not any(len(token) == 12 and token.isdigit() for token in text.replace(":", " ").split())
 
 
@@ -412,6 +416,8 @@ IAM_SIZE_LIMITS = {
     # customer managed policy FixItObservability: fixit-dev's inline policies already
     # share one 2,048-char budget, so this one isn't added to it
     "observability-policy.json": 6144,
+    # customer managed policy FixItPolly (step 24b), for the same reason
+    "polly-policy.json": 6144,
 }
 
 
@@ -463,3 +469,14 @@ def test_deployer_can_create_the_implicit_default_endpoint(tmp_path: Path) -> No
         "bedrock-agentcore:UpdateAgentRuntimeEndpoint",
         "bedrock-agentcore:DeleteAgentRuntimeEndpoint",
     } <= set(scoped["Action"])
+
+
+def test_polly_policy_is_one_action_and_tiny(tmp_path: Path) -> None:
+    render_iam.render_all(VALUES, output_dir=tmp_path)
+    policy = json.loads((tmp_path / "polly-policy.json").read_text())
+
+    assert len(policy["Statement"]) == 1
+    statement = policy["Statement"][0]
+    assert statement["Action"] == ["polly:SynthesizeSpeech"]
+    assert statement["Effect"] == "Allow"
+    assert len("".join((tmp_path / "polly-policy.json").read_text().split())) < 200

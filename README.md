@@ -356,6 +356,12 @@ make demo                                          # against the local dev serve
 make demo AGENT_ARN=<deployed runtime ARN>          # against a deployed AgentCore Runtime
 ```
 
+Replies are spoken with the browser's own voice. Set `FIXIT_DEMO_POLLY=1` to use
+Amazon Polly (generative engine, voice Matthew) instead, with the browser voice
+as the fallback; it is off by default, caches audio by text, and stops at 50,000
+characters per run. This is demo-only and the server itself never calls Polly.
+See [`demo/README.md`](demo/README.md#spoken-replies-with-polly-optional-off-by-default).
+
 ## Add a manual
 
 One command takes a manufacturer manual from a URL to validated, cited records in
@@ -450,6 +456,8 @@ Test suite:
   with no LLM extraction strategies.
 - **Amazon Bedrock** (Claude): offline error-code extraction from manuals
   (`FIXIT_EXTRACTOR=bedrock`), never at request time.
+- **Amazon Polly** (optional, demo only): spoken replies in the simulated Alexa+
+  (`FIXIT_DEMO_POLLY=1`), never in the server.
 - **Amazon Bedrock AgentCore Runtime**: hosts the server (IAM inbound auth only
   for now).
 
