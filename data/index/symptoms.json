@@ -1,0 +1,2554 @@
+[
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "Water filter indicated as installed incorrectly or a leak is present on cap control panel."
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Water filter installed backward or is leaking."
+    ],
+    "what_to_do": [
+      "Check for leak. If no leak is present, remove filter/bypass plug**, rotate 180° and reinstall."
+    ],
+    "response_label": "What to Do",
+    "footnotes": [
+      "**Some models do not come equipped with the filter bypass plug. To obtain a free bypass plug, call 800.GECARES. In Canada, call 800.561.3344."
+    ],
+    "text_incomplete": false,
+    "source_page": 46,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "“Warning Triangle” is lit",
+      "Replace Filter/Replace Water Filter is lit",
+      "Over Due light is lit"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Water filter leaking or needs replacing",
+      "Water filter backwards",
+      "On some models, replacing your water filter will not automatically reset your filter."
+    ],
+    "what_to_do": [
+      "Replace water filter, check for leak",
+      "Remove filter, rotate 180° and reinstall",
+      "On some models, hold the water button for 3 seconds, Reset is confirmed when you see “Replace Water Filter” and hear the tone."
+    ],
+    "response_label": "What to Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 46,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "Dispenser Off is lit"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Control A, B & C",
+      "Wrong filter installed"
+    ],
+    "what_to_do": [
+      "Replace filter with proper filter",
+      "Remove filter, rotate 180° and reinstall"
+    ],
+    "response_label": "What to Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 46,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "Not filtering"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Filter bypass installed Controls B & C"
+    ],
+    "what_to_do": [
+      "Install correct water filter"
+    ],
+    "response_label": "What to Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 46,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "Reset Filter is lit"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Water filter leaking or needs replacing"
+    ],
+    "what_to_do": [
+      "Replace water filter, or install filter bypass **",
+      "Press and hold Reset Filter for 3 seconds to reset (Control D only)"
+    ],
+    "response_label": "What to Do",
+    "footnotes": [
+      "**Some models do not come equipped with the filter bypass plug. To obtain a free bypass plug, call 800.GECARES. In Canada, call 800.561.3344."
+    ],
+    "text_incomplete": false,
+    "source_page": 46,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "Water filter indicator light is not lit"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "This is normal. This indicator will turn on to tell you that you need to replace the filter soon."
+    ],
+    "what_to_do": [
+      "See About the Water Filter for more information."
+    ],
+    "response_label": "What to Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 46,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "Handle is loose/handle has a gap."
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Handle needs adjusting"
+    ],
+    "what_to_do": [
+      "See Attach Refrigerator Handle and Attach the Freezer Handle sections for detailed instructions."
+    ],
+    "response_label": "What to Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 46,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "Refrigerator beeping"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "This is door alarm"
+    ],
+    "what_to_do": [
+      "-Turn off or disable with door closed",
+      "-If door open and alarm is sounding, you can only snooze the alarm"
+    ],
+    "response_label": "What to Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 46,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "Not cooling"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "The cooling system is off"
+    ],
+    "what_to_do": [
+      "See About Controls."
+    ],
+    "response_label": "What to Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 46,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "Water has poor taste/odor*"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Water dispenser has not been used for a long time"
+    ],
+    "what_to_do": [
+      "Dispense water, until all water in system is replenished."
+    ],
+    "response_label": "What to Do",
+    "footnotes": [
+      "*Select Models Only"
+    ],
+    "text_incomplete": false,
+    "source_page": 46,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "Water in glass is warm*"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Normal when refrigerator is first installed"
+    ],
+    "what_to_do": [
+      "Wait 24 hours for the refrigerator to completely cool down."
+    ],
+    "response_label": "What to Do",
+    "footnotes": [
+      "*Select Models Only"
+    ],
+    "text_incomplete": false,
+    "source_page": 46,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "Water in glass is warm*"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Water dispenser has not been used for a long time"
+    ],
+    "what_to_do": [
+      "Dispense water, until all water in system is replenished"
+    ],
+    "response_label": "What to Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 46,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "Water in glass is warm*"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Water system has drained"
+    ],
+    "what_to_do": [
+      "Allow several hours for replenished supply to chill"
+    ],
+    "response_label": "What to Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 46,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "Water dispenser does not work*"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Water supply line turned off or not connected"
+    ],
+    "what_to_do": [
+      "See Installing the Water Line"
+    ],
+    "response_label": "What to Do",
+    "footnotes": [
+      "*Select Models Only"
+    ],
+    "text_incomplete": false,
+    "source_page": 46,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "Water dispenser does not work*"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Water filter clogged or filter/bypass plug not installed"
+    ],
+    "what_to_do": [
+      "Replace filter cartridge or remove filter and install bypass plug**"
+    ],
+    "response_label": "What to Do",
+    "footnotes": [
+      "**Some models do not come equipped with the filter bypass plug. To obtain a free bypass plug, call 800.GECARES. In Canada, call 800.561.3344."
+    ],
+    "text_incomplete": false,
+    "source_page": 46,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "Water dispenser does not work*"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Air may be trapped in the water system"
+    ],
+    "what_to_do": [
+      "Press the dispenser arm for at least 5 minutes."
+    ],
+    "response_label": "What to Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 46,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "Water dispenser does not work*"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Water in reservoir is frozen because the controls are set too cold"
+    ],
+    "what_to_do": [
+      "Set the refrigerator control to a warmer setting and wait 24 hours. If the water does not dispense after 24 hours, call for service"
+    ],
+    "response_label": "What to Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 46,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "Water spurting from dispenser*"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Newly installed filter cartridge"
+    ],
+    "what_to_do": [
+      "Run water from the dispenser for 5 minutes (about 2 gallons)"
+    ],
+    "response_label": "What to Do",
+    "footnotes": [
+      "*Select Models Only"
+    ],
+    "text_incomplete": false,
+    "source_page": 47,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "No water or ice cube production*"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Supply line or shutoff valve is clogged"
+    ],
+    "what_to_do": [
+      "Call a plumber"
+    ],
+    "response_label": "What to Do",
+    "footnotes": [
+      "*Select Models Only"
+    ],
+    "text_incomplete": false,
+    "source_page": 47,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "No water or ice cube production*"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Water filter is clogged"
+    ],
+    "what_to_do": [
+      "Replace filter cartridge or remove filter and install bypass plug**"
+    ],
+    "response_label": "What to Do",
+    "footnotes": [
+      "**Some models do not come equipped with the filter bypass plug. To obtain a free bypass plug, call 800.GECARES. In Canada, call 800.561.3344."
+    ],
+    "text_incomplete": false,
+    "source_page": 47,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "No water or ice cube production*"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Filter cartridge not properly installed"
+    ],
+    "what_to_do": [
+      "Remove and reinstall filter cartridge, being certain that it locks in place."
+    ],
+    "response_label": "What to Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 47,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "No water or ice cube production*"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Ice maker is turned off"
+    ],
+    "what_to_do": [
+      "Check that the ice maker is turned on. See About the Automatic Ice Maker."
+    ],
+    "response_label": "What to Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 47,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "Water is leaking from dispenser*"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Air may be present in the water line system, causing water to drip after being dispensed"
+    ],
+    "what_to_do": [
+      "Dispense water for at least 5 minutes to remove air from system"
+    ],
+    "response_label": "What to Do",
+    "footnotes": [
+      "*Select Models Only"
+    ],
+    "text_incomplete": false,
+    "source_page": 47,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "AUTO FILL under fill/no fill*"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Not all containers work with AUTOFILL"
+    ],
+    "what_to_do": [
+      "Try different container"
+    ],
+    "response_label": "What to Do",
+    "footnotes": [
+      "*Select Models Only"
+    ],
+    "text_incomplete": false,
+    "source_page": 47,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "AUTO FILL under fill/no fill*"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Error message"
+    ],
+    "what_to_do": [
+      "See page 14"
+    ],
+    "response_label": "What to Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 47,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "AUTO FILL under fill/no fill*"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [],
+    "what_to_do": [
+      "Clean sensor. See page 14."
+    ],
+    "response_label": "What to Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 47,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "AUTO FILL overfills*"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Not all containers work with AUTO FILL"
+    ],
+    "what_to_do": [
+      "Try different container"
+    ],
+    "response_label": "What to Do",
+    "footnotes": [
+      "*Select Models Only"
+    ],
+    "text_incomplete": false,
+    "source_page": 47,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "Freezer cooling, refrigerator not cooling"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Normal, when refrigerator first plugged in or after extended power outage"
+    ],
+    "what_to_do": [
+      "Wait 24 hours for temperature in both compartments to reach selected temperatures."
+    ],
+    "response_label": "What to Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 47,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "Ice dispenser opens after closing freezer drawer *"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Normal"
+    ],
+    "what_to_do": [
+      "The ice dispenser door may open after closing freezer door to allow access"
+    ],
+    "response_label": "What to Do",
+    "footnotes": [
+      "*Select Models Only"
+    ],
+    "text_incomplete": false,
+    "source_page": 47,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "Low brewing flow rate"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "There may have been a dent at the bottom of K-Cup causing the pin to pierce the filter allowing coffee grounds clogging the bottom pin"
+    ],
+    "what_to_do": [
+      "Avoid using damaged/dented K-cups, and clean the lower needle before next brew"
+    ],
+    "response_label": "What to Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 47,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "Low brewing flow rate / water drips from inner door"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Top needle of the brewer clogged"
+    ],
+    "what_to_do": [
+      "Unclog the top needle holes using a paper clip and rinse brewer. Rinse brewer after every use."
+    ],
+    "response_label": "What to Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 47,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "Brewer is not detected or hot water leaking from top of the brewer"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Incorrect assembly of brewer in the bracket"
+    ],
+    "what_to_do": [
+      "Make sure the Keurig Logo is in the front. Push brewer all the way in the brackets"
+    ],
+    "response_label": "What to Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 47,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "Coffee dispensed with splash or bubble bursting"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Blocked vent hole in the brewer"
+    ],
+    "what_to_do": [
+      "Make sure the vent hole at the bottom of the brewer is clear from food or any other contamination"
+    ],
+    "response_label": "What to Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 47,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "Beverage quality not as expected"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "You may be using non-standard or out dated K-Cups"
+    ],
+    "what_to_do": [
+      "Recommend using official Keurig K-cups that are not past expiration and have not been damaged"
+    ],
+    "response_label": "What to Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 48,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "Liquid drips from the brewer after brewer cycle is completed and the brewer is removed from the bracket"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "It is possible for liquids to be retained by the brewer and drip when it is removed"
+    ],
+    "what_to_do": [
+      "Use a cloth or container to capture the drips when brewer is removed"
+    ],
+    "response_label": "What to Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 48,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "Delay when using Keurig K-cup Pod dispenser"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "To ensure a quality beverage is delivered, a short delay is required to ensure the refrigerator is operating correctly"
+    ],
+    "what_to_do": [
+      "Ensuring consistent, quality operation requires the refrigerator to delay dispense for a short period of time"
+    ],
+    "response_label": "What to Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 48,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "After brewing, my powdered beverage is not fully cleared from the used pod"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Depending on size selected, the powder may not dissolve fully. Some powdered beverages develop into ‘clumps’ when left sitting for some time"
+    ],
+    "what_to_do": [
+      "Shake the powdered pods before brewing to break up these clumps and allow better clearing. For powdered beverage with no filter, use the Cocoa cycle selection"
+    ],
+    "response_label": "What to Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 48,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "Brewer lid is difficult to close"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "K-cup is not fully seated"
+    ],
+    "what_to_do": [
+      "Press K-cup all the way down into the brewer prior to closing the lid. Lower needle must puncture K-cup bfore closing the brewer lid"
+    ],
+    "response_label": "What to Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 48,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "Brewer leaks during the brew cycle"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Trouble in closing brewer lid or damaged K-cup"
+    ],
+    "what_to_do": [
+      "Press K-cup all the way down into the brewer prior to closing the lid. Lower needle must puncture K-cup before closing the brewer lid. Recommend using official Keurig K-cups that have not been damaged and have a good seal between the top cover and plastic bottom"
+    ],
+    "response_label": "What to Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 48,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "My refrigerator door squeaks"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Diminished lubricant because of accidental cleaning of the lubricant on the hinge"
+    ],
+    "what_to_do": [
+      "It is best to order GEA lubricant service part number WR97X166 and apply on the hinge at specified location. It is possible to spray some non-toxic lubricant such as silicone based non-stick cooking spray, petroleum jelly or NSF approved food grade lubricants. IMPORTANT: Do not use WD-40 as it will remove any remaining grease in or around the hinge"
+    ],
+    "response_label": "What to Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 48,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "My refrigerator door squeaks"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Improper leveling"
+    ],
+    "what_to_do": [
+      "Make sure the unit is leveled"
+    ],
+    "response_label": "What to Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 48,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gfe28gynfs-refrigerator",
+    "brand": "GE",
+    "model": "GFE28GYNFS",
+    "appliance_type": "refrigerator",
+    "symptom": [
+      "My refrigerator door squeaks"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "If doors were removed and re-assembled during installation process, waterline and/harness under Top Hinge cover may get out of position and rub against door while door swivels."
+    ],
+    "what_to_do": [
+      "Remove the Top Hinge cover and make sure the waterline and harness that passes through the hinge pin has been properly seated and does not touch the any of the door parts during rotation. Applying some food grade lubricant around door thimble area will also help."
+    ],
+    "response_label": "What to Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 48,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Small amount of water remaining in dispenser (on some models) at end of cycle"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Normal dispenser operation"
+    ],
+    "what_to_do": [
+      "It is normal for a small amount of water to remain in dispenser after the cycle."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 26,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Short spray and delay after pushing the Start button"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Lid was opened and closed between cycle selection and start"
+    ],
+    "what_to_do": [
+      "This is normal. See START-UP SEQUENCE in the Safety Instructions section."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 26,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Water level seems low"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "This is normal"
+    ],
+    "what_to_do": [
+      "Water may not cover the top level of the clothes. This is normal for this high efficiency washer."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 26,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Low water flow"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Water valve screens are stopped up"
+    ],
+    "what_to_do": [
+      "Turn off the water source and remove the water connection hoses from the upper back of the washer and the water faucets. Clean both the hose screens (if so equipped) and the screens in the machine using a brush or a toothpick. Reconnect the hoses and turn the water back on. Check to ensure there are no leaks at the connections."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 26,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Water siphoning out of washer"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Drain standpipe is too low or hose too far into standpipe"
+    ],
+    "what_to_do": [
+      "The drain hose must exceed 30” height at some point between the washer back and the drain pipe. Use anti-siphon clip. See the Installation Instructions."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 26,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Too many suds"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Soft water"
+    ],
+    "what_to_do": [
+      "Try less detergent."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 26,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Too many suds"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Too much detergent"
+    ],
+    "what_to_do": [
+      "Measure your detergent carefully. Use less soap if you have soft water, a smaller load or a lightly soiled load."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 26,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Too many suds"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Type of detergent"
+    ],
+    "what_to_do": [
+      "Switch to High Efficiency detergent such as"
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": true,
+    "source_page": 26,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Water leaks"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Type of detergent"
+    ],
+    "what_to_do": [
+      "Switch to High Efficiency detergent such as"
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": true,
+    "source_page": 26,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Water leaks"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Using too much detergent in washer"
+    ],
+    "what_to_do": [
+      "Use less detergent. Use less soap if you have soft water, a smaller load or a lightly soiled load."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 26,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Water leaks"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Fill hoses or drain hose is improperly connected"
+    ],
+    "what_to_do": [
+      "Make sure hose connections are tight at faucets and rubber washers are installed. Make sure end of drain hose is correctly inserted in and secured to drain facility."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 26,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Water leaks"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Household drain clogged"
+    ],
+    "what_to_do": [
+      "Check household plumbing. You may need to call a plumber."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 26,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Water leaks"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Drain hose rubs on wall"
+    ],
+    "what_to_do": [
+      "Make sure drain hose does not make contact with the wall. May cause excessive wear on the hose."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 26,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Water leaks"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Constant water pressure to fill hoses at water source"
+    ],
+    "what_to_do": [
+      "Tighten hoses at the faucets. Check condition of the fill hoses; they should be replaced every 5 years."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 26,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Water temperature seems incorrect"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Cooler water temperatures provide improved energy efficiency"
+    ],
+    "what_to_do": [
+      "New laundry detergents have been formulated to work with cooler water temperatures without affecting wash performance."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 26,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Water temperature seems incorrect"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Water supply is turned off or improperly connected"
+    ],
+    "what_to_do": [
+      "Turn both hot and cold faucets fully on and make sure hoses are connected to correct faucets. NOTE: Water valves are marked “H” and “C”."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 26,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Water temperature seems incorrect"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Water valve screens are stopped up"
+    ],
+    "what_to_do": [
+      "Turn off the water source and remove the water connection hoses from the upper back of the washer and the water faucets. Clean both the hose screens (if so equipped) and the screens in the machine using a brush or a toothpick. Reconnect the hoses and turn the water back on. Check to ensure there are no leaks at the connections."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 26,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Water temperature seems incorrect"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Cool/Cold Water when selecting Hot"
+    ],
+    "what_to_do": [
+      "This is normal. The washer senses water temperature (on some models) and optimizes for best results. Cold water is added periodically when hot is selected."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 26,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Water temperature seems incorrect"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "House water heater is not set properly"
+    ],
+    "what_to_do": [
+      "Make sure house water heater is delivering water at 120°F–140°F (48°C–60°C)."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 26,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Water pumped out before cycle is complete"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Water was left in unit for 24 hours with lid closed or 15 minutes with lid open"
+    ],
+    "what_to_do": [
+      "Previous cycle has been cancelled. Close lid, select new cycle, and start machine."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 26,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Water won’t drain"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Drain hose is kinked or improperly connected"
+    ],
+    "what_to_do": [
+      "Straighten drain hose and make sure washer is not sitting on it. Top of drain outlet should be less than 8 ft (2.44 m) above floor."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 26,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Washer spins and pauses at the beginning of cycles"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "This is normal"
+    ],
+    "what_to_do": [
+      "The washer is sensing the load."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 26,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Washer pauses during wash cycle"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "The Soak Option was chosen"
+    ],
+    "what_to_do": [
+      "This is normal. The washer alternates between agitate and soak during these cycles to get your clothes cleaner with less wear."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 27,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Washer pauses during wash cycle"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "This is normal"
+    ],
+    "what_to_do": [
+      "Many cycles incorporate as series of soaks within the agitation period to get your clothes clean with less wear."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 27,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Residual powder in dispenser or clogging of dispensers"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Wash water too cold or low home water pressure"
+    ],
+    "what_to_do": [
+      "Select a warmer wash temperature if possible to improve dissolving of detergent or use liquid detergent. Make sure siphon caps are free of debris and fully pressed into position. Remove and clean tray if clogging occurs."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 27,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Laundry additives dispensing too soon"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Overfilling of dispensers"
+    ],
+    "what_to_do": [
+      "Do not overfill or add water to dispenser. Select Deep Rinse option when using fabric softener."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 27,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Washer pauses during spin cycle"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "This is normal"
+    ],
+    "what_to_do": [
+      "The washer may pause during the spin cycle to remove soapy water more efficiently."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 27,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Washer won’t operate"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Washer is unplugged"
+    ],
+    "what_to_do": [
+      "Make sure cord is plugged securely into a working outlet."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 27,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Washer won’t operate"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Water supply is turned off"
+    ],
+    "what_to_do": [
+      "Turn both hot and cold faucets fully on."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 27,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Washer won’t operate"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Lid is open—safety feature prevents agitation and spinning when lid is up"
+    ],
+    "what_to_do": [
+      "Close lid and press Start."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 27,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Washer won’t operate"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Circuit breaker/fuse is tripped/blown"
+    ],
+    "what_to_do": [
+      "Check house circuit breakers/fuses. Replace fuses or reset breaker. Washer should have a separate outlet."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 27,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Washer won’t operate"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Electronics need to be reset"
+    ],
+    "what_to_do": [
+      "Unplug washer, wait 2 minutes, plug back in and press Start."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 27,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Washer won’t operate"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Start was not pressed"
+    ],
+    "what_to_do": [
+      "Press Start."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 27,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Detergent packets not dissolving"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Laundry detergent packet placed in dispenser"
+    ],
+    "what_to_do": [
+      "Laundry detergent packets should not be used in the dispensers. They should only be added directly to the wash basket following the manufacturer’s directions."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 27,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Unexplained time and/or settings changes"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Changing options (on some models)"
+    ],
+    "what_to_do": [
+      "This is normal. Several options will change other options to maximize washer performance."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 27,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Basket seems loose"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Basket moves or rotates freely"
+    ],
+    "what_to_do": [
+      "Washer basket does not have a traditional brake. Washer basket will move freely. This is normal."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 27,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Colored spots"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Incorrect use of fabric softener"
+    ],
+    "what_to_do": [
+      "Check fabric softener package for instructions and follow directions for using dispenser. Make sure you have selected the Deep Rinse option. Pretreat stain and rewash using Speed Wash cycle before drying."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 27,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Colored spots"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Dye transfer"
+    ],
+    "what_to_do": [
+      "Sort whites or lightly colored items from dark colors."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 27,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Grayed or yellowed clothes"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Detergent amount"
+    ],
+    "what_to_do": [
+      "Be sure to follow detergent manufacturer’s directions."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 27,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Grayed or yellowed clothes"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Hard water"
+    ],
+    "what_to_do": [
+      "Use a water conditioner or install a water softener."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 27,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Grayed or yellowed clothes"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Water is not hot enough"
+    ],
+    "what_to_do": [
+      "Make sure water heater is delivering water at 120°F–140°F (48°C–60°C)."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 27,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Grayed or yellowed clothes"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Washer is overloaded"
+    ],
+    "what_to_do": [
+      "Loosely load clothes no higher than the top row of holes in the washer basket. For best results, load items around the outside of the basket."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 27,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Grayed or yellowed clothes"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Dye transfer"
+    ],
+    "what_to_do": [
+      "Sort clothes by color. If fabric label states wash separately, unstable dyes may be indicated."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 27,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Lint or residue on clothes"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Clothes are air or line dried"
+    ],
+    "what_to_do": [
+      "If you do not dry your clothes with a clothes dryer, your clothes may retain more lint."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 27,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Lint or residue on clothes"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Incorrect sorting"
+    ],
+    "what_to_do": [
+      "Separate lint producers from lint collectors."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 27,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Lint or residue on clothes"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Washing too long"
+    ],
+    "what_to_do": [
+      "Wash small loads for a shorter time using Light Soil setting."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 27,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Lint or residue on clothes"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Detergent not dissolving"
+    ],
+    "what_to_do": [
+      "Rewash, next time: Try a liquid detergent; Use warmer water temperature."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 27,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Lint or residue on clothes"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Overloading"
+    ],
+    "what_to_do": [
+      "Loosely load clothes in the washer basket. For best results, load items around the outside of the basket."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 27,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Lint or residue on clothes"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Incorrect use of fabric softener"
+    ],
+    "what_to_do": [
+      "Check fabric softener package for instructions and follow directions for using dispenser. Make sure you have selected the Deep Rinse option."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 27,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Clothes too wet"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "No spin selected"
+    ],
+    "what_to_do": [
+      "Select a spin option."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 28,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Clothes too wet"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Incorrect cycle selected"
+    ],
+    "what_to_do": [
+      "Make sure the cycle selected matches the load you are washing.",
+      "Some fabrics will feel wetter when rinsed with cold water."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 28,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Clothes too wet"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Wash load out of balance"
+    ],
+    "what_to_do": [
+      "Redistribute load in washer and run through Drain & Spin cycle."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 28,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Blinking Spin light",
+      "or Spin light on at end of cycle"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Out of balance condition has been detected"
+    ],
+    "what_to_do": [
+      "Allow cycle to continue and finish.",
+      "If load is wet at the end of the cycle, even out load and run a Drain & Spin cycle."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 28,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Pilling"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Result of normal wear on poly-cotton blends and fuzzy fabrics"
+    ],
+    "what_to_do": [
+      "While this is not caused by the washer, you can slow the pilling process by washing garments inside out."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 28,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Snags, holes, tears, rips or excessive wear"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Pins, snaps, hooks, sharp buttons, belt buckles, zippers and sharp objects left in pockets"
+    ],
+    "what_to_do": [
+      "Fasten snaps, hooks, buttons and zippers.",
+      "Remove loose items like pins, objects in pockets and sharp buttons.",
+      "Turn knits (which snag easily) inside out."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 28,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Snags, holes, tears, rips or excessive wear"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Undiluted chlorine bleach"
+    ],
+    "what_to_do": [
+      "Check bleach package instructions for proper amount.",
+      "Never add undiluted bleach to wash or allow clothes to come in contact with undiluted bleach."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 28,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Snags, holes, tears, rips or excessive wear"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Chemicals like hair bleach or dye, permanent wave solution"
+    ],
+    "what_to_do": [
+      "Rinse items that may have chemicals on them before washing.",
+      "Use Speed Wash cycle with Extra Rinse option."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 28,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Wrinkling"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Incorrect wash and dry cycles"
+    ],
+    "what_to_do": [
+      "Match Cycle selection to the type of fabric you are washing (especially for easy care loads)."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 28,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Wrinkling"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Improper sorting"
+    ],
+    "what_to_do": [
+      "Avoid mixing heavy items (like jeans) with light items (like blouses).",
+      "Try a fabric softener."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 28,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Wrinkling"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Overloading"
+    ],
+    "what_to_do": [
+      "Loosely load clothes in the washer basket."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 28,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Wrinkling"
+    ],
+    "symptom_label": "Problem",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Repeated washing in water that is too hot"
+    ],
+    "what_to_do": [
+      "Wash in warm or cold water."
+    ],
+    "response_label": "What To Do",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 28,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "“Clicking”"
+    ],
+    "symptom_label": "Sounds",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Shifter mechanism is engaging or disengaging"
+    ],
+    "what_to_do": [
+      "The drive system will engage at the start of agitate and disengage when agitate is complete. This occurs multiple times during the wash."
+    ],
+    "response_label": "Reason",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 28,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Back and forth",
+      "“swoosh”"
+    ],
+    "symptom_label": "Sounds",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Electric motor reversing direction"
+    ],
+    "what_to_do": [
+      "This sound is the motor rotating back and forth to clean your laundry."
+    ],
+    "response_label": "Reason",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 28,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "“Clicking” behind",
+      "Control during fill"
+    ],
+    "symptom_label": "Sounds",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Automatic Temperature Control Valve"
+    ],
+    "what_to_do": [
+      "Two valves mix cold and hot water. The “clicking” is when either valve turns on or off to raise or lower the fill water temperature."
+    ],
+    "response_label": "Reason",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 28,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Water flow changes during fill"
+    ],
+    "symptom_label": "Sounds",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Automatic Temperature Control Valve"
+    ],
+    "what_to_do": [
+      "Two valves mix cold and hot water. The “clicking” is when either valve turns on or off to raise or lower the fill water temperature."
+    ],
+    "response_label": "Reason",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 28,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Motor sounds during spin"
+    ],
+    "symptom_label": "Sounds",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Motor ramping up/down during spin cycle"
+    ],
+    "what_to_do": [
+      "The motor will speed up incrementally during the spin cycle. When spin is complete, it will coast until it stops."
+    ],
+    "response_label": "Reason",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 28,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "“Humming”"
+    ],
+    "symptom_label": "Sounds",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Water drain pump"
+    ],
+    "what_to_do": [
+      "The drain pump will make a humming sound when pumping out water after agitation stops and continue until spin is complete."
+    ],
+    "response_label": "Reason",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 28,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "“Humming”"
+    ],
+    "symptom_label": "Sounds",
+    "symptom_continued": true,
+    "possible_causes": [
+      "Drive motor"
+    ],
+    "what_to_do": [
+      "The drive motor will make a “humming” sound during the wash and spin phases of the cycle."
+    ],
+    "response_label": "Reason",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 28,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "“Gurgling”"
+    ],
+    "symptom_label": "Sounds",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Water drain pump"
+    ],
+    "what_to_do": [
+      "When the pump starts drawing in air, It starts to gurgle. The washer should then begin spinning and the sound will continue until it is done spinning."
+    ],
+    "response_label": "Reason",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 28,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Water “swishing”"
+    ],
+    "symptom_label": "Sounds",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Washing process"
+    ],
+    "what_to_do": [
+      "Water swishing while the unit is agitating is normal, especially with smaller loads."
+    ],
+    "response_label": "Reason",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 28,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "Washer rocking/ moving"
+    ],
+    "symptom_label": "Sounds",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Washer leveling legs uneven"
+    ],
+    "what_to_do": [
+      "To level the washer, adjust the leveling legs by rotating the individual leg in the proper direction for up or down."
+    ],
+    "response_label": "Reason",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 28,
+    "source_section": "Troubleshooting Tips"
+  },
+  {
+    "manual_id": "ge-gtw680bsjws-washer",
+    "brand": "GE",
+    "model": "GTW680BSJWS",
+    "appliance_type": "washing_machine",
+    "symptom": [
+      "“Squeaking” sound"
+    ],
+    "symptom_label": "Sounds",
+    "symptom_continued": false,
+    "possible_causes": [
+      "Washer not level and rubbing on cabinet"
+    ],
+    "what_to_do": [
+      "To level the washer, adjust the leveling legs by rotating the individual leg in the proper direction for up or down."
+    ],
+    "response_label": "Reason",
+    "footnotes": [],
+    "text_incomplete": false,
+    "source_page": 28,
+    "source_section": "Troubleshooting Tips"
+  }
+]
