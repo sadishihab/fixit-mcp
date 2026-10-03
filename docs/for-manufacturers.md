@@ -4,7 +4,7 @@ This guide is for an appliance manufacturer, or a developer working for one, who
 wants to try FixIt on **its own manuals** and, eventually, ship its own support
 add-on for a voice assistant.
 
-Read this first: FixIt is a hackathon project (release 0.2.0), not a finished
+Read this first: FixIt is a hackathon project (release 0.3.0), not a finished
 product or a service. It works end to end on seven real manuals (error codes from
 five of them, troubleshooting-table rows from two) and a simulated assistant, and
 this page says plainly what that does and does not cover. The code is

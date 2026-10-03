@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-03
+
+Adds a public container image on GitHub Container Registry that serves the six tools with no AWS
+account, an MCP Apps visual card for `diagnose_symptom`, and a `diagnose_symptom` matcher that
+understands more everyday phrasings and gives fewer wrong answers.
+
 ### Added
 
 - **A public container image on GitHub Container Registry**, `ghcr.io/sadishihab/fixit-mcp`, so `docker run -p 8000:8000 ghcr.io/sadishihab/fixit-mcp:latest` serves the six tools with no AWS account (SQLite household store, demo households seeded, non-root, `0.0.0.0:8000/mcp`; `linux/amd64` and `linux/arm64`). `.github/workflows/image.yml` publishes it only when a version tag (`v*`) is pushed, using the built-in `GITHUB_TOKEN` and nothing else, and only after a smoke job has started the amd64 image and run `scripts/smoke_test.py` against it. "Run workflow" builds and smoke-tests both architectures without pushing. The Dockerfile and the AgentCore deployment path are unchanged.
@@ -229,6 +235,7 @@ Developer Hackathon*.
 - A new manual reaches the deployed server only after an image rebuild and runtime update.
 - Not built: OAuth account linking, parts ordering, maintenance scheduling.
 
-[Unreleased]: https://github.com/sadishihab/fixit-mcp/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/sadishihab/fixit-mcp/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/sadishihab/fixit-mcp/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/sadishihab/fixit-mcp/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/sadishihab/fixit-mcp/releases/tag/v0.1.0
