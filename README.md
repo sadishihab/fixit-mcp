@@ -162,7 +162,7 @@ full requirements checklist and [`CLAUDE.md`](CLAUDE.md) for the architecture.
 
 ## Demo video
 
-TODO: link once recorded.
+Watch the demo video: <https://youtu.be/EbuSbJQJrXQ>
 
 ## Architecture
 
